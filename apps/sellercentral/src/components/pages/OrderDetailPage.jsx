@@ -16,6 +16,7 @@ import { getUI } from "@/lib/ui-strings";
 import { statusLabel } from "@/lib/status-labels";
 import { userError } from "@/lib/api-error-messages";
 import { getOrderDetailCopy } from "@/lib/order-detail-i18n";
+import { ScPageHeader, ScStatusPill } from "@/components/sc/ScPage";
 
 function fmtCents(c, locale) {
   const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
@@ -71,8 +72,8 @@ function Badge({ value, locale }) {
 
 function Section({ title, children }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, padding: 20, marginBottom: 16 }}>
-      {title && <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "#1d1b18" }}>{title}</h3>}
+    <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 20, padding: 20, marginBottom: 16 }}>
+      {title && <h3 style={{ margin: "0 0 14px", fontFamily: '"Bricolage Grotesque", Georgia, serif', fontSize: 17, fontWeight: 700, color: "#1d1b18" }}>{title}</h3>}
       {children}
     </div>
   );
@@ -297,46 +298,29 @@ export default function OrderDetailPage() {
   };
 
   return (
-    <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: "wrap",
-          width: "100%",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0 }}>
-          <Button onClick={() => router.push("/orders")}>← {ui.orders}</Button>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            {c.orderTitle} #{order?.order_number || "—"}
-          </h1>
-          <span style={{ fontSize: 12, color: "#a39a8d" }}>{fmtDate(order?.created_at)}</span>
-        </div>
-        {order?.id && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              alignItems: "center",
-              justifyContent: "flex-end",
-              flexShrink: 0,
-            }}
-          >
+    <div style={{ padding: "8px 0 24px", background: "transparent", minHeight: "100%" }}>
+      {/* Header (Konsept s41): breadcrumb, title + status pills, actions */}
+      <ScPageHeader
+        breadcrumb={[{ label: ui.orders, href: "/orders" }, { label: `#${order?.order_number || "—"}` }]}
+        title={`${c.orderTitle} #${order?.order_number || "—"}`}
+        badge={order ? (
+          <span style={{ display: "inline-flex", gap: 6 }}>
+            {order.payment_status && <ScStatusPill status={order.payment_status} label={statusLabel(locale, order.payment_status)} />}
+            {order.delivery_status && <ScStatusPill status={order.delivery_status} label={statusLabel(locale, order.delivery_status)} />}
+          </span>
+        ) : null}
+        subtitle={fmtDate(order?.created_at)}
+        actions={order?.id ? (
+          <>
             <Button url={getOrderPdfDownloadUrl(order.id, "invoice", locale)} external variant="secondary">
               {ui.invoice}
             </Button>
             <Button url={getOrderPdfDownloadUrl(order.id, "lieferschein", locale)} external variant="secondary">
               {ui.deliveryNote}
             </Button>
-          </div>
-        )}
-      </div>
+          </>
+        ) : null}
+      />
 
       {error && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#b91c1c", marginBottom: 16, fontSize: 13 }}>

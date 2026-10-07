@@ -21,6 +21,7 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import { computeGrundpreis } from "@/lib/grundpreis";
+import RatingDistribution from "@/components/product/RatingDistribution";
 import { EnergyClassBadge, LegalGroupTabs, SafetyResources, legalGroups } from "@/components/product/PdpCompliance";
 import { useMetafieldDefinitions, metafieldTitle, metafieldValue, mergeMetafieldRows } from "@/lib/metafield-definitions";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -2137,6 +2138,7 @@ export default function ProductTemplate() {
             {tp("reviewsDisclaimer")}
           </p>
           <PdpReviewSummary average={reviewAvg} count={reviewCount} reviews={productReviews} />
+          <RatingDistribution reviews={productReviews} locale={locale} />
           {productReviews.length > 0 ? (
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
               {productReviews.map((rv) => (

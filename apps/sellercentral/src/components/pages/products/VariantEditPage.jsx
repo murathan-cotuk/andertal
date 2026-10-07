@@ -791,10 +791,18 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       )}
 
       <div className="product-edit-header">
-        <span className="product-edit-title-link" style={{ cursor: "default" }}>
-          <span style={{ display: "flex", width: 20, height: 20 }}><ProductIcon /></span>
-          <span className="product-edit-name">{displayTitle || variantSummary || product?.title || t("Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt")}</span>
-        </span>
+        <div style={{ minWidth: 0 }}>
+          <div className="product-edit-crumb" style={{ fontSize: 12, color: "#5e574e", marginBottom: 2 }}>
+            <Link href="/products/inventory" style={{ color: "#5e574e" }}>{t("Products", "Ürünler", "Produits", "Productos", "Prodotti", "Produkte")}</Link>
+            <span style={{ margin: "0 4px", color: "#a39a8d" }}>›</span>
+            <Link href={`/products/${idOrHandle}`} style={{ color: "#5e574e" }}>{product?.title || t("Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt")}</Link>
+            <span style={{ margin: "0 4px", color: "#a39a8d" }}>›</span>
+            {t("Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}
+          </div>
+          <h1 className="product-edit-name" style={{ margin: 0, fontFamily: '"Bricolage Grotesque", Georgia, serif', fontSize: 26, lineHeight: 1.15, fontWeight: 700, color: "#1d1b18" }}>
+            {displayTitle || variantSummary || product?.title || t("Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt")}
+          </h1>
+        </div>
         <Text as="span" variant="bodySm" tone="subdued">
           {variantSummary}
         </Text>

@@ -55,10 +55,9 @@ function KpiCard({ icon, label, value, sub, accent = "#ee8a12", onClick }) {
     <div
       style={{
         background: "#fff",
-        borderRadius: 12,
-        padding: "18px 20px",
+        borderRadius: 16,
+        padding: "16px 18px",
         border: "1px solid #e6dfd4",
-        borderLeft: `4px solid ${accent}`,
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         height: "100%",
         boxSizing: "border-box",
@@ -76,16 +75,13 @@ function KpiCard({ icon, label, value, sub, accent = "#ee8a12", onClick }) {
         e.currentTarget.style.transform = "none";
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          {label}
-        </div>
-        <span style={{ fontSize: 20, lineHeight: 1 }}>{icon}</span>
+      <div style={{ fontSize: 13, color: "#5e574e" }}>
+        {label}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: "#1d1b18", marginTop: 8, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ fontFamily: '"Bricolage Grotesque", Georgia, serif', fontSize: 28, fontWeight: 700, color: "#1d1b18", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#5e574e", marginTop: 4 }}>{sub}</div>}
     </div>
   );
   if (onClick) {
@@ -312,7 +308,7 @@ export default function DashboardHome() {
 
   return (
     <Page
-      title={t("Dashboard", "Kontrol paneli", "Tableau de bord", "Panel", "Dashboard", "Dashboard")}
+      title=""
       primaryAction={{ content: t("Add product", "Ürün ekle", "Ajouter produit", "Agregar producto", "Aggiungi prodotto", "Produkt anlegen"), onAction: () => router.push("/products/single-upload") }}
       secondaryActions={[{ content: ui.orders, onAction: () => router.push("/orders") }]}
     >
@@ -324,8 +320,11 @@ export default function DashboardHome() {
 
       <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#1d1b18" }}>{greeting}</h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#5e574e" }}>
+          <div style={{ fontSize: 13, color: "#5e574e" }}>{greeting}</div>
+          <h1 style={{ margin: "0 0 2px", fontFamily: '"Bricolage Grotesque", Georgia, serif', fontSize: 28, fontWeight: 700, color: "#1d1b18", letterSpacing: "-0.01em" }}>
+            {t("Overview", "Genel bakış", "Vue d'ensemble", "Resumen", "Panoramica", "Übersicht")}
+          </h1>
+          <p style={{ margin: 0, fontSize: 13, color: "#5e574e" }}>
             {new Date().toLocaleDateString(
               locale === "de" ? "de-DE" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "en-GB",
               { weekday: "long", day: "numeric", month: "long", year: "numeric" }
@@ -384,7 +383,7 @@ export default function DashboardHome() {
       {/* Charts row */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "stretch" }}>
         <Panel title={t("Revenue · Daily", "Ciro · Günlük", "Revenus · Quotidien", "Ingresos · Diario", "Fatturato · Giornaliero", "Umsatz · Tagesverlauf")} subtitle={periodLabel}>
-          <RevenueAreaChart data={chartData} accent="#ee8a12" height={220} />
+          <RevenueAreaChart data={chartData} accent="#ee8a12" height={220} variant="bars" />
         </Panel>
         <Panel title={t("Order status", "Sipariş durumu", "Statut des commandes", "Estado de pedidos", "Stato ordini", "Bestellstatus")} subtitle={periodLabel}>
           <StatusBars counts={statusCounts} locale={locale} />

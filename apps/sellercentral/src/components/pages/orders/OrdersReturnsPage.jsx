@@ -8,6 +8,7 @@ import { statusLabel as localizeStatus } from "@/lib/status-labels";
 import { returnSlipFilename } from "@/lib/download-names";
 import { getOrdersReturnsCopy } from "@/lib/orders-returns-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { ScPageHeader, ScTabs, ScKpiTiles } from "@/components/sc/ScPage";
 
 /* ───────── helpers ───────── */
 function fmtDate(d, locale) {
@@ -658,52 +659,37 @@ export default function OrdersReturnsPage() {
 
   return (
     <div style={{ padding: "1rem 0 1.5rem" }}>
-      {/* Header */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.75rem" }}>
-        <div>
-          <h1 style={{ fontSize: "1.125rem", fontWeight: 650, margin: 0, color: "#1d1b18" }}>{c.pageTitle}</h1>
-          <p style={{ fontSize: "0.75rem", color: "#5e574e", margin: "0.125rem 0 0" }}>{c.pageSubtitle}</p>
-        </div>
-        <button
-          onClick={() => setShowNew(true)}
-          style={{ padding: "0.375rem 0.875rem", background: "#1d1b18", color: "#fff", border: "none", borderRadius: "0.4375rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: 600 }}
-        >
-          + {c.newReturn}
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", marginBottom: "0.5rem" }}>
-        {[
-          { label: c.statTotal, value: returns.length, color: "#111" },
-          { label: c.filterOpen, value: counts.offen || 0, color: "#c2410c" },
-          { label: c.filterApproved, value: counts.genehmigt || 0, color: "#15803d" },
-          { label: c.statRefunded, value: fmtMoney(totalRefunded, locale), color: "#7f3f00" },
-        ].map(s => (
-          <div key={s.label} style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: "0.625rem", padding: "0.5rem 0.75rem" }}>
-            <div style={{ fontSize: "0.6875rem", color: "#a39a8d", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</div>
-            <div style={{ fontSize: "1.125rem", fontWeight: 700, color: s.color, marginTop: "0.125rem" }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Status pills — same visual language as Orders (compact, bordered pill row) */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem", padding: "0.3125rem 0.5rem", marginBottom: "0.5rem", background: "#fff", border: "1px solid #e6dfd4", borderRadius: "0.5rem" }}>
-        {["alle", "offen", "genehmigt", "eingegangen", "abgelehnt", "abgeschlossen"].map(s => (
+      <ScPageHeader
+        breadcrumb={[{ label: ui.orders || lt(locale, "Orders", "Siparişler", "Commandes", "Pedidos", "Ordini", "Bestellungen"), href: "/orders" }]}
+        title={c.pageTitle}
+        subtitle={c.pageSubtitle}
+        actions={
           <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            style={{
-              height: "1.75rem", padding: "0 0.625rem", borderRadius: "0.375rem", fontSize: "0.75rem", cursor: "pointer", fontWeight: filterStatus === s ? 650 : 500,
-              background: filterStatus === s ? "#1d1b18" : "#fff",
-              color: filterStatus === s ? "#fff" : "#3a352f",
-              border: filterStatus === s ? "none" : "1px solid #d6ccbd",
-            }}
+            onClick={() => setShowNew(true)}
+            style={{ height: 34, padding: "0 16px", background: "#1d1b18", color: "#fff", border: "none", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
           >
-            {filterPillLabels[s]} {s !== "alle" && counts[s] ? `(${counts[s]})` : ""}
+            + {c.newReturn}
           </button>
-        ))}
-      </div>
+        }
+      />
+
+      <ScKpiTiles items={[
+        { label: c.statTotal, value: returns.length, onClick: () => setFilterStatus("alle") },
+        { label: c.filterOpen, value: counts.offen || 0, hintTone: "warn", onClick: () => setFilterStatus("offen") },
+        { label: c.filterApproved, value: counts.genehmigt || 0, onClick: () => setFilterStatus("genehmigt") },
+        { label: c.statRefunded, value: fmtMoney(totalRefunded, locale) },
+      ]} />
+
+      {/* Status tabs with counts (Konsept s42) */}
+      <ScTabs
+        tabs={["alle", "offen", "genehmigt", "eingegangen", "abgeschlossen", "abgelehnt"].map((st) => ({
+          id: st,
+          label: filterPillLabels[st],
+          count: st === "alle" ? returns.length : (counts[st] || undefined),
+        }))}
+        selected={filterStatus}
+        onSelect={setFilterStatus}
+      />
 
       {/* Search / date range / sort — same filter-bar language as Orders */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem", padding: "0.3125rem 0.5rem", marginBottom: "0.5rem", background: "#fff", border: "1px solid #e6dfd4", borderRadius: "0.5rem" }}>

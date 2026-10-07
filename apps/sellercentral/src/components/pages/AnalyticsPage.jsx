@@ -845,6 +845,7 @@ export default function AnalyticsPage() {
                   data={chartData}
                   accent={BRAND}
                   height={240}
+                  variant="bars"
                   showClicksLine={hasMarketingData && (marketingTotals.clicks || 0) > 0}
                 />
               </BlockStack>

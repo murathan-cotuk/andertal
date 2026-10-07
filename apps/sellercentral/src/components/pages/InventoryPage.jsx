@@ -41,6 +41,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { SettingsIcon } from "@shopify/polaris-icons";
 
 import { confirmRemoval } from "@/lib/confirm-delete";
+import { ScPageHeader, ScTabs, ScBulkBar } from "@/components/sc/ScPage";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
 const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
 const EXCEL_BORDER = "1px solid #e6dfd4";
@@ -53,29 +54,6 @@ const InvPageContainer = styled.div`
   padding: 4px 0 16px;
   min-height: 100%;
   background: transparent;
-`;
-
-const InvPageHeader = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-`;
-
-const InvPageTitle = styled.h1`
-  font-size: 18px;
-  font-weight: 650;
-  margin: 0;
-  color: #1d1b18;
-`;
-
-const InvHeaderMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
 `;
 
 const InvFilterBar = styled.div`
@@ -140,18 +118,6 @@ const InvTableCard = styled.div`
   background: #fff;
   border-radius: 8px;
   border: 1px solid #e6dfd4;
-`;
-
-const InvBulkBar = styled.div`
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 5px 10px;
-  margin-bottom: 8px;
-  background: #faf7f2;
-  border: 1px solid #fcebd5;
-  border-radius: 8px;
 `;
 
 const InvSectionLabel = styled.div`
@@ -2490,10 +2456,11 @@ export default function InventoryPage() {
 
   return (
     <InvPageContainer>
-      <InvPageHeader>
-        <InvPageTitle>{invTitle}</InvPageTitle>
-        <InvHeaderMeta>
-          <span style={{ fontSize: 12, color: "#5e574e" }}>{totalCount} {productsWord}</span>
+      <ScPageHeader
+        breadcrumb={[{ label: lt(locale, "Products", "Ürünler", "Produits", "Productos", "Prodotti", "Produkte") }]}
+        title={invTitle}
+        subtitle={`${totalCount} ${productsWord}`}
+        actions={<>
           {isSuperuser && (
             <Button
               size="slim"
@@ -2513,8 +2480,8 @@ export default function InventoryPage() {
             {lt(locale, "Group products", "Ürünleri grupla", "Grouper les produits", "Agrupar productos", "Raggruppa prodotti", "Produkte gruppieren")}
           </Button>
           <Button variant="primary" size="slim" onClick={() => router.push("/products/new")}>{addProductLabel}</Button>
-        </InvHeaderMeta>
-      </InvPageHeader>
+        </>}
+      />
 
       {error && (
         <div style={{ marginBottom: 8 }}>
@@ -2543,10 +2510,7 @@ export default function InventoryPage() {
       )}
 
       {selectedCount > 0 && (
-        <InvBulkBar>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#7f3f00" }}>
-            {selectedCount} {lt(locale, "selected", "seçili", "sélectionné(s)", "seleccionado(s)", "selezionato/i", "ausgewählt")}
-          </span>
+        <ScBulkBar label={`${selectedCount} ${lt(locale, "selected", "seçili", "sélectionné(s)", "seleccionado(s)", "selezionato/i", "ausgewählt")}`}>
           <InlineStack gap="200" wrap blockAlign="center">
             {canCombineSelection && (
               <Button size="slim" onClick={openCombineModal}>
@@ -2567,9 +2531,15 @@ export default function InventoryPage() {
               {lt(locale, "Clear selection", "Seçimi temizle", "Effacer la sélection", "Borrar selección", "Cancella selezione", "Auswahl aufheben")}
             </Button>
           </InlineStack>
-        </InvBulkBar>
+        </ScBulkBar>
       )}
 
+      {/* Status tabs (Konsept s32/s33) replace the status dropdown */}
+      <ScTabs
+        tabs={statusOptions.map((o) => ({ id: o.value, label: o.value === "all" ? lt(locale, "All", "Tümü", "Tous", "Todos", "Tutti", "Alle") : o.label, count: o.value === statusFilter ? totalCount : undefined }))}
+        selected={statusFilter}
+        onSelect={setStatusFilter}
+      />
       <InvFilterBar>
         <InvFilterInput
           placeholder={lt(locale, "Search products (name, SKU, EAN, variation)…", "Ürün ara (isim, sku, ean, varyasyon)…", "Rechercher produits (nom, SKU, EAN, variation)…", "Buscar productos (nombre, SKU, EAN, variación)…", "Cerca prodotti (nome, SKU, EAN, variazione)…", "Produkte suchen (Name, SKU, EAN, Variation)…")}
@@ -2577,9 +2547,6 @@ export default function InventoryPage() {
           onChange={(e) => setProductSearch(e.target.value)}
           aria-label="Search products"
         />
-        <InvFilterSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
-          {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </InvFilterSelect>
         <InvFilterSelect value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} aria-label="Sort">
           {sortOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </InvFilterSelect>

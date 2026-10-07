@@ -80,8 +80,8 @@ Kullanıcı talimatı: Faz A–D sırayla; `docs/CONNECTOR.md` ile bağlantılı
 ### Andertal Shop-SC Konsept.pdf
 
 Kaynak: `docs/designs/claude-frontendfigma/Andertal Shop-SC Konsept.pdf`.
-- [ ] Shop sayfaları tek tek PDF ile karşılaştırılır; yapılmış / eksik listesi `ILERLEME.md`'ye yazılır. (Kural: istenmeden shop görünümü değiştirilmez — eksikler PDF'teki tasarım olduğu için uygulanır, sonucu kullanıcıya listelenir.)
-- [ ] PDF'in sonundaki Sellercentral tasarımları uygulanır (yoğun tablo tercihi korunur).
+- [x] Shop sayfaları tek tek PDF ile karşılaştırılır; yapılmış / eksik listesi `ILERLEME.md`'ye yazılır. (Kural: istenmeden shop görünümü değiştirilmez — eksikler PDF'teki tasarım olduğu için uygulanır, sonucu kullanıcıya listelenir.)
+- [~] PDF'in sonundaki Sellercentral tasarımları uygulanır — kabuk, liste şablonu (Envanter/Bestellungen/Retouren), Bestellung detayı, ürün/varyant başlıkları, Übersicht + Berichte yapıldı; kalan: mobil SC (s36/37), ürün düzenlemede dil hapları + pazar fiyat tablosu + yapışkan kaydet çubuğu (onay gerekir), PDP teslim tarihi tahmini (veri modeli). Ayrıntı: ILERLEME.md (yoğun tablo tercihi korunur).
 
 ## Fonksiyon bazlı iyileştirme programı (2026-10-07)
 

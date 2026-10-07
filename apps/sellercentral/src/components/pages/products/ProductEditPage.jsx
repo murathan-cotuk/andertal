@@ -32,6 +32,8 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
+import { ScStatusPill } from "@/components/sc/ScPage";
+import { productStatusLabel, normalizeProductStatus } from "@/lib/product-status-labels";
 import {
   shopVisibilityBannerTitle,
   shopVisibilityHiddenReasons,
@@ -593,6 +595,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [categories, setCategories] = useState([]);
   const [collections, setCollections] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [brandsLoaded, setBrandsLoaded] = useState(false);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [mediaDragIndex, setMediaDragIndex] = useState(null);
   const [mediaDragOverIndex, setMediaDragOverIndex] = useState(null);
@@ -923,17 +926,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   // Load categories, collections, brands in parallel so the page feels faster
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      client.getAdminHubCategories().then((r) => r.categories || []).catch(() => []),
-      client.getMedusaCollections({ adminHub: true }).then((r) => r.collections || []).catch(() => []),
-      client.getBrands().then((r) => r.brands || []).catch(() => []),
-    ]).then(([categoriesList, collectionsList, brandsList]) => {
-      if (!cancelled) {
-        setCategories(categoriesList);
-        setCollections(collectionsList);
-        setBrands(brandsList);
-      }
-    });
+    // Independent loads: the large category tree must not hold back brands / collections
+    // (the locked brand field used to show the raw brand UUID until all categories arrived).
+    client.getAdminHubCategories().then((r) => r.categories || []).catch(() => []).then((list) => { if (!cancelled) setCategories(list); });
+    client.getMedusaCollections({ adminHub: true }).then((r) => r.collections || []).catch(() => []).then((list) => { if (!cancelled) setCollections(list); });
+    client.getBrands().then((r) => r.brands || []).catch(() => []).then((list) => { if (!cancelled) { setBrands(list); setBrandsLoaded(true); } });
     return () => { cancelled = true; };
   }, [client]);
 
@@ -2741,10 +2738,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   return (
     <Page title="">
       <style>{`
-        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--p-color-border); }
+        .product-edit-header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin: 4px 0 14px; }
+        .product-edit-header .product-edit-crumb { font-size: 12px; color: #5e574e; margin-bottom: 2px; }
+        .product-edit-header .product-edit-crumb a { color: #5e574e; text-decoration: none; }
         .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
         .product-edit-header .product-edit-title-link:hover { color: var(--p-color-text); }
-        .product-edit-header .product-edit-name { margin: 0; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; }
+        .product-edit-header .product-edit-name { margin: 0; font-family: "Bricolage Grotesque", Georgia, serif; font-size: 26px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; color: #1d1b18; }
         ${PRODUCT_SECTION_STYLES}
         .product-edit-label { font-size: 0.8125rem; font-weight: 500; color: var(--p-color-text); margin-bottom: 6px; }
         .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 12px; align-items: start; }
@@ -3246,10 +3245,19 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       )}
 
       <div className="product-edit-header">
-        <Link href="/products/inventory" className="product-edit-title-link" style={{ marginRight: 4 }}>
-          <span style={{ display: "flex", alignItems: "center", width: 20, height: 20 }}><ProductIcon /></span>
-          <span className="product-edit-name">{isNew ? pe.newProduct : (product?.title || pe.productFallback)}</span>
-        </Link>
+        <div style={{ minWidth: 0, marginRight: 4 }}>
+          <div className="product-edit-crumb">
+            <Link href="/products/inventory">{lt(locale, "Products", "Ürünler", "Produits", "Productos", "Prodotti", "Produkte")}</Link>
+            <span style={{ margin: "0 4px", color: "#a39a8d" }}>›</span>
+            {isNew ? pe.newProduct : lt(locale, "Edit", "Düzenle", "Modifier", "Editar", "Modifica", "Bearbeiten")}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h1 className="product-edit-name">{isNew ? pe.newProduct : (product?.title || pe.productFallback)}</h1>
+            {!isNew && product?.status && (
+              <ScStatusPill status={normalizeProductStatus(product.status)} label={productStatusLabel(locale, product.status)} />
+            )}
+          </div>
+        </div>
         <span style={{ flex: 1 }} />
         {!isNew && isSuperuser && (
           <Button size="slim" onClick={openCommissionModal}>
@@ -3783,7 +3791,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 {brandLocked ? (
                   <TextField
                     label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                    value={brandSummaryLabel || getMeta(product, "brand_id") || "—"}
+                    value={brandSummaryLabel || (brandsLoaded ? getMeta(product, "brand_id") || "—" : "…")}
                     disabled
                     autoComplete="off"
                     helpText={

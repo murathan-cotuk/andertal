@@ -24,7 +24,10 @@ export default function RevenueAreaChart({
   accent = DEFAULT_ACCENT,
   emptyLabel,
   showClicksLine = false,
+  // "bars" (Konsept s5/s43): beige daily bars, the latest day in the accent colour.
+  variant = "area",
 }) {
+  const bars = variant === "bars";
   const locale = useLocale();
   const lt = useLt();
   const dateLoc = dateLocaleFor(locale);
@@ -81,12 +84,12 @@ export default function RevenueAreaChart({
     if (n === 0) return [];
     const step = n > 1 ? chartW / (n - 1) : 0;
     return data.map((d, i) => {
-      const x = n === 1 ? padL + chartW / 2 : padL + i * step;
+      const x = bars ? padL + ((i + 0.5) * chartW) / n : (n === 1 ? padL + chartW / 2 : padL + i * step);
       const y = padT + chartH - (d.revenue / maxRevenue) * chartH;
       const clicksY = padT + chartH - ((d.clicks || 0) / maxClicks) * chartH * 0.45;
       return { ...d, x, y, clicksY, i };
     });
-  }, [data, chartW, chartH, maxRevenue, maxClicks, padL, padT]);
+  }, [data, chartW, chartH, maxRevenue, maxClicks, padL, padT, bars]);
 
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
@@ -137,10 +140,10 @@ export default function RevenueAreaChart({
           <span style={{ width: 16, height: 3, background: accent, borderRadius: 2 }} />
           {lt("Revenue", "Gelir", "Chiffre d'affaires", "Ingresos", "Ricavi", "Umsatz")}
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {!bars && <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 16, height: 0, borderTop: `2px dashed ${accent}` }} />
           {lt("Trend", "Trend", "Tendance", "Tendencia", "Andamento", "Verlauf")}
-        </span>
+        </span>}
         {showClicksLine && (
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 16, height: 0, borderTop: "2px solid #6366f1" }} />
@@ -176,15 +179,31 @@ export default function RevenueAreaChart({
           );
         })}
 
-        <path d={areaPath} fill={accent} fillOpacity={0.14} />
-        <path
+        {bars && points.map((p) => {
+          const bw = Math.max(4, Math.min(34, (chartW / points.length) * 0.62));
+          const top = Math.min(p.y, padT + chartH - (p.revenue > 0 ? 2 : 0));
+          const last = p.i === points.length - 1;
+          return (
+            <rect
+              key={`bar-${p.key}`}
+              x={p.x - bw / 2}
+              y={top}
+              width={bw}
+              height={Math.max(0, padT + chartH - top)}
+              rx={3}
+              fill={last || hoverIdx === p.i ? accent : "#e8dccb"}
+            />
+          );
+        })}
+        {!bars && <path d={areaPath} fill={accent} fillOpacity={0.14} />}
+        {!bars && <path
           d={linePath}
           fill="none"
           stroke={accent}
           strokeWidth={2.5}
           strokeLinejoin="round"
           strokeLinecap="round"
-        />
+        />}
         {showClicksLine && clicksPath && (
           <path
             d={clicksPath}
@@ -210,7 +229,7 @@ export default function RevenueAreaChart({
           />
         )}
 
-        {points.map((p) => (
+        {!bars && points.map((p) => (
           <circle
             key={p.key}
             cx={p.x}
@@ -241,7 +260,7 @@ export default function RevenueAreaChart({
         })}
 
         {points.map((p) => {
-          const w = data.length > 1 ? chartW / (data.length - 1) : chartW;
+          const w = bars ? chartW / data.length : (data.length > 1 ? chartW / (data.length - 1) : chartW);
           return (
             <rect
               key={`hit-${p.key}`}

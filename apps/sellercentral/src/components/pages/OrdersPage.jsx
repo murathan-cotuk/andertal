@@ -25,6 +25,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
+import { ScPageHeader, ScTabs, ScBulkBar, ScKpiTiles } from "@/components/sc/ScPage";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -123,29 +124,6 @@ const PageContainer = styled.div`
   background: transparent;
 `;
 
-const PageHeader = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-`;
-
-const PageTitle = styled.h1`
-  font-size: 18px;
-  font-weight: 650;
-  margin: 0;
-  color: #1d1b18;
-`;
-
-const HeaderMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-`;
-
 const FilterBar = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -206,18 +184,6 @@ const TableCard = styled(Card)`
   overflow: clip;
   border-radius: 8px;
   border: 1px solid #e6dfd4;
-`;
-
-const BulkBar = styled.div`
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 5px 10px;
-  margin-bottom: 8px;
-  background: #faf7f2;
-  border: 1px solid #fcebd5;
-  border-radius: 8px;
 `;
 
 const SuperuserSectionLabel = styled.td`
@@ -1008,6 +974,8 @@ export default function OrdersPage() {
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
   const [filterPayStatus, setFilterPayStatus] = useState("");
   const [filterDelivery, setFilterDelivery] = useState("");
+  // Orders of the last unfiltered load — basis for the KPI tiles (Konsept s40).
+  const [kpiOrders, setKpiOrders] = useState(null);
   const [sort, setSort] = useState("created_at_desc");
   const [expanded, setExpanded] = useState({});
   const [loadingItems, setLoadingItems] = useState({});
@@ -1118,6 +1086,9 @@ export default function OrdersPage() {
       if (isSuperuser && filterSellerId) params.seller_id = filterSellerId;
       const data = await client.getOrders(params);
       setOrders(data.orders || []);
+      if (!search && !filterOrderStatus && !filterPayStatus && !filterDelivery && !(isSuperuser && filterSellerId)) {
+        setKpiOrders(data.orders || []);
+      }
     } catch { setOrders([]); }
     setLoading(false);
   }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort, isSuperuser, filterSellerId]);
@@ -1422,10 +1393,11 @@ export default function OrdersPage() {
           locale={locale}
         />
       )}
-      <PageHeader>
-        <PageTitle>{ui.orders}</PageTitle>
-        <HeaderMeta>
-          <span style={{ fontSize: 12, color: "#5e574e" }}>{orders.length} {ui.orders}</span>
+      <ScPageHeader
+        breadcrumb={[{ label: ui.orders }]}
+        title={lt(locale, "All orders", "Tüm siparişler", "Toutes les commandes", "Todos los pedidos", "Tutti gli ordini", "Alle Bestellungen")}
+        subtitle={`${orders.length} ${ui.orders}`}
+        actions={<>
           {isSuperuser && (
             <div ref={colMenuRef} style={{ position: "relative" }}>
               <button
@@ -1456,12 +1428,60 @@ export default function OrdersPage() {
               {ui.addOrder}
             </Button>
           )}
-        </HeaderMeta>
-      </PageHeader>
+        </>}
+      />
+
+      {/* KPI tiles + status tabs (Konsept s40). Tabs only set the existing filters. */}
+      {Array.isArray(kpiOrders) && (() => {
+        const live = kpiOrders.filter((o) => String(o.order_status || "") !== "storniert");
+        const toShip = live.filter((o) => String(o.payment_status) === "bezahlt" && String(o.delivery_status || "offen") === "offen");
+        const oldToShip = toShip.filter((o) => o.created_at && Date.now() - new Date(o.created_at).getTime() > 24 * 3600 * 1000);
+        const unpaid = live.filter((o) => String(o.payment_status || "offen") === "offen");
+        const inTransit = live.filter((o) => String(o.delivery_status) === "versendet");
+        const returnsOpen = kpiOrders.filter((o) => ["retoure_anfrage", "retoure"].includes(String(o.order_status)));
+        const setTab = (st) => { setFilterOrderStatus(st.o || ""); setFilterPayStatus(st.p || ""); setFilterDelivery(st.d || ""); };
+        return (
+          <ScKpiTiles items={[
+            { label: lt(locale, "To ship", "Gönderilecek", "À expédier", "Por enviar", "Da spedire", "Zu versenden"), value: toShip.length, hint: oldToShip.length ? lt(locale, `${oldToShip.length} older than 24 h`, `${oldToShip.length} adet 24 saatten eski`, `${oldToShip.length} depuis plus de 24 h`, `${oldToShip.length} hace más de 24 h`, `${oldToShip.length} da oltre 24 h`, `${oldToShip.length} seit über 24 h`) : null, hintTone: "warn", onClick: () => setTab({ p: "bezahlt", d: "offen" }) },
+            { label: lt(locale, "Unpaid", "Ödenmemiş", "Non payées", "Sin pagar", "Non pagati", "Unbezahlt"), value: unpaid.length, onClick: () => setTab({ p: "offen" }) },
+            { label: lt(locale, "In transit", "Yolda", "En transit", "En tránsito", "In transito", "Unterwegs"), value: inTransit.length, hint: lt(locale, "with tracking number", "takip numaralı", "avec numéro de suivi", "con número de seguimiento", "con numero di tracciamento", "mit Sendungsnummer"), onClick: () => setTab({ d: "versendet" }) },
+            { label: lt(locale, "Open returns", "Açık iadeler", "Retours ouverts", "Devoluciones abiertas", "Resi aperti", "Offene Retouren"), value: returnsOpen.length, onClick: () => setTab({ o: "retoure" }) },
+          ]} />
+        );
+      })()}
+      <ScTabs
+        tabs={[
+          { id: "all", label: lt(locale, "All", "Tümü", "Toutes", "Todos", "Tutti", "Alle") },
+          { id: "to_ship", label: lt(locale, "To ship", "Gönderilecek", "À expédier", "Por enviar", "Da spedire", "Zu versenden") },
+          { id: "unpaid", label: lt(locale, "Unpaid", "Ödenmemiş", "Non payées", "Sin pagar", "Non pagati", "Offen") },
+          { id: "shipped", label: lt(locale, "Shipped", "Gönderildi", "Expédiées", "Enviados", "Spediti", "Versendet") },
+          { id: "delivered", label: lt(locale, "Delivered", "Teslim edildi", "Livrées", "Entregados", "Consegnati", "Zugestellt") },
+          { id: "cancelled", label: lt(locale, "Cancelled", "İptal", "Annulées", "Cancelados", "Annullati", "Storniert") },
+        ].map((t) => (t.id === (
+          !filterOrderStatus && !filterPayStatus && !filterDelivery ? "all"
+            : filterPayStatus === "bezahlt" && filterDelivery === "offen" && !filterOrderStatus ? "to_ship"
+            : filterPayStatus === "offen" && !filterDelivery && !filterOrderStatus ? "unpaid"
+            : filterDelivery === "versendet" && !filterPayStatus && !filterOrderStatus ? "shipped"
+            : filterDelivery === "zugestellt" && !filterPayStatus && !filterOrderStatus ? "delivered"
+            : filterOrderStatus === "storniert" && !filterPayStatus && !filterDelivery ? "cancelled" : ""
+        ) ? { ...t, count: orders.length } : t))}
+        selected={
+          !filterOrderStatus && !filterPayStatus && !filterDelivery ? "all"
+            : filterPayStatus === "bezahlt" && filterDelivery === "offen" && !filterOrderStatus ? "to_ship"
+            : filterPayStatus === "offen" && !filterDelivery && !filterOrderStatus ? "unpaid"
+            : filterDelivery === "versendet" && !filterPayStatus && !filterOrderStatus ? "shipped"
+            : filterDelivery === "zugestellt" && !filterPayStatus && !filterOrderStatus ? "delivered"
+            : filterOrderStatus === "storniert" && !filterPayStatus && !filterDelivery ? "cancelled" : ""
+        }
+        onSelect={(id) => {
+          const map = { all: {}, to_ship: { p: "bezahlt", d: "offen" }, unpaid: { p: "offen" }, shipped: { d: "versendet" }, delivered: { d: "zugestellt" }, cancelled: { o: "storniert" } };
+          const st = map[id] || {};
+          setFilterOrderStatus(st.o || ""); setFilterPayStatus(st.p || ""); setFilterDelivery(st.d || "");
+        }}
+      />
 
       {selected.size > 0 && (
-        <BulkBar>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#7f3f00" }}>{selected.size} {ui.selected}</span>
+        <ScBulkBar label={`${selected.size} ${ui.selected}`}>
           <InlineStack gap="200" wrap blockAlign="center">
             <Button variant="primary" size="slim" onClick={() => startPacking(selectedOrders)}>
               {ui.bulkShip}
@@ -1470,7 +1490,7 @@ export default function OrdersPage() {
               {ui.clearSelection}
             </Button>
           </InlineStack>
-        </BulkBar>
+        </ScBulkBar>
       )}
 
       <FilterBar>
