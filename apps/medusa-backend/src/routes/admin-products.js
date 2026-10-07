@@ -9,6 +9,11 @@ const {
   patchPlaceholderTranslationHandles,
 } = require('../product-url-handle')
 const { assignAnId, normalizeAnId, ensureVariantAnIds, findProductByAnId } = require('../an-id')
+const { collectVariantEans, collectProductRowEans, validateProductEansDb } = require('../product-ean')
+const { collectProductRowSkus, validateSellerSkusDb } = require('../product-sku')
+const { applyListingReadinessGate } = require('../product-readiness')
+const { explainStoreVisibility } = require('../shop-visibility')
+const { getApprovedSellerIdsSet } = require('./seller-settings')
 const { resolveProductCommissionOverride, productCommissionOverridePct } = require('../commission-rate')
 const {
   buildListingSellerMeta,
@@ -17,6 +22,31 @@ const {
   PRODUCT_ROLE_FAMILY_SHELL,
   isFamilyShell,
 } = require('../product-identity')
+
+const attachShopVisibility = async (product) => {
+  if (!product || typeof product !== 'object') return product
+  try {
+    const approvedSellerIds = await getApprovedSellerIdsSet()
+    product.shop_visibility = explainStoreVisibility(product, { approvedSellerIds })
+  } catch (_) {
+    product.shop_visibility = explainStoreVisibility(product, {})
+  }
+  return product
+}
+
+const attachShopVisibilityMany = async (products) => {
+  const list = Array.isArray(products) ? products : []
+  let approvedSellerIds = new Set()
+  try {
+    approvedSellerIds = await getApprovedSellerIdsSet()
+  } catch (_) { /* empty set */ }
+  for (const p of list) {
+    if (p && typeof p === 'object') {
+      p.shop_visibility = explainStoreVisibility(p, { approvedSellerIds })
+    }
+  }
+  return list
+}
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -396,53 +426,6 @@ const listAdminHubProductsDb = async (query = {}) => {
 }
 
 const BULLET_POINT_MAX_LEN = 120
-const normalizeEanValue = (v) => {
-  if (v == null) return ''
-  const s = String(v).trim()
-  const digitsOnly = normalizeStoreEan(s)
-  return digitsOnly || s
-}
-const collectVariantEans = (variants) => {
-  const out = []
-  if (!Array.isArray(variants)) return out
-  for (const v of variants) { const e = normalizeEanValue(v && v.ean); if (e) out.push(e) }
-  return out
-}
-
-const validateProductEansDb = async (client, parentEan, variantEans, excludeProductIdOrIds) => {
-  const values = []
-  const seen = new Set()
-  const p = normalizeEanValue(parentEan)
-  if (p) { seen.add(p); values.push(p) }
-  for (const ve of variantEans || []) {
-    const e = normalizeEanValue(ve)
-    if (!e) continue
-    if (p && e === p) return { ok: false, message: 'Variant EAN must be different from parent EAN' }
-    if (seen.has(e)) return { ok: false, message: `Duplicate EAN in request payload: ${e}` }
-    seen.add(e); values.push(e)
-  }
-  if (!values.length) return { ok: true }
-  const excludeIds = new Set(
-    (Array.isArray(excludeProductIdOrIds) ? excludeProductIdOrIds : [excludeProductIdOrIds])
-      .map((id) => String(id || '').trim())
-      .filter(Boolean)
-  )
-  const res = await client.query('SELECT id, sku, metadata, variants, status FROM admin_hub_products')
-  const dbEans = new Set()
-  for (const row of (res.rows || [])) {
-    if (excludeIds.has(String(row.id))) continue
-    if (String(row.status || '') === 'merged') continue
-    const pm = row && row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
-    const pe = normalizeEanValue(pm.ean)
-    if (pe) dbEans.add(pe)
-    const vv = Array.isArray(row && row.variants) ? row.variants : []
-    for (const ve of collectVariantEans(vv)) dbEans.add(ve)
-  }
-  for (const e of values) {
-    if (dbEans.has(e)) return { ok: false, message: `EAN already exists: ${e}` }
-  }
-  return { ok: true }
-}
 
 const normalizeProductMetadata = (meta) => {
   if (!meta || typeof meta !== 'object') return meta
@@ -813,12 +796,23 @@ const createAdminHubProductDb = async (body) => {
       if (status.toLowerCase() === 'published') status = 'draft'
     }
     const metadata = metaObj ? JSON.stringify(metaObj) : null
-    const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
+    const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null, { requireValidGtin: true })
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
+    const skuValidation = await validateSellerSkusDb(client, {
+      sellerId: (body.seller || body.seller_id || '').trim() || null,
+      parentSku: body.sku,
+      variants: variantsArr,
+    })
+    if (!skuValidation.ok) { await client.end(); return { __error: skuValidation.message } }
     const brandGate = await validateBrandForPublish(client, metaObj || {}, status, (body.seller || body.seller_id || '').trim() || null)
     if (!brandGate.ok) {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
       if (status.toLowerCase() === 'published') status = 'draft'
+    }
+    const readiness = applyListingReadinessGate({ status, title, priceCents: price, metadata: metaObj, variants: variantsArr })
+    if (readiness.message) {
+      complianceWarning = complianceWarning ? `${complianceWarning} · ${readiness.message}` : readiness.message
+      status = readiness.status
     }
     // AN-ID: assigned once, here, for every new CANONICAL (master) product and each of
     // its variations. A seller who later lists against the same EAN gets a row in
@@ -853,6 +847,7 @@ const createAdminHubProductDb = async (body) => {
       created_at: r.created_at, updated_at: r.updated_at,
       ...(autoTranslatedLocales.length ? { auto_translated_locales: autoTranslatedLocales } : {}),
       ...(complianceWarning ? { compliance_warning: complianceWarning, compliance_detail: complianceDetail, compliance_downgraded: true } : {}),
+      ...(readiness.missing.length ? { publish_missing: readiness.missing } : {}),
     }
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -1000,13 +995,35 @@ const updateAdminHubProductDb = async (id, body) => {
         if (String(status || '').toLowerCase() === 'published') status = 'draft'
       }
     }
-    const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
+    const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid, {
+      requireValidGtin: true,
+      grandfathered: collectProductRowEans(existing),
+    })
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
+    const skuValidation = await validateSellerSkusDb(client, {
+      sellerId: existing.seller_id,
+      parentSku: sku,
+      variants: nextVariantsArr,
+      excludeProductId: uuid,
+      grandfathered: collectProductRowSkus(existing),
+    })
+    if (!skuValidation.ok) { await client.end(); return { __error: skuValidation.message } }
     if (!skipComplianceGates) {
       const brandGate = await validateBrandForPublish(client, metadataObj || {}, status, existing.seller_id || null)
       if (!brandGate.ok) {
         complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
         if (String(status || '').toLowerCase() === 'published') status = 'draft'
+      }
+    }
+    let publishMissing = []
+    if (!skipComplianceGates) {
+      const readiness = applyListingReadinessGate({
+        status, previousStatus: existing.status, title, priceCents: price, metadata: metadataObj, variants: nextVariantsArr,
+      })
+      if (readiness.message) {
+        complianceWarning = complianceWarning ? `${complianceWarning} · ${readiness.message}` : readiness.message
+        status = readiness.status
+        publishMissing = readiness.missing
       }
     }
     const metadata = Object.keys(metadataObj).length ? JSON.stringify(metadataObj) : null
@@ -1021,12 +1038,19 @@ const updateAdminHubProductDb = async (id, body) => {
     )
     // The shop buy box used to prefer admin_hub_seller_listings over this row. For a
     // product this seller already owns, the product form is the source of truth — keep
-    // their listing shadow in step so checkout cannot keep a stale 0 stock/price.
+    // their listing shadow in step so checkout cannot keep a stale 0 stock/price/brand.
     const ownerSellerId = existing.seller_id ? String(existing.seller_id).trim() : ''
     if (ownerSellerId) {
+      const shadowBrandId = metadataObj && metadataObj.brand_id ? String(metadataObj.brand_id).trim() || null : null
+      const shadowShipId = metadataObj && metadataObj.shipping_group_id ? String(metadataObj.shipping_group_id).trim() || null : null
       await client.query(
-        `UPDATE admin_hub_seller_listings SET inventory = $1, price_cents = $2, updated_at = now() WHERE product_id = $3 AND seller_id = $4`,
-        [inventory, price, uuid, ownerSellerId]
+        `UPDATE admin_hub_seller_listings
+            SET inventory = $1, price_cents = $2, status = $3,
+                brand_id = COALESCE($4, brand_id),
+                shipping_group_id = COALESCE($5, shipping_group_id),
+                updated_at = now()
+          WHERE product_id = $6 AND seller_id = $7`,
+        [inventory, price, status, shadowBrandId, shadowShipId, uuid, ownerSellerId]
       )
     }
     await client.end()
@@ -1038,6 +1062,7 @@ const updateAdminHubProductDb = async (id, body) => {
       saved.compliance_detail = complianceDetail
       saved.compliance_downgraded = true
     }
+    if (saved && publishMissing.length) saved.publish_missing = publishMissing
     return saved
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -1058,6 +1083,7 @@ const adminHubProductsGET = async (req, res) => {
       q.seller_id = sellerId
     }
     const products = await listAdminHubProductsDb(q)
+    await attachShopVisibilityMany(products)
     res.json({ products, count: products.length })
   } catch (err) {
     console.error('Admin Hub products GET error:', err)
@@ -1510,15 +1536,22 @@ const adminHubProductByIdGET = async (req, res) => {
       console.warn('adminHubProductByIdGET listings:', e && e.message)
     }
 
+    // Shop visibility uses the catalog master row (what store-products filters on), not the
+    // commercial listing overlay below (which may rewrite status for second-seller editors).
+    await attachShopVisibility(product)
+    const shopVisibility = product.shop_visibility
+
     // A non-owning, non-superuser caller viewing a shared catalog product must see THEIR OWN
     // commercial data (sku/price/inventory/status/brand/shipping), never the master row's —
     // that belongs to whoever originally created it. Without this overlay, opening a listing
     // you just added (or any second-seller listing) showed the original owner's SKU and price
     // as if they were yours.
     const callerSellerId = !isSuperuserCaller && req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
-    if (callerSellerId && product.seller_id && String(product.seller_id).trim() !== callerSellerId) {
+    if (callerSellerId) {
       const myListing = seller_listings.find((l) => String(l.seller_id || '').trim() === callerSellerId)
-      if (myListing) {
+      const isOtherOwner = product.seller_id && String(product.seller_id).trim() !== callerSellerId
+      if (myListing && isOtherOwner) {
+        // Second-seller listing: show THEIR commercial fields, never the master's.
         product = {
           ...product,
           sku: myListing.sku || null,
@@ -1533,9 +1566,29 @@ const adminHubProductByIdGET = async (req, res) => {
             publish_date: myListing.publish_date || null,
             ean: myListing.seller_metadata?.ean || (product.metadata && typeof product.metadata === 'object' ? product.metadata.ean : null) || null,
           },
+          shop_visibility: shopVisibility,
+        }
+      } else if (myListing && !isOtherOwner) {
+        // Owner: product metadata is source of truth, but older listing shadows may hold
+        // brand/shipping that never made it back into metadata — surface those so the seller
+        // always sees what they saved.
+        const meta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+        const brandId = meta.brand_id || myListing.brand_id || null
+        const shipId = meta.shipping_group_id || myListing.shipping_group_id || null
+        if ((brandId && !meta.brand_id) || (shipId && !meta.shipping_group_id)) {
+          product = {
+            ...product,
+            metadata: {
+              ...meta,
+              ...(brandId ? { brand_id: brandId } : {}),
+              ...(shipId ? { shipping_group_id: shipId } : {}),
+            },
+            shop_visibility: shopVisibility,
+          }
         }
       }
     }
+    product.shop_visibility = shopVisibility
     res.json({ product, seller_listings, ean_siblings })
   } catch (err) {
     console.error('Admin Hub product GET error:', err)
@@ -1920,6 +1973,7 @@ const adminHubProductByIdPUT = async (req, res) => {
         }).catch((e) => console.error('[eu-origin] enqueue after product PUT:', e?.message || e))
       }
     }
+    await attachShopVisibility(product)
     res.json({ product, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
   } catch (err) {
     console.error('Admin Hub product PUT error:', err)
@@ -2206,7 +2260,13 @@ module.exports = function createAdminProductsRouter() {
   // Link N independent EAN products under a family roof (preferred), or legacy-fold
   // into variants[] when body.legacy_fold === true. Soft-archives only in legacy mode.
   router.post('/admin-hub/v1/products/combine-as-variants', async (req, res) => {
-    const { buildCombineAsVariantsPlan, buildFamilyLinkPlan } = require('../combine-as-variants-core')
+    const {
+      buildCombineAsVariantsPlan,
+      buildFamilyLinkPlan,
+      buildNewRoofCombinePlan,
+      assertCallerOwnsAllForCombine,
+    } = require('../combine-as-variants-core')
+    const createNewParent = req.body?.create_new_parent === true
     const parentId = String(req.body?.parent_id || '').trim()
     const productIds = Array.isArray(req.body?.product_ids)
       ? [...new Set(req.body.product_ids.map((id) => String(id || '').trim()).filter(Boolean))]
@@ -2217,9 +2277,13 @@ module.exports = function createAdminProductsRouter() {
         ? req.body.option_values
         : {}
     const legacyFold = req.body?.legacy_fold === true
+    const roofTitle = String(req.body?.parent_title || req.body?.roof_title || '').trim()
+    const roofSku = String(req.body?.parent_sku || req.body?.roof_sku || '').trim()
 
-    if (!parentId) return res.status(400).json({ message: 'parent_id required' })
-    if (!productIds.includes(parentId)) productIds.unshift(parentId)
+    if (!createNewParent) {
+      if (!parentId) return res.status(400).json({ message: 'parent_id required' })
+      if (!productIds.includes(parentId)) productIds.unshift(parentId)
+    }
     if (productIds.length < 2) return res.status(400).json({ message: 'At least 2 product_ids required' })
 
     const isSuperuser = req.sellerUser?.is_superuser === true
@@ -2228,6 +2292,74 @@ module.exports = function createAdminProductsRouter() {
 
     const client = getProductsDbClient()
     if (!client) return res.status(503).json({ message: 'Database not configured' })
+
+    const archiveSourcesIntoParent = async (roofId, sourceIds) => {
+      for (const sourceId of sourceIds) {
+        const sourceRow = await client.query(
+          `SELECT metadata, variants FROM admin_hub_products WHERE id = $1 LIMIT 1`,
+          [sourceId]
+        )
+        const src = sourceRow.rows[0] || {}
+        const srcMeta = src.metadata && typeof src.metadata === 'object' ? src.metadata : {}
+        let srcEan = normalizeStoreEan(srcMeta.ean)
+        if (!srcEan) {
+          const srcVars = Array.isArray(src.variants) ? src.variants : (typeof src.variants === 'string' ? (() => { try { const j = JSON.parse(src.variants); return Array.isArray(j) ? j : [] } catch (_) { return [] } })() : [])
+          for (const v of srcVars) {
+            srcEan = normalizeStoreEan(v && v.ean)
+            if (srcEan) break
+          }
+        }
+        const srcListingMeta = srcEan ? JSON.stringify({ ean: srcEan }) : null
+        await client.query(
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata, listed_ean)
+           SELECT $1, seller_id, price_cents, inventory, status, sku, COALESCE(seller_metadata, $3::jsonb), $4
+           FROM admin_hub_seller_listings
+           WHERE product_id = $2
+           ON CONFLICT DO NOTHING`,
+          [roofId, sourceId, srcListingMeta, srcEan || '']
+        )
+        if (srcListingMeta) {
+          await client.query(
+            `UPDATE admin_hub_seller_listings
+             SET seller_metadata = COALESCE(seller_metadata, '{}'::jsonb) || $3::jsonb
+             WHERE product_id = $2
+               AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL OR TRIM(COALESCE(seller_metadata->>'ean','')) = '')`,
+            [roofId, sourceId, srcListingMeta]
+          )
+        }
+        await client.query(
+          `DELETE FROM admin_hub_seller_listings sl
+           WHERE sl.product_id = $1
+             AND EXISTS (SELECT 1 FROM admin_hub_seller_listings m WHERE m.product_id = $2 AND m.seller_id = sl.seller_id)`,
+          [sourceId, roofId]
+        )
+        await client.query('UPDATE admin_hub_seller_listings SET product_id = $1 WHERE product_id = $2', [roofId, sourceId])
+        await client.query(
+          'UPDATE admin_hub_product_change_requests SET product_id = $1 WHERE product_id = $2',
+          [roofId, sourceId]
+        )
+        try {
+          await client.query('UPDATE admin_hub_eu_origin_pending SET product_id = $1 WHERE product_id = $2', [roofId, sourceId])
+        } catch (_) { /* table may not exist */ }
+        try {
+          await client.query(
+            `DELETE FROM store_customer_wishlist w
+             WHERE w.product_id = $1
+               AND EXISTS (SELECT 1 FROM store_customer_wishlist m WHERE m.product_id = $2 AND m.customer_id = w.customer_id)`,
+            [sourceId, roofId]
+          )
+          await client.query('UPDATE store_customer_wishlist SET product_id = $1 WHERE product_id = $2', [roofId, sourceId])
+        } catch (_) { /* wishlist may not exist */ }
+        await client.query(
+          `UPDATE admin_hub_products
+           SET status = 'merged',
+               metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('merged_into_id', $1::text),
+               updated_at = now()
+           WHERE id = $2`,
+          [roofId, sourceId]
+        )
+      }
+    }
 
     try {
       await client.connect()
@@ -2248,14 +2380,86 @@ module.exports = function createAdminProductsRouter() {
         loaded.push(r.rows[0])
       }
 
-      if (!isSuperuser) {
-        for (const p of loaded) {
-          const owner = String(p.seller_id || (p.metadata && p.metadata.seller_id) || '').trim()
-          if (owner && owner !== callerSellerId) {
-            await client.query('ROLLBACK')
-            return res.status(403).json({ message: `Not allowed to combine product: ${p.title || p.id}` })
-          }
+      // Sellers: only own products (seller_id === caller). Listed catalog / other-seller
+      // add-existing rows cannot be combined. Superuser may combine anything.
+      const ownership = assertCallerOwnsAllForCombine({
+        products: loaded,
+        callerSellerId,
+        isSuperuser,
+      })
+      if (!ownership.ok) {
+        await client.query('ROLLBACK')
+        return res.status(403).json({ message: ownership.message })
+      }
+
+      // ── New roof (çatı): create a fresh parent; selected products become its variants ──
+      if (createNewParent) {
+        const roofPlan = buildNewRoofCombinePlan({
+          products: loaded,
+          roofTitle,
+          roofSku,
+          optionName,
+          optionValues,
+        })
+        if (!roofPlan.ok) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({ message: roofPlan.message })
         }
+        const eanValidation = await validateProductEansDb(
+          client,
+          null,
+          collectVariantEans(roofPlan.variants),
+          roofPlan.source_ids_to_archive
+        )
+        if (!eanValidation.ok) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({ message: eanValidation.message })
+        }
+        const handleBase = slugifyTitle(roofPlan.roof_title) || ('family-' + Date.now())
+        let handle = handleBase
+        for (let i = 0; i < 50; i++) {
+          const tryHandle = i === 0 ? handleBase : `${handleBase}-${i + 1}`
+          const exists = await client.query(
+            'SELECT 1 FROM admin_hub_products WHERE LOWER(TRIM(handle)) = LOWER(TRIM($1)) LIMIT 1',
+            [tryHandle]
+          )
+          if (!exists.rows.length) { handle = tryHandle; break }
+        }
+        const reserved = new Set()
+        const anId = await assignAnId(client, reserved)
+        const { variants: stampedVariants } = await ensureVariantAnIds(client, roofPlan.variants, reserved)
+        const sellerIdForRoof = callerSellerId || loaded[0]?.seller_id || null
+        const ins = await client.query(
+          `INSERT INTO admin_hub_products
+             (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id)
+           VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11)
+           RETURNING id`,
+          [
+            roofPlan.roof_title,
+            handle,
+            roofPlan.roof_sku,
+            '',
+            sellerIdForRoof,
+            loaded[0]?.collection_id || null,
+            roofPlan.price_cents,
+            roofPlan.inventory,
+            JSON.stringify(roofPlan.parent_metadata),
+            JSON.stringify(stampedVariants),
+            anId,
+          ]
+        )
+        const newParentId = ins.rows[0].id
+        await archiveSourcesIntoParent(newParentId, roofPlan.source_ids_to_archive)
+        await client.query('COMMIT')
+        const product = await getAdminHubProductByIdOrHandleDb(newParentId)
+        return res.json({
+          combined: true,
+          mode: 'new_roof',
+          parent_id: newParentId,
+          archived_ids: roofPlan.source_ids_to_archive,
+          variant_count: stampedVariants.length,
+          product,
+        })
       }
 
       // ── Preferred path: family roof (products stay independent sellable rows) ──
@@ -2609,7 +2813,14 @@ module.exports = function createAdminProductsRouter() {
         const createRes = await fetch(`${backendBase}/admin-hub/products`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: authHeader }, body: JSON.stringify(productPayload) })
         const createData = await createRes.json().catch(() => ({}))
         if (!createRes.ok) { results.push({ title, status: 'error', reason: createData?.message || `HTTP ${createRes.status}` }) }
-        else { results.push({ title, status: 'created', id: createData?.product?.id || createData?.id || null, reason: unmatchedNames.length ? unmatchedNames.join('; ') : undefined }) }
+        else {
+          const created = createData?.product || createData || {}
+          const notes = [...unmatchedNames]
+          if (productPayload.status === 'published' && String(created.status || '') === 'draft') {
+            notes.push(`saved as draft${created.compliance_warning ? ` (${created.compliance_warning})` : ''}`)
+          }
+          results.push({ title, status: 'created', id: created.id || null, product_status: created.status || null, reason: notes.length ? notes.join('; ') : undefined })
+        }
       } catch (e) { results.push({ title: String(row.title || row.Title || ''), status: 'error', reason: e?.message || 'Unknown error' }) }
     }
     const created = results.filter((r) => r.status === 'created').length

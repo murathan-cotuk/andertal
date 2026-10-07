@@ -20,6 +20,7 @@ import { categoryPathQuery } from "@/lib/store-categories-url";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
+import { computeGrundpreis } from "@/lib/grundpreis";
 import { useMetafieldDefinitions, metafieldTitle, metafieldValue } from "@/lib/metafield-definitions";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
@@ -1052,6 +1053,7 @@ function ProductCampaignPriceBlock({
     : hasSale
       ? priceCents
       : null;
+  const gp = typeof grundpreis === "function" ? grundpreis(buyBoxPriceCents) : null;
   return (
     <PriceTop>
       <PriceStack>
@@ -1071,10 +1073,10 @@ function ProductCampaignPriceBlock({
           </PriceSubRow>
         )}
         <TaxLine>{tp("taxLine")}</TaxLine>
-        {grundpreis && (
+        {gp && (
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-            {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
-            <span>{grundpreis.display}</span>
+            {gp.contentLabel && <span>{gp.contentLabel} · </span>}
+            <span>{gp.display}</span>
           </div>
         )}
       </PriceStack>
@@ -1453,22 +1455,8 @@ export default function ProductTemplate() {
   const metaRows = buildMetaRows(meta, locale);
 
   // Grundpreis (unit price) — e.g. "1 kg = 50,00 €"
-  const grundpreis = (() => {
-    const unitTypeRaw = meta.unit_type;
-    const unitValueRaw = meta.unit_value;
-    const unitRefRaw = meta.unit_reference;
-    if (!unitTypeRaw || unitValueRaw == null || unitValueRaw === "") return null;
-    // Support both "0.2" and "0,2" (German decimal)
-    const unitVal = parseFloat(String(unitValueRaw).replace(",", "."));
-    const unitRef = parseFloat(String(unitRefRaw ?? "1").replace(",", ".")) || 1;
-    if (!unitVal || unitVal <= 0 || !isFinite(unitVal)) return null;
-    const perUnitCents = Math.round((displayCents / unitVal) * unitRef);
-    if (!perUnitCents || perUnitCents <= 0) return null;
-    const unitLabel = unitTypeRaw === "stück" ? "Stück" : unitTypeRaw;
-    const refLabel = unitRef === 1 ? `1 ${unitLabel}` : `${unitRef} ${unitLabel}`;
-    const contentLabel = `${String(unitValueRaw).replace(".", ",")} ${unitLabel}`;
-    return { display: `(${refLabel} = ${formatPriceCents(perUnitCents)} €)`, contentLabel };
-  })();
+  // Computed against the price actually shown in the buy box (campaign price included).
+  const grundpreis = (cents) => computeGrundpreis(meta, variant?.metadata, cents, formatPriceCents);
 
   // Combined dimensions row — "H × B × T cm" (only if at least one value is set)
   const dimensionsDisplay = (() => {

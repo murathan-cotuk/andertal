@@ -266,6 +266,16 @@ function ImportResult({ result, t }) {
           {result.media.skipped > 0 && <>, {t.mediaSkipped(result.media.skipped)}</>}
         </div>
       )}
+      {result.drafts?.length > 0 && (
+        <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #fde68a", borderRadius: 8, padding: 12, background: "#fffbeb" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#92400e", paddingBottom: 4 }}>{t.importResultDraftsTitle(result.drafts.length)}</div>
+          {result.drafts.map((d, i) => (
+            <div key={i} style={{ fontSize: 12, color: "#92400e", padding: "2px 0" }}>
+              <strong>{d.sku}</strong>: {d.missing?.length ? d.missing.map(t.publishMissing).join(", ") : d.warning}
+            </div>
+          ))}
+        </div>
+      )}
       {hasErrors && (
         <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #fee2e2", borderRadius: 8, padding: 12, background: "#fff5f5" }}>
           {result.errors.map((e, i) => (

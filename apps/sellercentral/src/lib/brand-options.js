@@ -81,5 +81,21 @@ export function buildBrandOptions({ brands, sellerId, isSuperuser, currentId, t 
   if (others.length) {
     options.push({ title: t("Other brands", "Diğer markalar", "Autres marques", "Otras marcas", "Altri brand", "Weitere Marken"), options: others });
   }
+
+  // Always surface the currently assigned brand — even if it was filtered out of the
+  // selectable lists — so a locked Select never renders blank after save.
+  const cur = String(currentId || "").trim();
+  if (cur) {
+    const flatten = (opts) => opts.flatMap((o) => (o && Array.isArray(o.options) ? o.options : [o]));
+    const known = new Set(flatten(options).map((o) => String(o?.value || "")));
+    if (!known.has(cur)) {
+      const row = list.find((b) => String(b.id) === cur);
+      options.push({
+        label: row ? `${row.name}${statusSuffix(row)}` : cur,
+        value: cur,
+      });
+    }
+  }
+
   return { options, hasLockedRegistered };
 }

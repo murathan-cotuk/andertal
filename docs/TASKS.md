@@ -47,6 +47,31 @@ Engel: Gizli anahtar veritabanında (`store_platform_checkout`), webhook sırrı
 
 Engel: Bunu 5 ve 6 bitmeden yapma.
 
+## Fonksiyon bazlı iyileştirme programı (2026-10-07)
+
+Her alan tek tek ve uçtan uca ele alınır: önce denetim raporu, sonra kod, veri, test ve doküman. Bir alan bitmeden sonrakine geçilmez. Hedef: uluslararası pazaryeri standardı (Amazon, Zalando, Otto seviyesi), modern görünüm, eksiksiz fonksiyon. Kural: çalışan hiçbir şey bozulmaz; her değişiklik geriye uyumludur ve testlidir. Referans derinlik: ödeme altyapısı (`docs/Odeme-Payout-Implementasyon.md`).
+
+- [ ] **A. Ürün oluşturma ve yayınlama:** ürün ekleme, varyantlar, Eigenschaften, marka, kategori, GPSR/yasal alanlar, kaydetme (taslak), yayına alma, mevcut katalog ürününe teklif ekleme, toplu yükleme.
+- [ ] **B. Sipariş yaşam döngüsü:** sipariş, hazırlama, kargo etiketi ve takip, teslim onayı (ödeme saati), iptal, iade ve Widerruf.
+- [ ] **C. Satıcı kaydı ve onboarding:** kayıt, onay, sözleşme, hukuki ve vergi bilgileri, ödeme hesabı.
+- [ ] **D. Kategori ağacı ve import:** Excel import, kategori atama, filtreler, uyumluluk profilleri.
+- [ ] **E. Shop vitrini:** ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi.
+- [ ] **F. Bildirimler ve e-postalar:** müşteriye ve satıcıya ne, ne zaman gider; zil paneli; flow otomasyonu.
+- [ ] **G. Faturalar ve vergi:** müşteri faturası, Provisionsrechnung, OSS, DAC7 raporu.
+
+A alanı ilerleme (2026-10-07):
+- [x] EAN/GTIN: yeni girilen kod GS1 kontrol hanesiyle doğrulanır (GTIN-8/12/13/14); önceden kayıtlı kodlar muaf. Çakışma kontrolü tüm ürünleri belleğe çekmek yerine veritabanında yapılır (`src/product-ean.js`). SC'de alan anında uyarır.
+- [x] SKU: satıcı hesabı içinde benzersiz (ürün, varyant ve teklif SKU'ları; büyük/küçük harf duyarsız); eski SKU'lar muaf (`src/product-sku.js`).
+- [x] Grundpreis (PAngV 2022): g/ml her zaman 1 kg / 1 l başına; varyantın kendi içeriği kullanılır; kampanya fiyatı gösterilirken Grundpreis de ona göre hesaplanır (`apps/shop/src/lib/grundpreis.js`).
+- [ ] Grundpreis kategori/ürün kartlarında da gösterilmeli (E alanı) ve Google Merchant feed'e `unit_pricing_measure` eklenmeli (SEO alanı).
+- [ ] Canlıdaki test ürünlerinin EAN'ları gerçek GTIN değil (153 kodun 144'ü); kod değiştirilmedikçe kaydetme engellenmez. "arts | | | title_de" başlıklı ürünler hatalı Excel importundan kalmış.
+
+Açık küçük işler (A alanında kapatılır):
+- [ ] "Ecom Lastest" ve "1 Tütün tabakasi…" ürünleri eski `_catalog_approval_pending` işareti yüzünden shop'ta gizli; işaret temizlenecek.
+- [ ] Second-nav arka plan düzeltmesi (`ShopHeader.jsx`, chrome cover yalnızca kaydırınca) push bekliyor.
+
+Stripe Dashboard işleri (bölüm 6) bilinçli olarak programın sonuna bırakıldı.
+
 ## Bu listeye alınmayanlar
 
 Affiliate ödemeleri vergi incelemesi bitene kadar kapalı; ilk satışa engel değil. Kategorilere toplu SEO metni yazılmayacak. Sunucu tarafı stil gecikmesi ve CDN hız işidir, satış kapısı değil.

@@ -268,16 +268,30 @@ class MedusaAdminClient {
 
   /**
    * POST /admin-hub/v1/products/combine-as-variants
-   * Fold standalone products into one parent's variants[]; archives absorbed rows as merged.
+   * Default: create a NEW roof parent (title + SKU); selected products become its variants.
+   * Pass createNewParent:false + parentId + legacyFold to append under an existing parent.
    */
-  async combineProductsAsVariants({ parentId, productIds, optionName, optionValues } = {}) {
+  async combineProductsAsVariants({
+    parentId,
+    productIds,
+    optionName,
+    optionValues,
+    parentTitle,
+    parentSku,
+    createNewParent = true,
+    legacyFold = true,
+  } = {}) {
     return this.request('/admin-hub/v1/products/combine-as-variants', {
       method: 'POST',
       body: JSON.stringify({
-        parent_id: parentId,
+        create_new_parent: createNewParent === true,
+        parent_id: parentId || undefined,
+        parent_title: parentTitle || undefined,
+        parent_sku: parentSku || undefined,
         product_ids: productIds,
         option_name: optionName,
         option_values: optionValues || {},
+        legacy_fold: legacyFold === true,
       }),
     });
   }

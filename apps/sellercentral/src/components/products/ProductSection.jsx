@@ -20,14 +20,14 @@ export const PRODUCT_SECTION_STYLES = `
     height: 0;
     border: 0;
     border-top: 1px solid #e6dfd4;
-    margin: 14px 0 12px;
+    margin: 10px 0 8px;
     box-shadow: none;
   }
   .product-edit-sections > .Polaris-BlockStack > .product-section-rule:first-child {
-    margin-top: 4px;
+    margin-top: 2px;
   }
   .product-edit-sidebar .product-section-rule {
-    margin: 12px 0 10px;
+    margin: 8px 0 6px;
   }
   .product-edit-sidebar h2.Polaris-Text--root {
     font-size: 0.9rem !important;

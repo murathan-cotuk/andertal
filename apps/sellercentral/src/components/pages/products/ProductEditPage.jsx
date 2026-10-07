@@ -32,6 +32,12 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
+import {
+  shopVisibilityBannerTitle,
+  shopVisibilityHiddenReasons,
+  shopVisibilityReasonLabel,
+} from "@/lib/shop-visibility-i18n";
+import { gtinFieldError } from "@/lib/gtin";
 import { titleToHandle, sanitizeSeoHandleInput, isPlaceholderHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
@@ -67,10 +73,13 @@ const getDefaultShopUrl = () => {
   const url = (typeof env === "string" ? env : "").trim();
   if (url) return url.replace(/\/$/, "");
   if (typeof window !== "undefined") {
-    if (window.location.hostname === "localhost") return "http://localhost:3000";
-    return window.location.origin;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:3000";
+    }
+    // Never fall back to SellerCentral origin — "View in shop" must open the storefront.
+    return "https://andertal.com";
   }
-  return "";
+  return "https://andertal.com";
 };
 
 /** Digits + one decimal dot — avoids controlled type="number" + toFixed fighting mid-edit. */
@@ -389,9 +398,12 @@ function shopProductHandleForLocale(product, loc) {
   const tr = product?.metadata?.translations?.[loc];
   const h = ((tr?.handle || "").trim() || (product?.handle || "").trim());
   if (!h) return "";
+  // Match shop `storefrontProductHandle`: {handle}-a-{last8 of uuid} (legacy {handle}-{8} still resolves).
   const rawId = String(product?.id || "").replace(/^prod_/i, "").toLowerCase();
-  const shortCode = rawId.length >= 8 ? rawId.slice(-8) : rawId;
-  return shortCode ? `${h}-${shortCode}` : h;
+  const uuid = rawId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+  const id = uuid ? uuid[0] : rawId;
+  const shortCode = id.length >= 8 ? id.slice(-8) : id;
+  return shortCode ? `${h}-a-${shortCode}` : h;
 }
 
 function getEmptyProduct() {
@@ -1258,6 +1270,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   // seller here — editing this listing (isSecondSeller) or creating a new one against a catalog
   // match found via EAN/URL/existing_id search (isReusingCatalogOnCreate).
   const isCatalogLocked = isSecondSeller || isReusingCatalogOnCreate;
+  // Brand stays visible for sellers but is not editable once set (or when catalog-locked).
+  const brandLocked = isCatalogLocked || (!isNew && Boolean(getMeta(product, "brand_id")));
 
   const changeRequestSubmittedMsg =
     locale === "tr"
@@ -1584,7 +1598,27 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           }),
         }));
       }
-      const variantsToSave = product.variants || [];
+      // Brand + category are family identity: stamp onto every matrix variant and lock them.
+      const familyBrandId = metadata.brand_id || undefined;
+      const familyCategoryId = metadata.category_id || undefined;
+      const variantsToSave = (product.variants || []).map((row) => {
+        if (!Array.isArray(row?.option_values) || !row.option_values.length) return row;
+        const m = { ...(row.metadata && typeof row.metadata === "object" ? row.metadata : {}) };
+        const locks = new Set(Array.isArray(m.parent_locked_fields) ? m.parent_locked_fields : []);
+        if (familyBrandId) {
+          m.brand_id = familyBrandId;
+          locks.add("brand_id");
+        }
+        if (familyCategoryId) {
+          m.category_id = familyCategoryId;
+          if (metadata.admin_category_id) m.admin_category_id = metadata.admin_category_id;
+          if (metadata.category_ids) m.category_ids = metadata.category_ids;
+          if (metadata.category_slug) m.category_slug = metadata.category_slug;
+          locks.add("category_id");
+        }
+        if (locks.size) m.parent_locked_fields = [...locks];
+        return { ...row, metadata: m };
+      });
       // Soft gates only, from here down: missing required fields (GPSR or EAN) must NEVER
       // discard the seller's work or block Save outright — the product is saved as a draft
       // (never left/made "published") and the seller is warned instead. The backend enforces
@@ -1772,7 +1806,19 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       const autoNoteLocales = updatedRaw?.listing_saved || updatedRaw?.suggestion_submitted
         ? []
         : (updatedRaw?.product?.auto_translated_locales || savedProduct?.auto_translated_locales);
-      const backendComplianceWarning = resolvedProduct?.compliance_warning || updatedRaw?.product?.compliance_warning || "";
+      const publishMissing = resolvedProduct?.publish_missing || updatedRaw?.product?.publish_missing || [];
+      const readinessText = publishMissing.length
+        ? lt(locale, "Saved as draft — to publish, add: ", "Taslak olarak kaydedildi — yayınlamak için ekleyin: ", "Enregistré en brouillon — pour publier, ajoutez : ", "Guardado como borrador — para publicar, añada: ", "Salvato come bozza — per pubblicare, aggiungi: ", "Als Entwurf gespeichert — zum Veröffentlichen ergänzen: ")
+          + publishMissing.map((k) => ({
+            title: lt(locale, "title", "başlık", "titre", "título", "titolo", "Titel"),
+            price: lt(locale, "price", "fiyat", "prix", "precio", "prezzo", "Preis"),
+            image: lt(locale, "at least one image", "en az bir görsel", "au moins une image", "al menos una imagen", "almeno un'immagine", "mindestens ein Bild"),
+            category: lt(locale, "category", "kategori", "catégorie", "categoría", "categoria", "Kategorie"),
+          })[k] || k).join(", ")
+        : "";
+      const backendOtherWarning = String(resolvedProduct?.compliance_warning || updatedRaw?.product?.compliance_warning || "")
+        .split(" · ").filter((part) => part && !part.startsWith("Not published yet")).join(" · ");
+      const backendComplianceWarning = [backendOtherWarning, readinessText].filter(Boolean).join(" · ");
       if (backendComplianceWarning || softComplianceWarning) {
         // Work was saved (as draft) — surface what still blocks publishing instead of a plain success.
         setMessage({ type: "warning", text: backendComplianceWarning || softComplianceWarning });
@@ -2311,7 +2357,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     { key: "eu_origin_document_url", kind: "text", lockable: true },
     // Shop assignment
     { key: "category_id", kind: "lockonly", lockable: true },
-    { key: "brand_id", kind: "lockonly", lockable: true },
+    // brand_id intentionally omitted — always locked to the family product (not editable per variant)
     { key: "shipping_group_id", kind: "select", optionsFrom: "shipping" },
     { key: "spezifikationen", kind: "lockonly", lockable: true },
     { key: "metafields", kind: "lockonly", lockable: true },
@@ -2695,16 +2741,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   return (
     <Page title="">
       <style>{`
-        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--p-color-border); }
+        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--p-color-border); }
         .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
         .product-edit-header .product-edit-title-link:hover { color: var(--p-color-text); }
         .product-edit-header .product-edit-name { margin: 0; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; }
         ${PRODUCT_SECTION_STYLES}
         .product-edit-label { font-size: 0.8125rem; font-weight: 500; color: var(--p-color-text); margin-bottom: 6px; }
-        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 16px; align-items: start; }
+        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 12px; align-items: start; }
         @media (max-width: 780px) { .product-edit-price-grid { grid-template-columns: 1fr; } }
         .product-edit-main-stack { width: 100%; }
-        .product-edit-sidebar { display: flex; flex-direction: column; gap: 16px; }
+        .product-edit-sidebar { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; align-self: start; }
+        @media (max-width: 768px) { .product-edit-sidebar { position: static; } }
+        .product-edit-layout .Polaris-Layout { align-items: start; }
         .variations-fullwidth { width: 100%; }
         .product-price-strike { text-decoration: line-through; color: var(--p-color-text-subdued); }
         .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-width: 400px; }
@@ -2749,7 +2797,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-description-toolbar .product-desc-html-btn:hover { background: var(--p-color-bg-surface-hover); color: var(--p-color-text); }
         .product-description-toolbar .product-desc-html-btn.active { background: var(--p-color-bg-surface-selected); color: var(--p-color-text); }
         .product-description-toolbar .product-desc-html-btn svg { width: 16px; height: 16px; }
-        .product-description-editor { min-height: 200px; padding: 16px; outline: none; font-size: 14px; line-height: 1.6; color: var(--p-color-text); }
+        .product-description-editor { min-height: 140px; padding: 12px 14px; outline: none; font-size: 14px; line-height: 1.55; color: var(--p-color-text); }
         .product-description-editor h1 { font-size: 1.75rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
         .product-description-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
         .product-description-editor h3 { font-size: 1.25rem; font-weight: 600; margin: 0.6em 0 0.3em; line-height: 1.35; }
@@ -2763,7 +2811,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-description-editor li { margin-bottom: 0.25em; }
         .product-description-editor strong { font-weight: 600; }
         .product-description-editor blockquote { margin: 0.75em 0; padding-left: 1em; border-left: 4px solid var(--p-color-border); color: var(--p-color-text-subdued); }
-        .product-description-html { min-height: 200px; width: 100%; padding: 16px; font-family: ui-monospace, "SF Mono", Monaco, monospace; font-size: 13px; line-height: 1.5; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary); border: none; border-radius: 0; resize: vertical; box-sizing: border-box; }
+        .product-description-html { min-height: 140px; width: 100%; padding: 12px 14px; font-family: ui-monospace, "SF Mono", Monaco, monospace; font-size: 13px; line-height: 1.5; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary); border: none; border-radius: 0; resize: vertical; box-sizing: border-box; }
         .product-description-html:focus { outline: none; }
         .product-description-html::placeholder { color: var(--p-color-text-subdued); }
         .product-description-hint { margin-top: 8px; font-size: 12px; color: var(--p-color-text-subdued); }
@@ -2862,6 +2910,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             onDismiss={() => { setMessage({ type: "", text: "" }); setSaveErrorFields([]); }}
           >
             {message.text}
+          </Banner>
+        </Box>
+      )}
+
+      {!isNew && shopVisibilityHiddenReasons(product).length > 0 && (
+        <Box paddingBlockEnd="200">
+          <Banner tone="warning" title={shopVisibilityBannerTitle(locale)}>
+            <BlockStack gap="100">
+              {shopVisibilityHiddenReasons(product).map((r) => (
+                <Text as="p" variant="bodySm" key={r.code || r.message}>
+                  • {shopVisibilityReasonLabel(r.code, locale) || r.message}
+                </Text>
+              ))}
+            </BlockStack>
           </Banner>
         </Box>
       )}
@@ -3239,7 +3301,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         )}
       </div>
 
-      <Box paddingBlockEnd="300">
+      <Box paddingBlockEnd="200">
         <Tabs
           tabs={[
             { id: "allgemein", content: pe.tabGeneral },
@@ -3253,28 +3315,24 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       </Box>
 
       {activeTabIndex === 0 && (
+      <div className="product-edit-layout">
       <Layout>
         <Layout.Section>
-          <BlockStack gap="300">
+          <BlockStack gap="200">
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="500">
-              <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
-                <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
-                  {pe.title}
-                </ProductSectionHeading>
-                <Box minWidth="160px">
-                  <Select label={pe.status} labelHidden options={statusOptionsFor(locale)} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
-                </Box>
-              </InlineStack>
+            <BlockStack gap="300">
+              <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
+                {pe.title}
+              </ProductSectionHeading>
               <TextField label="Title" labelHidden value={editingTitle} onChange={(v) => updateLocaleField("title", v)} placeholder="e.g. Cotton T-Shirt" autoComplete="off" helpText={pe.titleHelp} />
 
               <ProductSectionRule />
-              <InlineStack gap="300" wrap>
-                <Box minWidth="240px" flex="1">
+              <InlineStack gap="200" wrap>
+                <Box minWidth="160px" flex="1">
                   <TextField label="SKU" value={product.sku || ""} onChange={(v) => update({ sku: v })} placeholder="SKU" autoComplete="off" />
                 </Box>
-                <Box minWidth="240px" flex="1">
+                <Box minWidth="160px" flex="1">
                   <TextField
                     label={
                       <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -3285,6 +3343,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     value={getMeta(product, "ean")}
                     onChange={isCatalogLocked ? undefined : (v) => { updateMeta("ean", v); setEanLookupState(null); }}
                     onBlur={isCatalogLocked ? undefined : handleEanBlur}
+                    error={isCatalogLocked ? undefined : gtinFieldError(getMeta(product, "ean"), initialProduct?.metadata?.ean, locale)}
                     placeholder="EAN / Barcode"
                     autoComplete="off"
                     disabled={isCatalogLocked}
@@ -3297,7 +3356,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   />
                 </Box>
                 {!isNew && (
-                  <Box minWidth="200px" flex="1">
+                  <Box minWidth="140px" flex="1">
                     <TextField
                       label={
                         <InlineStack gap="100" blockAlign="center" wrap={false}>
@@ -3343,159 +3402,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </InlineStack>
                 </Banner>
               )}
-
-              <ProductSectionRule />
-
-              <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
-                <BlockStack gap="300">
-                  <BlockStack gap="150">
-                    <ProductSectionHeading>{locale === "en" ? "Shop assignment" : locale === "tr" ? "Mağaza ataması" : locale === "fr" ? "Attribution boutique" : locale === "es" ? "Asignación de tienda" : locale === "it" ? "Assegnazione negozio" : "Shop-Zuordnung"}</ProductSectionHeading>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {locale === "en" ? `Category, brand, shipping group${isSuperuser ? " and collections" : ""} — control catalog and shop navigation.` : locale === "tr" ? `Kategori, marka, kargo grubu${isSuperuser ? " ve koleksiyonlar" : ""} — katalog ve mağaza navigasyonunu yönetir.` : locale === "fr" ? `Catégorie, marque, groupe d'expédition${isSuperuser ? " et collections" : ""} — gèrent le catalogue et la navigation boutique.` : locale === "es" ? `Categoría, marca, grupo de envío${isSuperuser ? " y colecciones" : ""} — controlan el catálogo y la navegación de la tienda.` : locale === "it" ? `Categoria, marca, gruppo di spedizione${isSuperuser ? " e collezioni" : ""} — gestiscono il catalogo e la navigazione del negozio.` : `Kategorie, Marke, Versandgruppe${isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.`}
-                    </Text>
-                  </BlockStack>
-
-                  <div>
-                    <BlockStack gap="400">
-                      <Divider />
-                      {variantGroups.length > 0 && (
-                        <Banner tone="info">
-                          {locale === "en" ? "This product has variations — brand and shipping group are set per variant (each variant is its own product); category applies to the whole family and must match on every variant. Open a variant below to edit its brand/shipping." : locale === "tr" ? "Bu ürünün varyasyonları var — marka ve kargo grubu varyant başına ayarlanıyor (her varyant kendi ürünüdür); kategori tüm aileye uygulanır ve her varyantta aynı olmalıdır. Marka/kargoyu düzenlemek için aşağıdan bir varyant açın." : locale === "fr" ? "Ce produit a des variations — marque et groupe d'expédition sont définis par variante (chaque variante est son propre produit) ; la catégorie s'applique à toute la famille et doit être identique sur chaque variante. Ouvrez une variante ci-dessous pour éditer sa marque/expédition." : locale === "es" ? "Este producto tiene variaciones — marca y grupo de envío se definen por variante (cada variante es su propio producto); la categoría aplica a toda la familia y debe coincidir en cada variante. Abre una variante abajo para editar su marca/envío." : locale === "it" ? "Questo prodotto ha variazioni — marca e gruppo di spedizione sono impostati per variante (ogni variante è un proprio prodotto); la categoria si applica a tutta la famiglia e deve corrispondere su ogni variante. Apri una variante qui sotto per modificarne marca/spedizione." : "Dieses Produkt hat Variationen — Marke und Versandgruppe werden pro Variante gesetzt (jede Variante ist ihr eigenes Produkt); die Kategorie gilt für die ganze Familie und muss bei jeder Variante gleich sein. Öffne unten eine Variante, um Marke/Versand zu bearbeiten."}
-                        </Banner>
-                      )}
-                      <InlineStack gap="500" wrap>
-                        <Box minWidth="240px" flex="1">
-                          <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
-                          <Box paddingBlockStart="150">
-                            <CategoryDrilldownSelect
-                              label={locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}
-                              labelHidden
-                              categories={categories || []}
-                              value={getMeta(product, "category_id")}
-                              onChange={updateCategoryWithParents}
-                              placeholder={locale === "en" ? "Select category" : locale === "tr" ? "Kategori seç" : locale === "fr" ? "Choisir une catégorie" : locale === "es" ? "Seleccionar categoría" : locale === "it" ? "Seleziona categoria" : "Kategorie wählen"}
-                              disabled={categoryLocked}
-                            />
-                          </Box>
-                          {categoryLocked && (
-                            <Box paddingBlockStart="100">
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {locale === "en" ? "The category can't be changed after the product has been created (it determines which legal fields apply)." : locale === "tr" ? "Ürün oluşturulduktan sonra kategori değiştirilemez (hangi yasal alanların uygulanacağını belirler)." : locale === "fr" ? "La catégorie ne peut plus être modifiée une fois le produit créé (elle détermine les champs légaux applicables)." : locale === "es" ? "La categoría no se puede cambiar después de crear el producto (determina los campos legales aplicables)." : locale === "it" ? "La categoria non può essere modificata dopo la creazione del prodotto (determina i campi legali applicabili)." : "Die Kategorie kann nach dem Anlegen des Produkts nicht mehr geändert werden (sie bestimmt, welche rechtlichen Felder gelten)."}
-                              </Text>
-                            </Box>
-                          )}
-                        </Box>
-                        {variantGroups.length === 0 && (
-                          <>
-                            <Box minWidth="240px" flex="1">
-                              <Select
-                                label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                                options={brandSelect.options}
-                                value={getMeta(product, "brand_id") || ""}
-                                onChange={isCatalogLocked ? undefined : (v) => updateMeta("brand_id", v || undefined)}
-                                disabled={isCatalogLocked}
-                                helpText={
-                                  isCatalogLocked
-                                    ? (locale === "en" ? "Fixed by the catalog product — can't be changed here." : locale === "tr" ? "Katalog ürünü tarafından belirlenir — burada değiştirilemez." : locale === "fr" ? "Défini par le produit catalogue — non modifiable ici." : locale === "es" ? "Definido por el producto del catálogo — no se puede cambiar aquí." : locale === "it" ? "Definito dal prodotto a catalogo — non modificabile qui." : "Wird vom Katalogprodukt vorgegeben — hier nicht änderbar.")
-                                    : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && b.status === "superseded")
-                                    ? (locale === "en" ? "This brand was superseded after another seller registered it officially. Submit your own proof to sell under it again." : locale === "tr" ? "Bu marka başka bir satıcı tarafından resmi olarak tescil edildiği için geçersiz kılındı. Bu marka altında tekrar satış yapmak için kendi belgenizi gönderin." : locale === "fr" ? "Cette marque a été remplacée après son enregistrement officiel par un autre vendeur. Soumettez votre propre preuve pour vendre à nouveau sous cette marque." : locale === "es" ? "Esta marca fue reemplazada después de que otro vendedor la registrara oficialmente. Envíe su propia prueba para volver a vender bajo esta marca." : locale === "it" ? "Questo brand è stato sostituito dopo che un altro venditore lo ha registrato ufficialmente. Invia una tua prova per tornare a vendere con questo brand." : "Diese Marke wurde ersetzt, nachdem ein anderer Verkäufer sie offiziell registriert hat. Reichen Sie einen eigenen Nachweis ein, um wieder unter dieser Marke zu verkaufen.")
-                                    : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
-                                    ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
-                                    : brandSelect.hasLockedRegistered
-                                    ? (locale === "en" ? "Brands registered by another seller need your own registration or reseller authorization (Brands page)." : locale === "tr" ? "Başka bir satıcının tescilli markası için kendi tescil veya yetkili satıcı belgen gerekir (Markalar sayfası)." : locale === "fr" ? "Les marques déposées par un autre vendeur nécessitent votre propre enregistrement ou autorisation de revendeur (page Marques)." : locale === "es" ? "Las marcas registradas por otro vendedor requieren tu propio registro o autorización de distribuidor (página Marcas)." : locale === "it" ? "I brand registrati da un altro venditore richiedono la tua registrazione o autorizzazione da rivenditore (pagina Brand)." : "Von einem anderen Verkäufer registrierte Marken brauchen deine eigene Registrierung oder Händlerberechtigung (Seite Marken).")
-                                    : undefined
-                                }
-                              />
-                            </Box>
-                            <Box minWidth="240px" flex="1">
-                              <Select
-                                label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
-                                options={[
-                                  { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
-                                  ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
-                                ]}
-                                value={meta.shipping_group_id ?? ""}
-                                onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
-                              />
-                            </Box>
-                          </>
-                        )}
-                      </InlineStack>
-
-                      {isSuperuser && (
-                        <>
-                          <Divider />
-                          <BlockStack gap="300">
-                            <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Collections" : locale === "tr" ? "Koleksiyonlar" : locale === "fr" ? "Collections" : locale === "es" ? "Colecciones" : locale === "it" ? "Collezioni" : "Kollektionen"}</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Product can be assigned to multiple collections (e.g. Sale, Season)." : locale === "tr" ? "Ürün birden fazla koleksiyona atanabilir (örn. İndirim, Sezon)." : locale === "fr" ? "Le produit peut être assigné à plusieurs collections (ex. Soldes, Saison)." : locale === "es" ? "El producto puede asignarse a varias colecciones (ej. Rebajas, Temporada)." : locale === "it" ? "Il prodotto può essere assegnato a più collezioni (es. Saldo, Stagione)." : "Produkt kann mehreren Kollektionen zugeordnet werden (z. B. Sale, Saison)."}</Text>
-                            <div>
-                              <div ref={collectionSearchRef} className="collection-dropdown-wrap">
-                                <TextField
-                                  label={locale === "en" ? "Search collections" : locale === "tr" ? "Koleksiyon ara" : locale === "fr" ? "Rechercher des collections" : locale === "es" ? "Buscar colecciones" : locale === "it" ? "Cerca collezioni" : "Kollektionen durchsuchen"}
-                                  labelHidden
-                                  value={collectionSearch}
-                                  onChange={setCollectionSearch}
-                                  onFocus={() => setCollectionPopoverOpen(true)}
-                                  placeholder={locale === "en" ? "Search collection…" : locale === "tr" ? "Koleksiyon ara…" : locale === "fr" ? "Rechercher une collection…" : locale === "es" ? "Buscar colección…" : locale === "it" ? "Cerca collezione…" : "Kollektion suchen…"}
-                                  autoComplete="off"
-                                />
-                                {collectionPopoverOpen && collectionRect && typeof document !== "undefined" && createPortal(
-                                  <div
-                                    ref={collectionMenuRef}
-                                    style={{ position: "fixed", top: collectionRect.bottom + 4, left: collectionRect.left, width: collectionRect.width, maxHeight: 280, overflowY: "auto", background: "var(--p-color-bg-surface)", border: "1px solid var(--p-color-border)", borderRadius: 8, boxShadow: "var(--p-shadow-400)", zIndex: 10002 }}
-                                  >
-                                    {(collections || [])
-                                      .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
-                                      .map((c) => (
-                                        <button
-                                          key={c.id}
-                                          type="button"
-                                          className="collection-dropdown-item"
-                                          onMouseDown={(e) => e.preventDefault()}
-                                          onClick={() => {
-                                            const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
-                                            updateMeta("collection_ids", next);
-                                          }}
-                                        >
-                                          <span className="checkbox-container" style={{ pointerEvents: "none" }}>
-                                            <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
-                                            <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
-                                              <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
-                                            </svg>
-                                          </span>
-                                          <span>{c.title || c.handle || c.id}</span>
-                                        </button>
-                                      ))}
-                                  </div>,
-                                  document.body,
-                                )}
-                              </div>
-                              {collectionIds.filter((id) => (collections || []).some((c) => c.id === id)).length > 0 && (
-                                <InlineStack gap="100" wrap>
-                                  {collectionIds
-                                    .filter((id) => (collections || []).some((c) => c.id === id))
-                                    .map((id) => {
-                                      const c = (collections || []).find((x) => x.id === id);
-                                      return (
-                                        <span
-                                          key={id}
-                                          style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
-                                        >
-                                          {c ? (c.title || c.handle || id) : id}
-                                          <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
-                                        </span>
-                                      );
-                                    })}
-                                </InlineStack>
-                              )}
-                            </div>
-                          </BlockStack>
-                        </>
-                      )}
-                    </BlockStack>
-                  </div>
-                </BlockStack>
-              </Box>
 
               <ProductSectionRule />
               <BlockStack gap="200">
@@ -3571,7 +3477,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <ProductSectionHeading>{pe.media}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 {locale === "en" ? "New image uploads: JPEG or PNG, minimum 1000×1000 px; the server saves square WebP (1000×1000) for the shop." : locale === "tr" ? "Yeni görsel yüklemeleri: JPEG veya PNG, minimum 1000×1000 px; sunucu mağaza için kare WebP (1000×1000) kaydeder." : locale === "fr" ? "Nouveaux téléchargements d'images : JPEG ou PNG, minimum 1000×1000 px ; le serveur enregistre du WebP carré (1000×1000) pour la boutique." : locale === "es" ? "Nuevas subidas de imágenes: JPEG o PNG, mínimo 1000×1000 px; el servidor guarda WebP cuadrado (1000×1000) para la tienda." : locale === "it" ? "Nuovi caricamenti di immagini: JPEG o PNG, minimo 1000×1000 px; il server salva WebP quadrato (1000×1000) per il negozio." : "Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop."}
@@ -3629,13 +3535,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <ProductSectionHeading>{pe.pricing}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                {pe.pricingHelp}
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
+                {pe.pricingHelp} · {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
               </Text>
               <div className="product-edit-price-grid">
                 {[
@@ -3653,7 +3556,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     <TextField
                       key={metaKey}
                       label={label}
-                      prefix={currentCountryConf.symbol}
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
@@ -3675,13 +3577,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   );
                 })}
               </div>
+              <ProductSectionRule />
+              <ProductSectionHeading>{pe.inventory}</ProductSectionHeading>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="120px">
+                  <TextField label={pe.quantity} type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
+                </Box>
+                {!isCatalogLocked && (
+                  <Box minWidth="160px">
+                    <TextField label={pe.minOrderQty} type="number" min={1} value={meta.minimum_order_quantity != null ? String(meta.minimum_order_quantity) : ""} onChange={(v) => updateMeta("minimum_order_quantity", v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1))} placeholder="1" />
+                  </Box>
+                )}
+              </InlineStack>
+              <Text as="p" variant="bodySm" tone="subdued">{pe.warehouseHint}</Text>
             </BlockStack>
             </div>
           </Card>
 
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
+            <BlockStack gap="200">
               <ProductSectionHeading>{pe.bullets}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">{pe.bulletsHelp}</Text>
               {[0, 1, 2, 3, 4].map((i) => {
@@ -3705,7 +3620,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       placeholder={i === 0 ? "e.g. Premium quality" : ""}
                       autoComplete="off"
                     />
-                    <Text as="p" variant="bodySm" tone="subdued" style={{ marginTop: 4, color: overLimit ? "var(--p-color-text-critical)" : undefined }}>
+                    <Text as="p" variant="bodySm" tone="subdued" style={{ marginTop: 2, color: overLimit ? "var(--p-color-text-critical)" : undefined }}>
                       {len} / 120
                     </Text>
                   </Box>
@@ -3715,32 +3630,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             </div>
           </Card>
 
-          <Card>
-            <div className="product-edit-sections">
-            <BlockStack gap="400">
-              <ProductSectionHeading>{pe.inventory}</ProductSectionHeading>
-              <InlineStack gap="200" wrap>
-                <Box minWidth="120px">
-                  <TextField label={pe.quantity} type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
-                </Box>
-                {/* Not relevant when adding an existing catalog product to your own inventory —
-                    this listing is one seller's stock of an already-defined product, not a new
-                    product definition. */}
-                {!isCatalogLocked && (
-                  <Box minWidth="180px">
-                    <TextField label={pe.minOrderQty} type="number" min={1} value={meta.minimum_order_quantity != null ? String(meta.minimum_order_quantity) : ""} onChange={(v) => updateMeta("minimum_order_quantity", v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1))} placeholder="1" />
-                  </Box>
-                )}
-              </InlineStack>
-              <Text as="p" variant="bodySm" tone="subdued">{pe.warehouseHint}</Text>
-            </BlockStack>
-            </div>
-          </Card>
-
               {isSuperuser && (
               <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <ProductSectionHeading>{pe.seo}</ProductSectionHeading>
               <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
@@ -3840,54 +3733,206 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
         <Layout.Section variant="oneThird">
           <div className="product-edit-sidebar">
-          <BlockStack gap="300">
+          <BlockStack gap="200">
             <Card>
-              <BlockStack gap="400">
-                <BlockStack gap="200">
-                  <ProductSectionHeading>{locale === "en" ? "Publish date (optional)" : locale === "tr" ? "Yayın tarihi (isteğe bağlı)" : locale === "fr" ? "Date de publication (optionnel)" : locale === "es" ? "Fecha de publicación (opcional)" : locale === "it" ? "Data di pubblicazione (opzionale)" : "Veröffentlichungsdatum (optional)"}</ProductSectionHeading>
-                  <TextField
-                    label=""
-                    labelHidden
-                    type="datetime-local"
-                    value={(() => {
-                      // Keep the input controlled: datetime-local expects "YYYY-MM-DDTHH:mm"
-                      const raw = meta.publish_date;
-                      if (!raw) return "";
-                      const d = new Date(raw);
-                      if (isNaN(d.getTime())) return "";
-                      const pad = (n) => String(n).padStart(2, "0");
-                      const yyyy = d.getFullYear();
-                      const mm = pad(d.getMonth() + 1);
-                      const dd = pad(d.getDate());
-                      const hh = pad(d.getHours());
-                      const min = pad(d.getMinutes());
-                      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-                    })()}
-                    onChange={(v) => {
-                      if (!v) return updateMeta("publish_date", undefined);
-                      const d = new Date(v);
-                      if (isNaN(d.getTime())) return updateMeta("publish_date", undefined);
-                      // Store ISO so shop can do new Date(publish_date) safely
-                      updateMeta("publish_date", d.toISOString());
-                    }}
-                    placeholder="YYYY-MM-DDTHH:mm"
-                    helpText={locale === "en" ? "If a future date + time is set, the shop shows \"Coming soon\"." : locale === "tr" ? "İleri tarih + saat seçilirse shop’ta \"Pek yakında\" gösterilir." : locale === "fr" ? "Si une date + heure future est sélectionnée, la boutique affiche \"Bientôt disponible\"." : locale === "es" ? "Si se selecciona una fecha + hora futura, la tienda muestra \"Próximamente\"." : locale === "it" ? "Se si seleziona una data + ora futura, il negozio mostra \"Presto disponibile\"." : "Bei zukünftigem Datum + Uhrzeit zeigt der Shop \"Demnächst verfügbar\"."}
-                  />
-                </BlockStack>
+              <div className="product-edit-sections">
+              <BlockStack gap="200">
+                <ProductSectionHeading>{pe.status}</ProductSectionHeading>
+                <Select
+                  label={pe.status}
+                  labelHidden
+                  options={statusOptionsFor(locale)}
+                  value={product.status || "draft"}
+                  onChange={(v) => update({ status: v })}
+                />
+                {!isNew && shopProductHandleForLocale(product, locale) && (
+                  <a
+                    href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <Button fullWidth size="slim" icon={ViewIcon}>
+                      {pe.viewInShop}
+                    </Button>
+                  </a>
+                )}
+              </BlockStack>
+              </div>
+            </Card>
 
+            <Card>
+              <div className="product-edit-sections">
+              <BlockStack gap="200">
+                <ProductSectionHeading>
+                  {locale === "en" ? "Product organization" : locale === "tr" ? "Ürün organizasyonu" : locale === "fr" ? "Organisation du produit" : locale === "es" ? "Organización del producto" : locale === "it" ? "Organizzazione prodotto" : "Produktorganisation"}
+                </ProductSectionHeading>
+                <CategoryDrilldownSelect
+                  label={locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}
+                  categories={categories || []}
+                  value={getMeta(product, "category_id")}
+                  onChange={updateCategoryWithParents}
+                  placeholder={locale === "en" ? "Select category" : locale === "tr" ? "Kategori seç" : locale === "fr" ? "Choisir une catégorie" : locale === "es" ? "Seleccionar categoría" : locale === "it" ? "Seleziona categoria" : "Kategorie wählen"}
+                  disabled={categoryLocked}
+                />
+                {categoryLocked && (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {locale === "en" ? "Category is locked after create (legal fields depend on it)." : locale === "tr" ? "Oluşturma sonrası kategori kilitli (yasal alanlar buna bağlı)." : locale === "fr" ? "Catégorie verrouillée après création (champs légaux)." : locale === "es" ? "Categoría bloqueada tras crear (campos legales)." : locale === "it" ? "Categoria bloccata dopo la creazione (campi legali)." : "Kategorie nach dem Anlegen gesperrt (rechtliche Felder)."}
+                  </Text>
+                )}
+                {brandLocked ? (
+                  <TextField
+                    label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
+                    value={brandSummaryLabel || getMeta(product, "brand_id") || "—"}
+                    disabled
+                    autoComplete="off"
+                    helpText={
+                      isCatalogLocked
+                        ? (locale === "en" ? "Fixed by the catalog product." : locale === "tr" ? "Katalog ürünü tarafından sabit." : locale === "fr" ? "Fixé par le produit catalogue." : locale === "es" ? "Fijado por el catálogo." : locale === "it" ? "Fissato dal catalogo." : "Vom Katalogprodukt vorgegeben.")
+                        : (locale === "en" ? "Brand can't be changed after it has been set." : locale === "tr" ? "Marka bir kez ayarlandıktan sonra değiştirilemez." : locale === "fr" ? "La marque ne peut plus être modifiée une fois définie." : locale === "es" ? "La marca no se puede cambiar una vez establecida." : locale === "it" ? "Il brand non può essere modificato dopo essere stato impostato." : "Die Marke kann nach dem Setzen nicht mehr geändert werden.")
+                    }
+                  />
+                ) : (
+                  <Select
+                    label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
+                    options={brandSelect.options}
+                    value={getMeta(product, "brand_id") || ""}
+                    onChange={(v) => updateMeta("brand_id", v || undefined)}
+                    helpText={
+                      (brands || []).find((b) => b.id === getMeta(product, "brand_id") && b.status === "superseded")
+                        ? (locale === "en" ? "This brand was superseded — submit your own proof to sell under it again." : locale === "tr" ? "Bu marka geçersiz kılındı — tekrar satmak için belge gönderin." : locale === "fr" ? "Marque remplacée — soumettez une preuve pour vendre à nouveau." : locale === "es" ? "Marca reemplazada — envía tu prueba para vender de nuevo." : locale === "it" ? "Brand sostituito — invia una prova per vendere di nuovo." : "Marke ersetzt — eigenen Nachweis einreichen.")
+                        : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
+                        ? (locale === "en" ? "Brand pending authorization — can't publish yet." : locale === "tr" ? "Marka onay bekliyor — henüz yayınlanamaz." : locale === "fr" ? "Marque en attente d'autorisation." : locale === "es" ? "Marca pendiente de autorización." : locale === "it" ? "Brand in attesa di autorizzazione." : "Marke wartet auf Autorisierung.")
+                        : brandSelect.hasLockedRegistered
+                        ? (locale === "en" ? "Registered brands need your own auth (Brands page)." : locale === "tr" ? "Tescilli markalar için kendi belgen gerekir (Markalar)." : locale === "fr" ? "Marques déposées : votre autorisation (page Marques)." : locale === "es" ? "Marcas registradas: tu autorización (Marcas)." : locale === "it" ? "Brand registrati: tua autorizzazione (Brand)." : "Registrierte Marken: eigene Berechtigung (Marken).")
+                        : undefined
+                    }
+                  />
+                )}
+                <Select
+                  label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
+                  options={[
+                    { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
+                    ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
+                  ]}
+                  value={meta.shipping_group_id ?? ""}
+                  onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
+                />
                 {isSuperuser && (
-                <>
+                  <>
+                    <ProductSectionRule />
+                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                      {locale === "en" ? "Collections" : locale === "tr" ? "Koleksiyonlar" : locale === "fr" ? "Collections" : locale === "es" ? "Colecciones" : locale === "it" ? "Collezioni" : "Kollektionen"}
+                    </Text>
+                    <div ref={collectionSearchRef} className="collection-dropdown-wrap">
+                      <TextField
+                        label={locale === "en" ? "Search collections" : locale === "tr" ? "Koleksiyon ara" : locale === "fr" ? "Rechercher des collections" : locale === "es" ? "Buscar colecciones" : locale === "it" ? "Cerca collezioni" : "Kollektionen durchsuchen"}
+                        labelHidden
+                        value={collectionSearch}
+                        onChange={setCollectionSearch}
+                        onFocus={() => setCollectionPopoverOpen(true)}
+                        placeholder={locale === "en" ? "Search…" : locale === "tr" ? "Ara…" : locale === "fr" ? "Rechercher…" : locale === "es" ? "Buscar…" : locale === "it" ? "Cerca…" : "Suchen…"}
+                        autoComplete="off"
+                      />
+                      {collectionPopoverOpen && collectionRect && typeof document !== "undefined" && createPortal(
+                        <div
+                          ref={collectionMenuRef}
+                          style={{ position: "fixed", top: collectionRect.bottom + 4, left: collectionRect.left, width: Math.max(collectionRect.width, 220), maxHeight: 280, overflowY: "auto", background: "var(--p-color-bg-surface)", border: "1px solid var(--p-color-border)", borderRadius: 8, boxShadow: "var(--p-shadow-400)", zIndex: 10002 }}
+                        >
+                          {(collections || [])
+                            .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
+                            .map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className="collection-dropdown-item"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
+                                  updateMeta("collection_ids", next);
+                                }}
+                              >
+                                <span className="checkbox-container" style={{ pointerEvents: "none" }}>
+                                  <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
+                                  <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
+                                    <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
+                                  </svg>
+                                </span>
+                                <span>{c.title || c.handle || c.id}</span>
+                              </button>
+                            ))}
+                        </div>,
+                        document.body,
+                      )}
+                    </div>
+                    {collectionIds.filter((id) => (collections || []).some((c) => c.id === id)).length > 0 && (
+                      <InlineStack gap="100" wrap>
+                        {collectionIds
+                          .filter((id) => (collections || []).some((c) => c.id === id))
+                          .map((id) => {
+                            const c = (collections || []).find((x) => x.id === id);
+                            return (
+                              <span
+                                key={id}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
+                              >
+                                {c ? (c.title || c.handle || id) : id}
+                                <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
+                              </span>
+                            );
+                          })}
+                      </InlineStack>
+                    )}
+                  </>
+                )}
+              </BlockStack>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="product-edit-sections">
+              <BlockStack gap="200">
+                <ProductSectionHeading>
+                  {locale === "en" ? "Publishing" : locale === "tr" ? "Yayınlama" : locale === "fr" ? "Publication" : locale === "es" ? "Publicación" : locale === "it" ? "Pubblicazione" : "Veröffentlichung"}
+                </ProductSectionHeading>
+                <TextField
+                  label={locale === "en" ? "Publish date (optional)" : locale === "tr" ? "Yayın tarihi (isteğe bağlı)" : locale === "fr" ? "Date de publication (optionnel)" : locale === "es" ? "Fecha de publicación (opcional)" : locale === "it" ? "Data di pubblicazione (opzionale)" : "Veröffentlichungsdatum (optional)"}
+                  type="datetime-local"
+                  value={(() => {
+                    const raw = meta.publish_date;
+                    if (!raw) return "";
+                    const d = new Date(raw);
+                    if (isNaN(d.getTime())) return "";
+                    const pad = (n) => String(n).padStart(2, "0");
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  })()}
+                  onChange={(v) => {
+                    if (!v) return updateMeta("publish_date", undefined);
+                    const d = new Date(v);
+                    if (isNaN(d.getTime())) return updateMeta("publish_date", undefined);
+                    updateMeta("publish_date", d.toISOString());
+                  }}
+                  helpText={locale === "en" ? "Future date → shop shows \"Coming soon\"." : locale === "tr" ? "İleri tarih → shop’ta \"Pek yakında\"." : locale === "fr" ? "Date future → \"Bientôt disponible\"." : locale === "es" ? "Fecha futura → \"Próximamente\"." : locale === "it" ? "Data futura → \"Presto disponibile\"." : "Zukünftiges Datum → \"Demnächst verfügbar\"."}
+                />
+              </BlockStack>
+              </div>
+            </Card>
+
+            {isSuperuser && (
+            <Card>
+              <div className="product-edit-sections">
+              <BlockStack gap="200">
                 <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
                   <BlockStack gap="200">
-                    <ProductSectionHeading>{locale === "en" ? "Related products (customers also bought)" : locale === "tr" ? "İlgili ürünler (müşteriler de satın aldı)" : locale === "fr" ? "Produits associés (les clients ont aussi acheté)" : locale === "es" ? "Productos relacionados (los clientes también compraron)" : locale === "it" ? "Prodotti correlati (i clienti hanno anche acquistato)" : "Verwandte Produkte (Kunden kauften auch)"}</ProductSectionHeading>
-                    <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Products shown in the \"Customers who bought this item also bought\" section on the product page." : locale === "tr" ? "Ürün sayfasında \"Bu ürünü satın alanlar bunları da satın aldı\" bölümünde gösterilecek ürünler." : locale === "fr" ? "Produits affichés dans la section \"Les clients qui ont acheté cet article ont aussi acheté\" sur la page produit." : locale === "es" ? "Productos mostrados en la sección \"Los clientes que compraron este artículo también compraron\" en la página del producto." : locale === "it" ? "Prodotti mostrati nella sezione \"I clienti che hanno acquistato questo articolo hanno anche acquistato\" nella pagina prodotto." : "Produkte die im Bereich \"Kunden, die diesen Artikel gekauft haben, kauften auch\" auf der Produktseite angezeigt werden."}</Text>
+                    <ProductSectionHeading>{locale === "en" ? "Related products" : locale === "tr" ? "İlgili ürünler" : locale === "fr" ? "Produits associés" : locale === "es" ? "Productos relacionados" : locale === "it" ? "Prodotti correlati" : "Verwandte Produkte"}</ProductSectionHeading>
+                    <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Shown as \"Customers also bought\"." : locale === "tr" ? "\"Müşteriler bunları da aldı\" olarak gösterilir." : locale === "fr" ? "Section \"Les clients ont aussi acheté\"." : locale === "es" ? "Sección \"También compraron\"." : locale === "it" ? "Sezione \"I clienti hanno anche acquistato\"." : "Bereich \"Kunden kauften auch\"."}</Text>
                     <TextField
                       label=""
                       labelHidden
                       value={relatedProductSearch}
                       onChange={setRelatedProductSearch}
                       onFocus={() => setRelatedProductPopoverOpen(true)}
-                      placeholder={locale === "en" ? "Search product…" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher un produit…" : locale === "es" ? "Buscar producto…" : locale === "it" ? "Cerca prodotto…" : "Produkt suchen…"}
+                      placeholder={locale === "en" ? "Search product…" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher…" : locale === "es" ? "Buscar…" : locale === "it" ? "Cerca…" : "Suchen…"}
                       autoComplete="off"
                     />
                     <div style={{ position: "relative" }}>
@@ -3950,26 +3995,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </div>
 
                 <ProductSectionRule />
-
-                <BlockStack gap="200">
-                  <ProductSectionHeading>{pe.sales}</ProductSectionHeading>
-                  <Text as="p" variant="bodyMd">{meta.sales_count != null ? meta.sales_count : 0} {locale === "en" ? "sales" : locale === "tr" ? "satış" : locale === "fr" ? "ventes" : locale === "es" ? "ventas" : locale === "it" ? "vendite" : "Verkäufe"}</Text>
-                </BlockStack>
+                <ProductSectionHeading>{pe.sales}</ProductSectionHeading>
+                <Text as="p" variant="bodyMd">{meta.sales_count != null ? meta.sales_count : 0} {locale === "en" ? "sales" : locale === "tr" ? "satış" : locale === "fr" ? "ventes" : locale === "es" ? "ventas" : locale === "it" ? "vendite" : "Verkäufe"}</Text>
 
                 <ProductSectionRule />
-
-                <BlockStack gap="200">
-                  <ProductSectionHeading>{pe.type}</ProductSectionHeading>
-                  <TextField label="Product type" labelHidden value={meta.type ?? ""} onChange={(v) => updateMeta("type", v)} placeholder="e.g. T-Shirt" autoComplete="off" />
-                </BlockStack>
-                </>
-                )}
+                <ProductSectionHeading>{pe.type}</ProductSectionHeading>
+                <TextField label="Product type" labelHidden value={meta.type ?? ""} onChange={(v) => updateMeta("type", v)} placeholder="e.g. T-Shirt" autoComplete="off" />
               </BlockStack>
+              </div>
             </Card>
+            )}
           </BlockStack>
           </div>
         </Layout.Section>
       </Layout>
+      </div>
       )}
 
       {activeTabIndex === 2 && !isCatalogLocked && (

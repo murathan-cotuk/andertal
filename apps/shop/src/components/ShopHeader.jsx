@@ -2263,9 +2263,12 @@ export default function ShopHeader() {
             className="second-nav"
             {...secondNavLinkDataAttrs}
             style={{
+              // "Chrome covers on scroll" only applies once the page is actually scrolled — at rest
+              // the row always shows its own Styles background (it used to take the header colour
+              // permanently, hiding the configured second-nav background).
               ...(unifiedHeaderAtTop
                 ? { background: "transparent", borderTop: "none", borderBottom: "none" }
-                : snChromeCover && !snScrollBgSet
+                : snChromeCover && !snScrollBgSet && scrollPastThreshold
                   ? { background: "var(--header-chrome-bg)", "--second-nav-bg": "var(--header-chrome-bg)" }
                   : {}),
               // Styles → Second-nav "Hintergrund / Textfarbe (beim Scrollen)" per device; an explicit

@@ -1389,7 +1389,9 @@ export async function POST(request) {
 
     const lookups = await loadImportLookups(backendUrl, sellerToken);
 
-    const results = { created: 0, updated: 0, failed: 0, errors: [] };
+    // drafts: rows requested as published that the backend kept as draft (missing GPSR,
+    // price, image, category…) — reported so the seller knows what to complete.
+    const results = { created: 0, updated: 0, failed: 0, errors: [], drafts: [] };
     const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
     const collectedImageUrls = new Set();
 
@@ -1504,6 +1506,18 @@ export async function POST(request) {
           results.errors.push({ sku, error: err?.message || `HTTP ${res.status}` });
         } else {
           results.created++;
+          const wantedLive = ["published", "active"].includes(String(payload.status || "").toLowerCase());
+          if (wantedLive) {
+            const body = await res.json().catch(() => null);
+            const p = body?.product;
+            if (p && String(p.status || "").toLowerCase() === "draft") {
+              results.drafts.push({
+                sku,
+                missing: Array.isArray(p.publish_missing) ? p.publish_missing : [],
+                warning: p.compliance_warning || "",
+              });
+            }
+          }
         }
       } catch (e) {
         results.failed++;

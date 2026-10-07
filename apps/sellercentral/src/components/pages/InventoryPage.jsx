@@ -26,6 +26,10 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { userError } from "@/lib/api-error-messages";
 import { getUI } from "@/lib/ui-strings";
 import { lt, fmtMoney, fmtDateShort } from "@/lib/locale-text";
+import {
+  shopVisibilityHiddenReasons,
+  shopVisibilityReasonLabel,
+} from "@/lib/shop-visibility-i18n";
 import { formatDecimal } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { Link as I18nLink } from "@/i18n/navigation";
@@ -37,6 +41,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { SettingsIcon } from "@shopify/polaris-icons";
 
 import { confirmRemoval } from "@/lib/confirm-delete";
+import { encodeVariantPathKey } from "@/lib/variant-path-key";
 const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
 const EXCEL_BORDER = "1px solid #e6dfd4";
 
@@ -191,6 +196,96 @@ const InvEmpty = styled.div`
   color: #5e574e;
 `;
 
+/** Manual "Group products" folder — own card, not a broken row inside the excel grid. */
+const InvGroupCard = styled.div`
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e6dfd4;
+  border-radius: 8px;
+  overflow: clip;
+`;
+
+const InvGroupHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: #faf7f2;
+  border-bottom: ${(p) => (p.$open ? "1px solid #e6dfd4" : "none")};
+`;
+
+const InvGroupToggle = styled.button`
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #d6ccbd;
+  background: #fff;
+  color: #5e574e;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  &:hover { border-color: #a65300; color: #7f3f00; }
+`;
+
+const InvGroupTitle = styled.span`
+  font-size: 13px;
+  font-weight: 650;
+  color: #1d1b18;
+  letter-spacing: -0.01em;
+`;
+
+const InvGroupMeta = styled.span`
+  font-size: 12px;
+  color: #5e574e;
+`;
+
+const InvGroupBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fcebd5;
+  color: #7f3f00;
+  border: 1px solid #f5d3a8;
+`;
+
+const InvGroupUngroup = styled.button`
+  margin-left: auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #d6ccbd;
+  background: #fff;
+  color: #5e574e;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  &:hover { border-color: #a39a8d; color: #1d1b18; }
+`;
+
+const InvGroupBody = styled.div`
+  overflow-x: auto;
+  border-left: 3px solid #f5d3a8;
+`;
+
+const InvFamilyHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #faf7f2;
+  border-bottom: 1px solid #e6dfd4;
+`;
+
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
   description: true,
@@ -280,6 +375,20 @@ function isOwnInventoryProduct(product, mySellerId) {
   const s = String(product?.seller_id || "").trim();
   if (!s) return true;
   return s === String(mySellerId || "").trim();
+}
+
+/** Combine-as-variants: seller must own the master row (seller_id match). Listed catalog / other-seller add-existing products are not combinable. */
+function sellerOwnsForCombine(product, mySellerId) {
+  const mine = String(mySellerId || "").trim();
+  if (!mine) return false;
+  const owner = String(
+    product?.seller_id ||
+      (product?.metadata && typeof product.metadata === "object"
+        ? product.metadata.seller_id || product.metadata.seller
+        : "") ||
+      ""
+  ).trim();
+  return Boolean(owner) && owner === mine;
 }
 
 // A product a seller listed (but didn't originally create ? e.g. an already-existing
@@ -410,10 +519,12 @@ function getDefaultShopUrl() {
   const url = (typeof env === "string" ? env : "").trim();
   if (url) return url.replace(/\/$/, "");
   if (typeof window !== "undefined") {
-    if (window.location.hostname === "localhost") return "http://localhost:3000";
-    return window.location.origin;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:3000";
+    }
+    return "https://andertal.com";
   }
-  return "";
+  return "https://andertal.com";
 }
 
 function defaultShopMarketForLocale(loc) {
@@ -428,14 +539,18 @@ function defaultShopMarketForLocale(loc) {
 
 function shopPreviewPrefix(loc) {
   const l = String(loc || "de").toLowerCase();
-  return `/${defaultShopMarketForLocale(l)}/${l}/eur`;
+  return `/${defaultShopMarketForLocale(l)}/${l}`;
 }
 
 function shopProductHandleForLocale(product, loc) {
   const tr = product?.metadata?.translations?.[loc];
-  const h = (tr?.handle || "").trim();
-  if (h) return h;
-  return (product?.handle || "").trim();
+  const h = ((tr?.handle || "").trim() || (product?.handle || "").trim());
+  if (!h) return "";
+  const rawId = String(product?.id || "").replace(/^prod_/i, "").toLowerCase();
+  const uuid = rawId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+  const id = uuid ? uuid[0] : rawId;
+  const shortCode = id.length >= 8 ? id.slice(-8) : id;
+  return shortCode ? `${h}-a-${shortCode}` : h;
 }
 
 function statusLabel(statusRaw) {
@@ -516,6 +631,7 @@ function ProductStatusToggle({ on, onChange, disabled, title }) {
 }
 
 function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
+  const router = useRouter();
   const matrixVariants = (product.variants || []).filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0);
   const [drafts, setDrafts] = useState(() =>
     matrixVariants.map((v) => ({
@@ -645,7 +761,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
           </div>
           <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
             <a
-              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
               style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
@@ -655,9 +771,16 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             </a>
             <button
               type="button"
-              onClick={() => router.push(`/products/${product.id}`)}
+              onClick={() => {
+                const ov = d.option_values || matrixVariants[idx]?.option_values;
+                if (Array.isArray(ov) && ov.length) {
+                  router.push(`/products/${product.id}/variants/${encodeVariantPathKey(ov)}`);
+                } else {
+                  router.push(`/products/${product.id}`);
+                }
+              }}
               style={{ marginTop: 1, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
-              title={lt(locale, "Open product edit page via SKU", "SKU ile ürün düzenleme sayfasına git", "Ouvrir la page produit via SKU", "Abrir edición de producto vía SKU", "Apri modifica prodotto tramite SKU", "SKU üzerinden ürün düzenleme sayfasına git")}
+              title={lt(locale, "Open full product edit for this SKU", "Bu SKU için tam ürün düzenlemeyi aç", "Ouvrir l'édition complète de ce SKU", "Abrir edición completa de este SKU", "Apri modifica completa di questo SKU", "Vollständige Produktbearbeitung für diese SKU öffnen")}
             >
               {i18n.sku}: {matrixVariants[idx]?.sku || "?"}
             </button>
@@ -801,6 +924,9 @@ function InventoryProductRow({
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [invDraft, setInvDraft] = useState(null);
+  const [priceDraft, setPriceDraft] = useState(null);
+  const [rowSaving, setRowSaving] = useState(false);
   const menuBtnRef = useRef(null);
   const menuPanelRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
@@ -947,6 +1073,8 @@ function InventoryProductRow({
   const price =
     product.price != null
       ? Number(product.price)
+      : product.price_cents != null
+        ? Number(product.price_cents) / 100
       : product.variants?.[0]?.prices?.[0]?.amount
         ? Number(product.variants[0].prices[0].amount) / 100
         : 0;
@@ -958,6 +1086,103 @@ function InventoryProductRow({
     : "?";
   const hasVariants = Array.isArray(product.variants) && product.variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0).length > 0;
   const pendingCount = Array.isArray(pendingChangeRequests) ? pendingChangeRequests.length : 0;
+
+  const invDisplay = invDraft != null ? invDraft : String(inv);
+  const priceDisplay = priceDraft != null
+    ? priceDraft
+    : (Number.isFinite(price) ? price.toFixed(2) : "");
+
+  const commitRowCommercial = async (nextInv, nextPrice) => {
+    const inventoryVal = parseInt(String(nextInv ?? inv).replace(/[^\d-]/g, ""), 10);
+    const priceVal = parseFloat(String(nextPrice ?? price).replace(",", "."));
+    const inventory = Number.isFinite(inventoryVal) && inventoryVal >= 0 ? inventoryVal : 0;
+    const priceNum = Number.isFinite(priceVal) && priceVal >= 0 ? priceVal : 0;
+    const sameInv = inventory === inv;
+    const samePrice = Math.abs(priceNum - (Number.isFinite(price) ? price : 0)) < 0.001;
+    if (sameInv && samePrice) {
+      setInvDraft(null);
+      setPriceDraft(null);
+      return;
+    }
+    setRowSaving(true);
+    try {
+      const res = await medusaClient.updateAdminHubProduct(product.id, {
+        inventory,
+        price: priceNum,
+      });
+      if (res?.suggestion_submitted && !res?.listing_saved && !res?.product) {
+        window.alert(
+          l === "tr"
+            ? "Değişiklik onaya gönderildi."
+            : l === "de"
+              ? "Änderung zur Freigabe eingereicht."
+              : l === "fr"
+                ? "Modification soumise pour approbation."
+                : l === "es"
+                  ? "Cambio enviado para aprobación."
+                  : l === "it"
+                    ? "Modifica inviata per approvazione."
+                    : "Change submitted for approval.",
+        );
+        setInvDraft(null);
+        setPriceDraft(null);
+        return;
+      }
+      const updated = res?.product ?? res;
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id
+            ? {
+                ...p,
+                inventory: updated?.inventory ?? inventory,
+                price: updated?.price != null ? Number(updated.price) : priceNum,
+                price_cents: updated?.price_cents != null ? Number(updated.price_cents) : Math.round(priceNum * 100),
+                status: updated?.status ?? p.status,
+              }
+            : p
+        )
+      );
+      setInvDraft(null);
+      setPriceDraft(null);
+    } catch (err) {
+      console.error("Failed to update inventory/price", err);
+      window.alert(
+        l === "tr"
+          ? "Fiyat/stok güncellenemedi."
+          : l === "de"
+            ? "Preis/Bestand konnte nicht aktualisiert werden."
+            : l === "fr"
+              ? "Impossible de mettre à jour le prix/stock."
+              : l === "es"
+                ? "No se pudo actualizar precio/stock."
+                : l === "it"
+                  ? "Impossibile aggiornare prezzo/scorte."
+                  : "Could not update price/stock.",
+      );
+      setInvDraft(null);
+      setPriceDraft(null);
+    } finally {
+      setRowSaving(false);
+    }
+  };
+
+  const cellInputStyle = {
+    width: "100%",
+    maxWidth: "6.5rem",
+    height: 30,
+    margin: "0 auto",
+    display: "block",
+    fontSize: 13,
+    padding: "4px 8px",
+    border: "1px solid #d6ccbd",
+    borderRadius: 6,
+    boxSizing: "border-box",
+    textAlign: "center",
+    fontVariantNumeric: "tabular-nums",
+    outline: "none",
+    background: rowSaving ? "#f3eee6" : "#fff",
+    color: "#1d1b18",
+  };
   return (
     <div
       style={{ background: "#fff", borderBottom: EXCEL_BORDER, transition: "background-color .1s" }}
@@ -1000,9 +1225,24 @@ function InventoryProductRow({
           <div style={{ minWidth: 0, padding: "0.5rem 0.375rem", borderRight: EXCEL_BORDER, textAlign: "center" }}>
             {(() => {
               const c = statusColors(product.status);
+              const hideReasons = shopVisibilityHiddenReasons(product);
+              const hideTitle = hideReasons
+                .map((r) => shopVisibilityReasonLabel(r.code, locale) || r.message)
+                .filter(Boolean)
+                .join(" · ");
               return (
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "0.125rem 0.4375rem", borderRadius: "999px", fontSize: "0.6875rem", fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
-                  {localizeStatus(statusLabel(product.status))}
+                <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", padding: "0.125rem 0.4375rem", borderRadius: "999px", fontSize: "0.6875rem", fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
+                    {localizeStatus(statusLabel(product.status))}
+                  </span>
+                  {hideReasons.length > 0 && (
+                    <span
+                      title={hideTitle}
+                      style={{ fontSize: "0.5625rem", fontWeight: 600, color: "#b45309", lineHeight: 1.2, maxWidth: "5.5rem" }}
+                    >
+                      {lt(locale, "Not in shop", "Shop’ta yok", "Pas en boutique", "No en tienda", "Non in negozio", "Nicht im Shop")}
+                    </span>
+                  )}
                 </span>
               );
             })()}
@@ -1042,7 +1282,7 @@ function InventoryProductRow({
           </div>
           <div style={{ minWidth: 0, padding: "0.5rem", borderRight: EXCEL_BORDER }}>
             <a
-              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+              href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
               style={{ fontSize: "0.875rem", fontWeight: 600, color: "#1d1b18", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3125rem", whiteSpace: "nowrap", overflow: "hidden" }}
@@ -1070,10 +1310,10 @@ function InventoryProductRow({
             {mergedParentLabel && (
               <div style={{ marginTop: "0.1875rem" }}>
                 <span
-                  style={{ display: "inline-block", padding: "0.0625rem 0.375rem", borderRadius: 999, fontSize: "0.625rem", fontWeight: 600, background: "#eef2ff", color: "#3730a3" }}
+                  style={{ display: "inline-block", padding: "0.0625rem 0.375rem", borderRadius: 999, fontSize: "0.625rem", fontWeight: 600, background: "#fcebd5", color: "#7f3f00", border: "1px solid #f5d3a8" }}
                   title={l === "tr" ? "Bu ürün başka bir üründe varyasyon olarak gösteriliyor" : l === "en" ? "This product is displayed as a variant of another product" : l === "fr" ? "Ce produit est affiché comme variante d’un autre produit" : l === "es" ? "Este producto se muestra como variante de otro producto" : l === "it" ? "Questo prodotto è mostrato come variante di un altro prodotto" : "Dieses Produkt wird als Variante eines anderen Produkts angezeigt"}
                 >
-                  {(l === "tr" ? "Grup: " : l === "en" ? "Group: " : l === "fr" ? "Groupe : " : l === "es" ? "Grupo: " : l === "it" ? "Gruppo: " : "Gruppe: ") + mergedParentLabel}
+                  {(l === "tr" ? "Aile: " : l === "en" ? "Family: " : l === "fr" ? "Famille : " : l === "es" ? "Familia: " : l === "it" ? "Famiglia: " : "Familie: ") + mergedParentLabel}
                 </span>
               </div>
             )}
@@ -1085,8 +1325,48 @@ function InventoryProductRow({
               </div>
             )}
           </div>
-          <div style={{ fontSize: "0.8125rem", color: "#1d1b18", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>{inv}</div>
-          <div style={{ fontSize: "0.8125rem", color: "#1d1b18", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
+          <div style={{ padding: "0.5rem", borderRight: EXCEL_BORDER }}>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              disabled={rowSaving}
+              value={invDisplay}
+              onChange={(e) => setInvDraft(e.target.value)}
+              onFocus={() => { if (invDraft == null) setInvDraft(String(inv)); }}
+              onBlur={() => commitRowCommercial(invDraft != null ? invDraft : inv, priceDraft != null ? priceDraft : priceDisplay)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setInvDraft(null); e.currentTarget.blur(); }
+              }}
+              aria-label={i18n.inventory}
+              title={hasVariants
+                ? lt(locale, "Parent stock — also edit each variation when expanded", "Üst stok — açınca her varyasyonu da düzenleyin", "Stock parent — modifiez aussi chaque variante une fois dépliée", "Stock padre — edita también cada variación al expandir", "Scorte parent — modifica anche ogni variante quando espansa", "Parent-Bestand — bei aufgeklappten Variationen auch einzeln bearbeiten")
+                : undefined}
+              style={cellInputStyle}
+            />
+          </div>
+          <div style={{ padding: "0.5rem", borderRight: EXCEL_BORDER }}>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              disabled={rowSaving}
+              value={priceDisplay}
+              onChange={(e) => setPriceDraft(e.target.value)}
+              onFocus={() => { if (priceDraft == null) setPriceDraft(Number.isFinite(price) ? price.toFixed(2) : ""); }}
+              onBlur={() => commitRowCommercial(invDraft != null ? invDraft : inv, priceDraft != null ? priceDraft : priceDisplay)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setPriceDraft(null); e.currentTarget.blur(); }
+              }}
+              aria-label={i18n.price}
+              title={hasVariants
+                ? lt(locale, "Parent price — also edit each variation when expanded", "Üst fiyat — açınca her varyasyonu da düzenleyin", "Prix parent — modifiez aussi chaque variante une fois dépliée", "Precio padre — edita también cada variación al expandir", "Prezzo parent — modifica anche ogni variante quando espansa", "Parent-Preis — bei aufgeklappten Variationen auch einzeln bearbeiten")
+                : undefined}
+              style={cellInputStyle}
+            />
+          </div>
           <div style={{ fontSize: "0.75rem", color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0.5rem", borderRight: EXCEL_BORDER, textAlign: "center" }}>
             {variationSummary || "?"}
           </div>
@@ -1311,7 +1591,8 @@ export default function InventoryPage() {
   const [commissionError, setCommissionError] = useState("");
   const [showCustomCommissionOnly, setShowCustomCommissionOnly] = useState(false);
   const [combineModalOpen, setCombineModalOpen] = useState(false);
-  const [combineParentId, setCombineParentId] = useState("");
+  const [combineRoofTitle, setCombineRoofTitle] = useState("");
+  const [combineRoofSku, setCombineRoofSku] = useState("");
   const [combineOptionName, setCombineOptionName] = useState("Variante");
   const [combineLabels, setCombineLabels] = useState({});
   const [combineSaving, setCombineSaving] = useState(false);
@@ -1911,19 +2192,16 @@ export default function InventoryPage() {
     const groupTitle = getLocalizedTitle(items[0], locale);
     return (
       <React.Fragment key={masterId}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: INVENTORY_ROW_GRID,
-          background: "#f3eee6",
-          borderBottom: EXCEL_BORDER,
-        }}>
-          <div style={{ gridColumn: "1 / -1", padding: "7px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-            <Text as="span" variant="bodySm" fontWeight="semibold">{groupTitle}</Text>
-            <Text as="span" variant="bodySm" tone="subdued">
-              ? {items.length} {locale === "tr" ? "varyasyon" : locale === "en" ? "variants" : locale === "fr" ? "variantes" : locale === "es" ? "variantes" : locale === "it" ? "varianti" : "Varianten"}
-            </Text>
-          </div>
-        </div>
+        <InvFamilyHeader>
+          <InvGroupBadge>
+            {locale === "tr" ? "Katalog ailesi" : locale === "en" ? "Catalog family" : locale === "fr" ? "Famille catalogue" : locale === "es" ? "Familia de catálogo" : locale === "it" ? "Famiglia catalogo" : "Katalogfamilie"}
+          </InvGroupBadge>
+          <InvGroupTitle>{groupTitle}</InvGroupTitle>
+          <InvGroupMeta>
+            {items.length}{" "}
+            {locale === "tr" ? "ürün" : locale === "en" ? "products" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"}
+          </InvGroupMeta>
+        </InvFamilyHeader>
         {items.map((product) => renderRow(product))}
       </React.Fragment>
     );
@@ -1953,46 +2231,57 @@ export default function InventoryPage() {
   const renderManualGroup = (group, items) => {
     const isOpen = expandedGroupIds.has(group.id);
     const totalInv = items.reduce((s, p) => s + (Number(p?.inventory) || 0), 0);
+    const sortedItems = sortProductsList(items, locale, inventorySort);
     return (
-      <React.Fragment key={`mg-${group.id}`}>
-        <div style={{ display: "grid", gridTemplateColumns: INVENTORY_ROW_GRID, background: "#eef2ff", borderBottom: EXCEL_BORDER }}>
-          <div style={{ gridColumn: "1 / -1", padding: "7px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => toggleManualGroupExpanded(group)}
-              style={{ width: 22, height: 22, borderRadius: 5, border: "1px solid #c7d2fe", background: "#fff", color: "#3730a3", cursor: "pointer", fontSize: 11, lineHeight: 1, flexShrink: 0 }}
-              title={isOpen
-                ? (locale === "tr" ? "Grubu kapat" : locale === "en" ? "Collapse group" : locale === "fr" ? "Replier le groupe" : locale === "es" ? "Contraer grupo" : locale === "it" ? "Comprimi gruppo" : "Gruppe einklappen")
-                : (locale === "tr" ? "Grubu aç" : locale === "en" ? "Expand group" : locale === "fr" ? "Déplier le groupe" : locale === "es" ? "Expandir grupo" : locale === "it" ? "Espandi gruppo" : "Gruppe ausklappen")}
-            >
-              {isOpen ? "▼" : "▶"}
-            </button>
-            <Text as="span" variant="bodySm" fontWeight="semibold">{group.name}</Text>
-            {group.sku && <Text as="span" variant="bodySm" tone="subdued">SKU: {group.sku}</Text>}
-            <Text as="span" variant="bodySm" tone="subdued">
-              {items.length} {locale === "tr" ? "ürün" : locale === "en" ? "products" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"} · {locale === "tr" ? "toplam stok" : locale === "en" ? "total stock" : locale === "fr" ? "stock total" : locale === "es" ? "stock total" : locale === "it" ? "scorte totali" : "Bestand gesamt"}: {totalInv}
-            </Text>
-            <button
-              type="button"
-              onClick={async () => { if (await confirmRemoval()) { deleteManualGroup(group); } }}
-              style={{ marginLeft: "auto", border: "none", background: "none", color: "#5e574e", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}
-              title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "en" ? "Ungroup (products stay untouched)" : locale === "fr" ? "Dissocier (les produits sont conservés)" : locale === "es" ? "Desagrupar (los productos se mantienen)" : locale === "it" ? "Separa (i prodotti restano invariati)" : "Gruppierung aufheben (Produkte bleiben erhalten)"}
-            >
-              {locale === "tr" ? "Grubu çöz" : locale === "en" ? "Ungroup" : locale === "fr" ? "Dissocier" : locale === "es" ? "Desagrupar" : locale === "it" ? "Separa" : "Gruppierung aufheben"}
-            </button>
-          </div>
-        </div>
-        {isOpen && items.map((product) => renderRow(product))}
-      </React.Fragment>
+      <InvGroupCard key={`mg-${group.id}`}>
+        <InvGroupHeader $open={isOpen}>
+          <InvGroupToggle
+            type="button"
+            onClick={() => toggleManualGroupExpanded(group)}
+            aria-expanded={isOpen}
+            title={isOpen
+              ? (locale === "tr" ? "Grubu kapat" : locale === "en" ? "Collapse group" : locale === "fr" ? "Replier le groupe" : locale === "es" ? "Contraer grupo" : locale === "it" ? "Comprimi gruppo" : "Gruppe einklappen")
+              : (locale === "tr" ? "Grubu aç" : locale === "en" ? "Expand group" : locale === "fr" ? "Déplier le groupe" : locale === "es" ? "Expandir grupo" : locale === "it" ? "Espandi gruppo" : "Gruppe ausklappen")}
+          >
+            {isOpen ? "▼" : "▶"}
+          </InvGroupToggle>
+          <InvGroupBadge>
+            {locale === "tr" ? "Grup" : locale === "en" ? "Group" : locale === "fr" ? "Groupe" : locale === "es" ? "Grupo" : locale === "it" ? "Gruppo" : "Gruppe"}
+          </InvGroupBadge>
+          <InvGroupTitle>{group.name}</InvGroupTitle>
+          {group.sku ? <InvGroupMeta>SKU {group.sku}</InvGroupMeta> : null}
+          <InvGroupMeta>
+            {items.length}{" "}
+            {locale === "tr" ? "ürün" : locale === "en" ? "products" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"}
+            {" · "}
+            {locale === "tr" ? "stok" : locale === "en" ? "stock" : locale === "fr" ? "stock" : locale === "es" ? "stock" : locale === "it" ? "scorte" : "Bestand"}{" "}
+            {totalInv}
+          </InvGroupMeta>
+          <InvGroupUngroup
+            type="button"
+            onClick={async () => { if (await confirmRemoval()) { deleteManualGroup(group); } }}
+            title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "en" ? "Ungroup (products stay untouched)" : locale === "fr" ? "Dissocier (les produits sont conservés)" : locale === "es" ? "Desagrupar (los productos se mantienen)" : locale === "it" ? "Separa (i prodotti restano invariati)" : "Gruppierung aufheben (Produkte bleiben erhalten)"}
+          >
+            {locale === "tr" ? "Grubu çöz" : locale === "en" ? "Ungroup" : locale === "fr" ? "Dissocier" : locale === "es" ? "Desagrupar" : locale === "it" ? "Separa" : "Gruppierung aufheben"}
+          </InvGroupUngroup>
+        </InvGroupHeader>
+        {isOpen && (
+          <InvGroupBody>
+            {renderInventoryHeader()}
+            {sortedItems.map((product) => renderRow(product))}
+          </InvGroupBody>
+        )}
+      </InvGroupCard>
     );
   };
 
+  const manualGroupRows = sortedOwnRows.filter((e) => e.type === "manualGroup");
+  const tableOwnRows = sortedOwnRows.filter((e) => e.type !== "manualGroup");
+
   const renderOwnRows = () =>
-    sortedOwnRows.map((entry) =>
+    tableOwnRows.map((entry) =>
       entry.type === "group"
         ? renderParentGroup(entry.masterId, entry.items)
-        : entry.type === "manualGroup"
-        ? renderManualGroup(entry.group, entry.items)
         : renderRow(entry.product)
     );
 
@@ -2002,10 +2291,48 @@ export default function InventoryPage() {
     setDuplicateFullProduct(null);
   };
 
+  const productHasRealVariants = (product) =>
+    Array.isArray(product?.variants) &&
+    product.variants.some((v) => Array.isArray(v?.option_values) && v.option_values.length > 0);
+
   const openCombineModal = () => {
     if (selectedIds.length < 2) return;
-    const first = selectedIds[0];
-    setCombineParentId(first);
+    const selectedProducts = selectedIds.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+    if (!isSuperuser) {
+      const notOwned = selectedProducts.filter((p) => !sellerOwnsForCombine(p, mySellerId));
+      if (notOwned.length > 0) {
+        setError(
+          lt(
+            locale,
+            "You can only combine products you own. Products you added from the catalog or another seller cannot be combined as variants.",
+            "Yalnızca kendi ürünlerinizi birleştirebilirsiniz. Katalogdan veya başka satıcıdan eklediğiniz ürünler varyant olarak birleştirilemez.",
+            "Vous ne pouvez fusionner que vos propres produits. Les produits ajoutés depuis le catalogue ou un autre vendeur ne peuvent pas être fusionnés en variantes.",
+            "Solo puedes combinar productos que posees. Los añadidos del catálogo u otro vendedor no se pueden combinar como variantes.",
+            "Puoi unire solo i prodotti di tua proprietà. Quelli aggiunti dal catalogo o da un altro venditore non possono essere uniti come varianti.",
+            "Sie können nur eigene Produkte zusammenführen. Aus dem Katalog oder von einem anderen Verkäufer hinzugefügte Produkte können nicht als Varianten kombiniert werden.",
+          ),
+        );
+        return;
+      }
+    }
+    const alreadyParent = selectedProducts.filter(productHasRealVariants);
+    if (alreadyParent.length > 0) {
+      setError(
+        lt(
+          locale,
+          "Products that already have variants can't be combined under a new roof. Pick standalone products only.",
+          "Zaten varyantı olan ürünler yeni bir çatı altına alınamaz. Yalnızca bağımsız ürünler seçin.",
+          "Les produits qui ont déjà des variantes ne peuvent pas être fusionnés sous un nouveau toit. Sélectionnez uniquement des produits autonomes.",
+          "Los productos que ya tienen variantes no se pueden combinar bajo un techo nuevo. Elige solo productos independientes.",
+          "I prodotti che hanno già varianti non possono essere uniti sotto un nuovo tetto. Seleziona solo prodotti autonomi.",
+          "Produkte, die bereits Varianten haben, können nicht unter ein neues Dach gelegt werden. Nur Standalone-Produkte wählen.",
+        ),
+      );
+      return;
+    }
+    const firstTitle = getLocalizedTitle(selectedProducts[0], locale) || "";
+    setCombineRoofTitle(firstTitle ? `${firstTitle}`.replace(/\s+/g, " ").trim() : "");
+    setCombineRoofSku("");
     setCombineOptionName(
       locale === "en"
         ? "Variant"
@@ -2034,12 +2361,30 @@ export default function InventoryPage() {
   };
 
   const runCombineAsVariants = async () => {
-    if (!combineParentId || selectedIds.length < 2) return;
+    if (selectedIds.length < 2) return;
+    const title = String(combineRoofTitle || "").trim();
+    const sku = String(combineRoofSku || "").trim();
+    if (!title || !sku) {
+      setError(
+        lt(
+          locale,
+          "Enter a name and SKU for the new roof product.",
+          "Yeni çatı ürünü için isim ve SKU girin.",
+          "Saisissez un nom et un SKU pour le nouveau produit toit.",
+          "Introduce un nombre y un SKU para el nuevo producto techo.",
+          "Inserisci nome e SKU per il nuovo prodotto tetto.",
+          "Name und SKU für das neue Dachprodukt eingeben.",
+        ),
+      );
+      return;
+    }
     setCombineSaving(true);
     setError(null);
     try {
       const res = await medusaClient.combineProductsAsVariants({
-        parentId: combineParentId,
+        createNewParent: true,
+        parentTitle: title,
+        parentSku: sku,
         productIds: selectedIds,
         optionName: combineOptionName,
         optionValues: combineLabels,
@@ -2048,8 +2393,8 @@ export default function InventoryPage() {
       setSelectedIds([]);
       const data = await medusaClient.getAdminHubProducts();
       setProducts(data.products || []);
-      const parent = res?.parent_id || combineParentId;
-      router.push(`/products/${parent}`);
+      const parent = res?.parent_id;
+      if (parent) router.push(`/products/${parent}`);
     } catch (e) {
       setError(userError(e, locale, "Failed to combine products"));
       setCombineSaving(false);
@@ -2135,6 +2480,13 @@ export default function InventoryPage() {
   const addProductLabel = lt(locale, "Add product", "Ürün ekle", "Ajouter un produit", "Agregar producto", "Aggiungi prodotto", "Produkt hinzufügen");
   const bulkUploadLabel = lt(locale, "Bulk upload", "Toplu yükleme", "Import en masse", "Carga masiva", "Caricamento in blocco", "Massenimport");
   const selectedCount = selectedIds.length;
+  const canCombineSelection =
+    selectedCount >= 2 &&
+    (isSuperuser ||
+      selectedIds.every((id) => {
+        const p = products.find((x) => x.id === id);
+        return p && sellerOwnsForCombine(p, mySellerId);
+      }));
 
   return (
     <InvPageContainer>
@@ -2196,7 +2548,7 @@ export default function InventoryPage() {
             {selectedCount} {lt(locale, "selected", "seçili", "sélectionné(s)", "seleccionado(s)", "selezionato/i", "ausgewählt")}
           </span>
           <InlineStack gap="200" wrap blockAlign="center">
-            {selectedCount >= 2 && (
+            {canCombineSelection && (
               <Button size="slim" onClick={openCombineModal}>
                 {lt(locale, "Combine as variants", "Varyant olarak birleştir", "Fusionner en variantes", "Combinar como variantes", "Unisci come varianti", "Als Varianten zusammenführen")} ({selectedCount})
               </Button>
@@ -2287,10 +2639,15 @@ export default function InventoryPage() {
           )}
         </InvEmpty>
       ) : (
-        <TableShell>
-          {renderInventoryHeader()}
-          {renderOwnRows()}
-        </TableShell>
+        <>
+          {manualGroupRows.map((entry) => renderManualGroup(entry.group, entry.items))}
+          {tableOwnRows.length > 0 && (
+            <TableShell>
+              {renderInventoryHeader()}
+              {renderOwnRows()}
+            </TableShell>
+          )}
+        </>
       )}
 
       {isSuperuser && (
@@ -2343,7 +2700,14 @@ export default function InventoryPage() {
           onClose={() => setGroupModalOpen(false)}
           onCreate={async (payload) => {
             const res = await medusaClient.createInventoryGroup(payload);
-            if (res?.group) setInventoryGroups((prev) => [...prev, res.group]);
+            if (res?.group) {
+              setInventoryGroups((prev) => [...prev, res.group]);
+              setExpandedGroupIds((prev) => {
+                const next = new Set(prev);
+                next.add(res.group.id);
+                return next;
+              });
+            }
             setSelectedIds([]);
             setGroupModalOpen(false);
           }}
@@ -2369,37 +2733,56 @@ export default function InventoryPage() {
         primaryAction={{
           content:
             locale === "en"
-              ? "Combine"
+              ? "Create roof & combine"
               : locale === "tr"
-                ? "Birlestir"
+                ? "Çatı oluştur ve birleştir"
                 : locale === "fr"
-                  ? "Fusionner"
+                  ? "Créer le toit et fusionner"
                   : locale === "es"
-                    ? "Combinar"
+                    ? "Crear techo y combinar"
                     : locale === "it"
-                      ? "Unisci"
-                      : "Zusammenführen",
+                      ? "Crea tetto e unisci"
+                      : "Dach erstellen & zusammenführen",
           onAction: runCombineAsVariants,
           loading: combineSaving,
-          disabled: !combineParentId || selectedIds.length < 2,
+          disabled: selectedIds.length < 2 || !String(combineRoofTitle || "").trim() || !String(combineRoofSku || "").trim(),
         }}
         secondaryActions={[{ content: ui.cancel, onAction: closeCombineModal }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              {locale === "tr" ? "Seçilen ürünler tek bir parent altında varyant olur. Diğer ürünler arşivlenir (silinmez). Sipariş geçmişi korunur." : locale === "en" ? "Selected products become variants under one parent. Absorbed products are archived (not deleted). Orders keep their history." : locale === "fr" ? "Les produits sélectionnés deviennent des variantes d’un même parent. Les produits absorbés sont archivés (pas supprimés). L’historique des commandes est conservé." : locale === "es" ? "Los productos seleccionados pasan a ser variantes de un mismo padre. Los productos absorbidos se archivan (no se eliminan). Los pedidos conservan su historial." : locale === "it" ? "I prodotti selezionati diventano varianti di un unico prodotto principale. I prodotti assorbiti vengono archiviati (non eliminati). Lo storico ordini resta invariato." : "Ausgewählte Produkte werden Varianten unter einem Parent. Übernommene Produkte werden archiviert (nicht gelöscht). Bestellhistorie bleibt erhalten."}
+              {locale === "tr"
+                ? "Yeni bir çatı ürün oluşturulur (isim + SKU). Seçilen ürünler onun varyantı olur ve arşivlenir (silinmez). Mevcut ürünlerden hiçbiri parent olmaz."
+                : locale === "en"
+                  ? "A new roof product is created (name + SKU). Selected products become its variants and are archived (not deleted). None of the existing products becomes the parent."
+                  : locale === "fr"
+                    ? "Un nouveau produit toit est créé (nom + SKU). Les produits sélectionnés deviennent ses variantes et sont archivés (pas supprimés). Aucun produit existant ne devient le parent."
+                    : locale === "es"
+                      ? "Se crea un nuevo producto techo (nombre + SKU). Los seleccionados pasan a ser sus variantes y se archivan. Ningún producto existente se convierte en el padre."
+                      : locale === "it"
+                        ? "Viene creato un nuovo prodotto tetto (nome + SKU). I selezionati diventano sue varianti e vengono archiviati. Nessun prodotto esistente diventa il parent."
+                        : "Es wird ein neues Dachprodukt angelegt (Name + SKU). Die ausgewählten Produkte werden seine Varianten und archiviert (nicht gelöscht). Kein bestehendes Produkt wird zum Parent."}
             </Text>
-            <Select
+            <TextField
               label={
-                locale === "tr" ? "Ana ürün" : locale === "en" ? "Parent product" : locale === "fr" ? "Produit parent" : locale === "es" ? "Producto principal" : locale === "it" ? "Prodotto principale" : "Elternprodukt"
+                locale === "tr" ? "Çatı ürün adı" : locale === "en" ? "Roof product name" : locale === "fr" ? "Nom du produit toit" : locale === "es" ? "Nombre del producto techo" : locale === "it" ? "Nome prodotto tetto" : "Dachprodukt-Name"
               }
-              options={selectedIds.map((id) => {
-                const prod = products.find((p) => p.id === id);
-                return { label: getLocalizedTitle(prod, locale) || id, value: id };
-              })}
-              value={combineParentId}
-              onChange={setCombineParentId}
+              value={combineRoofTitle}
+              onChange={setCombineRoofTitle}
+              autoComplete="off"
+              helpText={
+                locale === "tr" ? "Shop’ta görünen aile / çatı başlığı" : locale === "en" ? "Family / roof title shown in the shop" : locale === "fr" ? "Titre famille / toit affiché en boutique" : locale === "es" ? "Título de familia / techo en la tienda" : locale === "it" ? "Titolo famiglia / tetto nel negozio" : "Familien-/Dachtitel im Shop"
+              }
+            />
+            <TextField
+              label={locale === "tr" ? "Çatı SKU" : locale === "en" ? "Roof SKU" : locale === "fr" ? "SKU toit" : locale === "es" ? "SKU techo" : locale === "it" ? "SKU tetto" : "Dach-SKU"}
+              value={combineRoofSku}
+              onChange={setCombineRoofSku}
+              autoComplete="off"
+              helpText={
+                locale === "tr" ? "Çatı ürünün kendi SKU’su (varyant SKU’larından ayrı)" : locale === "en" ? "SKU for the roof itself (separate from variant SKUs)" : locale === "fr" ? "SKU du toit (distinct des SKU des variantes)" : locale === "es" ? "SKU del techo (aparte de los SKU de variantes)" : locale === "it" ? "SKU del tetto (separato dagli SKU delle varianti)" : "SKU des Dachs (getrennt von Varianten-SKUs)"
+              }
             />
             <TextField
               label={
@@ -2409,7 +2792,7 @@ export default function InventoryPage() {
               onChange={setCombineOptionName}
               autoComplete="off"
               helpText={
-                locale === "tr" ? "örn. Renk, Beden" : locale === "en" ? 'e.g. Color, Size' : locale === "fr" ? "p. ex. Couleur, Taille" : locale === "es" ? "p. ej. Color, Talla" : locale === "it" ? "ad es. Colore, Taglia" : "z. B. Farbe, Größe"
+                locale === "tr" ? "örn. Renk, Beden" : locale === "en" ? "e.g. Color, Size" : locale === "fr" ? "p. ex. Couleur, Taille" : locale === "es" ? "p. ej. Color, Talla" : locale === "it" ? "ad es. Colore, Taglia" : "z. B. Farbe, Größe"
               }
             />
             <BlockStack gap="200">

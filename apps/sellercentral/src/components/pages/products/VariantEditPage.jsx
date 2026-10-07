@@ -20,11 +20,10 @@ import {
   Select,
   Tabs,
 } from "@shopify/polaris";
-import { ProductIcon, LockIcon, DuplicateIcon } from "@shopify/polaris-icons";
+import { ProductIcon, LockIcon, DuplicateIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
-import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
 import InfoIconTooltip from "@/components/InfoIconTooltip";
 import { decodeVariantPathKey, findVariantIndexByOptionKey } from "@/lib/variant-path-key";
@@ -34,7 +33,12 @@ import {
   PRODUCT_SECTION_STYLES,
 } from "@/components/products/ProductSection";
 import { lt } from "@/lib/locale-text";
-import { buildBrandOptions } from "@/lib/brand-options";
+import {
+  shopVisibilityBannerTitle,
+  shopVisibilityHiddenReasons,
+  shopVisibilityReasonLabel,
+} from "@/lib/shop-visibility-i18n";
+import { gtinFieldError } from "@/lib/gtin";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 
@@ -125,6 +129,45 @@ const getDefaultBaseUrl = () => {
   return url || (typeof window !== "undefined" ? "http://localhost:9000" : "");
 };
 
+const getDefaultShopUrl = () => {
+  const env = process.env.NEXT_PUBLIC_SHOP_URL || "";
+  const url = (typeof env === "string" ? env : "").trim();
+  if (url) return url.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:3000";
+    }
+    return "https://andertal.com";
+  }
+  return "https://andertal.com";
+};
+
+function defaultShopMarketForLocale(loc) {
+  const l = String(loc || "de").toLowerCase();
+  if (l === "en") return "gb";
+  if (l === "tr") return "tr";
+  if (l === "fr") return "fr";
+  if (l === "it") return "it";
+  if (l === "es") return "es";
+  return "de";
+}
+
+function shopPreviewPrefix(loc) {
+  const l = String(loc || "de").toLowerCase();
+  return `/${defaultShopMarketForLocale(l)}/${l}`;
+}
+
+function shopProductHandleForLocale(product, loc) {
+  const tr = product?.metadata?.translations?.[loc];
+  const h = ((tr?.handle || "").trim() || (product?.handle || "").trim());
+  if (!h) return "";
+  const rawId = String(product?.id || "").replace(/^prod_/i, "").toLowerCase();
+  const uuid = rawId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+  const id = uuid ? uuid[0] : rawId;
+  const shortCode = id.length >= 8 ? id.slice(-8) : id;
+  return shortCode ? `${h}-a-${shortCode}` : h;
+}
+
 function sanitizePriceDraftString(s) {
   const t = String(s ?? "").replace(",", ".");
   let out = "";
@@ -145,21 +188,6 @@ function descriptionVisualToHtml(html) {
   if (!s) return "";
   if (/<(p|div|h[1-6]|ul|ol|li)\b/i.test(s)) return s;
   return `<p>${s}</p>`;
-}
-
-function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
-  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
-  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
-  const out = [];
-  let cur = byId.get(String(categoryId));
-  const seen = new Set();
-  while (cur && !seen.has(String(cur.id))) {
-    seen.add(String(cur.id));
-    out.push(String(cur.id));
-    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
-    cur = pid && byId.has(pid) ? byId.get(pid) : null;
-  }
-  return out;
 }
 
 function variantImageUrlForLocale(row, loc) {
@@ -393,16 +421,21 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         const nm = { ...(next.metadata && typeof next.metadata === "object" ? next.metadata : {}) };
         const locks = Array.isArray(nm.parent_locked_fields) ? nm.parent_locked_fields : [];
         const pm = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
-        // Category / brand: follow parent when locked OR when child left empty.
-        if (locks.includes("category_id") || !nm.category_id) {
+        // Category / brand always follow the family product once set on the parent —
+        // variants are sellable units but brand/category are catalog identity, not per-SKU.
+        if (pm.category_id || locks.includes("category_id") || !nm.category_id) {
           copyMetaKey(nm, pm, "category_id");
           copyMetaKey(nm, pm, "admin_category_id");
           copyMetaKey(nm, pm, "category_ids");
           copyMetaKey(nm, pm, "category_slug");
         }
-        if (locks.includes("brand_id") || !nm.brand_id) {
+        if (pm.brand_id || locks.includes("brand_id") || !nm.brand_id) {
           copyMetaKey(nm, pm, "brand_id");
         }
+        const nextLocks = new Set(Array.isArray(nm.parent_locked_fields) ? nm.parent_locked_fields : []);
+        if (pm.brand_id) nextLocks.add("brand_id");
+        if (pm.category_id) nextLocks.add("category_id");
+        if (nextLocks.size) nm.parent_locked_fields = [...nextLocks];
         next = { ...next, metadata: nm };
         return next;
       });
@@ -506,11 +539,11 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const parentMeta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
 
   const effectiveMeta = (key, fallback = "") => {
-    if (isFieldLocked(key)) return getMeta(product, key, fallback);
-    if (key === "category_id" || key === "brand_id") {
-      const own = getMeta(v, key, "");
-      return own || getMeta(product, key, fallback);
+    // Brand + category always prefer the family product — never editable per SKU.
+    if (key === "brand_id" || key === "category_id") {
+      return getMeta(product, key, "") || getMeta(v, key, fallback);
     }
+    if (isFieldLocked(key)) return getMeta(product, key, fallback);
     return getMeta(v, key, fallback);
   };
 
@@ -591,27 +624,26 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       : parentMeta.translations?.[locale]?.description || "";
   const displayDescription = isFieldLocked("description") ? parentDescForLocale : editingDescription;
 
-  const updateVariantCategoryWithParents = useCallback((categoryId) => {
-    const selected = String(categoryId || "").trim();
-    patchVariant((cur) => {
-      const m = { ...(cur.metadata && typeof cur.metadata === "object" ? cur.metadata : {}) };
-      if (!selected) {
-        delete m.category_id;
-        delete m.admin_category_id;
-        delete m.category_ids;
-        delete m.category_slug;
-        return { ...cur, metadata: m };
-      }
-      const byId = new Map((categories || []).map((c) => [String(c.id), c]));
-      const catNode = byId.get(selected);
-      const lineage = categoryLineageIdsFromFlatList(categories, selected);
-      m.category_id = selected;
-      m.admin_category_id = selected;
-      m.category_ids = lineage.length > 0 ? lineage : [selected];
-      if (catNode?.slug) m.category_slug = String(catNode.slug).replace(/^\//, "");
-      return { ...cur, metadata: m };
-    });
-  }, [categories, patchVariant]);
+  const shopBaseUrl = getDefaultShopUrl();
+  const brandIdShown = effectiveMeta("brand_id");
+  const brandSummaryLabel = brandIdShown
+    ? (brands || []).find((b) => String(b.id) === String(brandIdShown))?.name || ""
+    : "";
+  const categoryIdShown = effectiveMeta("category_id");
+  const categorySummaryLabel = (() => {
+    if (!categoryIdShown || !Array.isArray(categories) || !categories.length) return "";
+    const byId = new Map(categories.map((c) => [String(c.id), c]));
+    const parts = [];
+    let cur = byId.get(String(categoryIdShown));
+    const seen = new Set();
+    while (cur && !seen.has(String(cur.id))) {
+      seen.add(String(cur.id));
+      parts.unshift(String(cur.name || cur.slug || cur.id).trim());
+      const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+      cur = pid && byId.has(pid) ? byId.get(pid) : null;
+    }
+    return parts.filter(Boolean).join(" › ");
+  })();
 
   const handleVerifyEuOriginVariant = useCallback(async (manual) => {
     if (!product?.id || !v?.option_values) return;
@@ -742,13 +774,27 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         </Box>
       )}
 
+      {shopVisibilityHiddenReasons(product).length > 0 && (
+        <Box paddingBlockEnd="200">
+          <Banner tone="warning" title={shopVisibilityBannerTitle(locale)}>
+            <BlockStack gap="100">
+              {shopVisibilityHiddenReasons(product).map((r) => (
+                <Text as="p" variant="bodySm" key={r.code || r.message}>
+                  • {shopVisibilityReasonLabel(r.code, locale) || r.message}
+                </Text>
+              ))}
+            </BlockStack>
+          </Banner>
+        </Box>
+      )}
+
       <div className="product-edit-header">
-        <Link href={`/products/${idOrHandle}`} className="product-edit-title-link">
+        <span className="product-edit-title-link" style={{ cursor: "default" }}>
           <span style={{ display: "flex", width: 20, height: 20 }}><ProductIcon /></span>
-          <span className="product-edit-name">{product?.title || "Product"}</span>
-        </Link>
+          <span className="product-edit-name">{displayTitle || variantSummary || product?.title || t("Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt")}</span>
+        </span>
         <Text as="span" variant="bodySm" tone="subdued">
-          → Variant: {variantSummary}
+          {variantSummary}
         </Text>
         <Button
           size="slim"
@@ -758,11 +804,23 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
             router.push(`/products/${idOrHandle}`);
           }}
         >
-          {t("Back to variations", "Varyasyonlara dön", "Retour aux variantes", "Volver a variantes", "Torna alle varianti", "Zurück zu Variationen")}
+          {t("Product family", "Ürün ailesi", "Famille produit", "Familia de producto", "Famiglia prodotto", "Produktfamilie")}
         </Button>
         <span style={{ flex: 1 }} />
+        {shopProductHandleForLocale(product, locale) && (
+          <a
+            href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "none" }}
+          >
+            <Button size="slim" icon={ViewIcon}>
+              {t("View in shop", "Mağazada gör", "Voir dans la boutique", "Ver en la tienda", "Vedi nel negozio", "Im Shop ansehen")}
+            </Button>
+          </a>
+        )}
         <Button size="slim" variant="primary" onClick={() => save()} loading={saving}>
-          Save
+          {t("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
         </Button>
       </div>
 
@@ -784,7 +842,9 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
           <Card>
             <div className="product-edit-sections">
             <BlockStack gap="300">
-              <ProductSectionHeading>Variant options</ProductSectionHeading>
+              <ProductSectionHeading>
+                {t("This sellable product", "Bu satılabilir ürün", "Ce produit vendable", "Este producto vendible", "Questo prodotto vendibile", "Dieses verkaufbare Produkt")}
+              </ProductSectionHeading>
               <InlineStack gap="200" wrap>
                 {(v.option_values || []).map((val, i) => (
                   <span
@@ -803,12 +863,12 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               </InlineStack>
               <Text as="p" variant="bodySm" tone="subdued">
                 {t(
-                  "Option keys above; customer-facing labels follow the parent variation translations. Edit groups on the main product.",
-                  "Yukarıdaki seçenek anahtarları; müşteri etiketleri ana ürün varyasyon çevirilerinden gelir. Grupları ana üründe düzenleyin.",
-                  "Clés d'option ci-dessus ; les libellés clients suivent les traductions du produit parent.",
-                  "Claves de opción arriba; las etiquetas de cliente siguen las traducciones del producto principal.",
-                  "Chiavi opzione sopra; le etichette cliente seguono le traduzioni del prodotto principale.",
-                  "Options-Schlüssel oben; kundenbezogene Labels folgen den Variations-Übersetzungen des Hauptartikels. Gruppen dort bearbeiten.",
+                  "Full product detail for this SKU. Option groups for the family are edited on the product-family page.",
+                  "Bu SKU için tam ürün detayı. Aile seçenek grupları ürün-aile sayfasında düzenlenir.",
+                  "Fiche complète pour ce SKU. Les groupes d'options de la famille se gèrent sur la page famille.",
+                  "Ficha completa de este SKU. Los grupos de opciones de la familia se editan en la página de familia.",
+                  "Scheda completa per questo SKU. I gruppi opzione della famiglia si modificano nella pagina famiglia.",
+                  "Vollständige Produktdetails für diese SKU. Optionsgruppen der Familie auf der Produktfamilien-Seite bearbeiten.",
                 )}
               </Text>
 
@@ -854,7 +914,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     value={v.ean ?? ""}
                     onChange={(tVal) => patchVariant({ ean: tVal || undefined })}
                     autoComplete="off"
-                    error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
+                    error={String(v.ean || "").trim() === "" ? "EAN required" : gtinFieldError(v.ean, initialProduct?.variants?.[variantIndex]?.ean, locale)}
                   />
                 </Box>
                 <Box minWidth="200px" flex="1">
@@ -882,52 +942,46 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               </ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 {t(
-                  "Category and brand follow the parent by default (lock). Shipping group stays per variant.",
-                  "Kategori ve marka varsayılan olarak ana ürünü izler (kilit). Kargo grubu varyanta özel kalır.",
-                  "Catégorie et marque suivent le parent par défaut (cadenas). Groupe d'expédition par variante.",
-                  "Categoría y marca siguen al principal por defecto (candado). Grupo de envío por variante.",
-                  "Categoria e marca seguono il principale di default (lucchetto). Gruppo di spedizione per variante.",
-                  "Kategorie und Marke folgen standardmäßig dem Hauptartikel (Schloss). Versandgruppe bleibt pro Variante.",
+                  "Brand and category are fixed for the product family. Shipping group can differ per SKU.",
+                  "Marka ve kategori ürün ailesi için sabittir. Kargo grubu SKU başına farklı olabilir.",
+                  "Marque et catégorie sont fixes pour la famille. Le groupe d'expédition peut différer par SKU.",
+                  "Marca y categoría son fijas para la familia. El grupo de envío puede diferir por SKU.",
+                  "Marca e categoria sono fisse per la famiglia. Il gruppo di spedizione può differire per SKU.",
+                  "Marke und Kategorie sind für die Produktfamilie fest. Versandgruppe kann pro SKU abweichen.",
                 )}
               </Text>
               <InlineStack gap="300" wrap>
                 <Box minWidth="220px" flex="1">
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <Text as="p" variant="bodySm" fontWeight="semibold">{t("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie")}</Text>
-                    <LockToggle fieldKey="category_id" parentValue={getMeta(product, "category_id")} />
-                  </InlineStack>
-                  <Box paddingBlockStart="100" className={isFieldLocked("category_id") ? "variant-lock-disabled" : undefined}>
-                    <CategoryDrilldownSelect
-                      label={t("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie")}
-                      labelHidden
-                      categories={categories || []}
-                      value={effectiveMeta("category_id")}
-                      onChange={updateVariantCategoryWithParents}
-                      placeholder={t("Select category", "Kategori seç", "Choisir une catégorie", "Seleccionar categoría", "Seleziona categoria", "Kategorie wählen")}
-                    />
-                  </Box>
+                  <TextField
+                    label={t("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie")}
+                    value={categorySummaryLabel || effectiveMeta("category_id") || "—"}
+                    disabled
+                    autoComplete="off"
+                    helpText={t(
+                      "Fixed with the product family — can't be changed here.",
+                      "Ürün ailesiyle sabit — burada değiştirilemez.",
+                      "Fixé avec la famille produit — non modifiable ici.",
+                      "Fijo con la familia de producto — no se puede cambiar aquí.",
+                      "Fisso con la famiglia prodotto — non modificabile qui.",
+                      "Mit der Produktfamilie festgelegt — hier nicht änderbar.",
+                    )}
+                  />
                 </Box>
                 <Box minWidth="220px" flex="1">
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <Text as="span" variant="bodySm" fontWeight="semibold">{t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}</Text>
-                    <LockToggle fieldKey="brand_id" parentValue={getMeta(product, "brand_id")} />
-                  </InlineStack>
-                  <Box paddingBlockStart="100">
-                    <Select
-                      label={t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}
-                      labelHidden
-                      options={buildBrandOptions({
-                        brands,
-                        sellerId: typeof window !== "undefined" ? window.localStorage.getItem("sellerId") : null,
-                        isSuperuser,
-                        currentId: effectiveMeta("brand_id"),
-                        t,
-                      }).options}
-                      value={effectiveMeta("brand_id") || ""}
-                      onChange={(val) => updateVariantMeta("brand_id", val || undefined)}
-                      disabled={isFieldLocked("brand_id")}
-                    />
-                  </Box>
+                  <TextField
+                    label={t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}
+                    value={brandSummaryLabel || effectiveMeta("brand_id") || "—"}
+                    disabled
+                    autoComplete="off"
+                    helpText={t(
+                      "Brand can't be changed after it has been set.",
+                      "Marka bir kez ayarlandıktan sonra değiştirilemez.",
+                      "La marque ne peut plus être modifiée une fois définie.",
+                      "La marca no se puede cambiar una vez establecida.",
+                      "Il brand non può essere modificato dopo essere stato impostato.",
+                      "Die Marke kann nach dem Setzen nicht mehr geändert werden.",
+                    )}
+                  />
                 </Box>
                 <Box minWidth="220px" flex="1">
                   <Select
@@ -936,7 +990,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                       { label: t("— None —", "— Yok —", "— Aucun —", "— Ninguno —", "— Nessuno —", "— Keine —"), value: "" },
                       ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
                     ]}
-                    value={vm.shipping_group_id ?? ""}
+                    value={vm.shipping_group_id ?? getMeta(product, "shipping_group_id") ?? ""}
                     onChange={(val) => updateVariantMeta("shipping_group_id", val || undefined)}
                   />
                 </Box>
@@ -1076,34 +1130,6 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <ProductSectionRule />
 
-              <ProductSectionHeading>{t("Status", "Durum", "Statut", "Estado", "Stato", "Status")}</ProductSectionHeading>
-              <Checkbox
-                label={t(
-                  "Variant active (sellable in the shop)",
-                  "Varyant aktif (mağazada satılabilir)",
-                  "Variante active (vendable en boutique)",
-                  "Variante activa (vendible en la tienda)",
-                  "Variante attiva (vendibile nel negozio)",
-                  "Variante aktiv (im Shop verkäuflich)",
-                )}
-                checked={vm.disabled !== true}
-                onChange={(on) => patchVariant((cur) => {
-                  const m = { ...(cur.metadata && typeof cur.metadata === "object" ? cur.metadata : {}) };
-                  if (on) delete m.disabled; else m.disabled = true;
-                  return { ...cur, metadata: m };
-                })}
-                helpText={t(
-                  "When off this variant is hidden and not purchasable, even if the product is published.",
-                  "Kapalıyken bu varyant gizlenir ve satın alınamaz — ürün yayında olsa bile.",
-                  "Désactivée, cette variante est masquée et non achetable, même si le produit est publié.",
-                  "Si está desactivada, esta variante se oculta y no se puede comprar, aunque el producto esté publicado.",
-                  "Se disattivata, questa variante è nascosta e non acquistabile, anche se il prodotto è pubblicato.",
-                  "Wenn aus, ist diese Variante ausgeblendet und nicht kaufbar, auch bei veröffentlichtem Produkt.",
-                )}
-              />
-
-              <ProductSectionRule />
-
               <ProductSectionHeading>Stock</ProductSectionHeading>
               <TextField
                 label="Inventory"
@@ -1228,19 +1254,58 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
           <div className="product-edit-sidebar">
           <Card>
             <BlockStack gap="300">
-              <ProductSectionHeading>Product status</ProductSectionHeading>
+              <ProductSectionHeading>{t("Status", "Durum", "Statut", "Estado", "Stato", "Status")}</ProductSectionHeading>
+              <Checkbox
+                label={t(
+                  "Sellable in the shop",
+                  "Mağazada satılabilir",
+                  "Vendable en boutique",
+                  "Vendible en la tienda",
+                  "Vendibile nel negozio",
+                  "Im Shop verkäuflich",
+                )}
+                checked={vm.disabled !== true}
+                onChange={(on) => patchVariant((cur) => {
+                  const m = { ...(cur.metadata && typeof cur.metadata === "object" ? cur.metadata : {}) };
+                  if (on) delete m.disabled; else m.disabled = true;
+                  return { ...cur, metadata: m };
+                })}
+              />
               <Select
-                label="Status"
-                labelHidden
+                label={t("Product family status", "Ürün ailesi durumu", "Statut famille", "Estado de familia", "Stato famiglia", "Status der Produktfamilie")}
                 options={STATUS_OPTIONS(locale)}
                 value={product.status || "draft"}
                 disabled
+                helpText={t(
+                  "Family publish status — change it on the product-family page.",
+                  "Aile yayın durumu — ürün-aile sayfasında değiştirilir.",
+                  "Statut de publication de la famille — à modifier sur la page famille.",
+                  "Estado de publicación de la familia — cámbielo en la página de familia.",
+                  "Stato di pubblicazione della famiglia — modificarlo nella pagina famiglia.",
+                  "Veröffentlichungsstatus der Familie — auf der Produktfamilien-Seite ändern.",
+                )}
               />
-              <Text as="p" variant="bodySm" tone="subdued">
-                Change status on the main product page.
-              </Text>
               <Divider />
-              <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
+              {shopProductHandleForLocale(product, locale) && (
+                <a
+                  href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: "none" }}
+                >
+                  <Button fullWidth icon={ViewIcon}>
+                    {t("View in shop", "Mağazada gör", "Voir dans la boutique", "Ver en la tienda", "Vedi nel negozio", "Im Shop ansehen")}
+                  </Button>
+                </a>
+              )}
+              <Button
+                onClick={() => {
+                  try { sessionStorage.setItem(`pe_tab_${idOrHandle}`, "2"); } catch { /* ignore */ }
+                  router.push(`/products/${idOrHandle}`);
+                }}
+              >
+                {t("Open product family", "Ürün ailesini aç", "Ouvrir la famille produit", "Abrir familia de producto", "Apri famiglia prodotto", "Produktfamilie öffnen")}
+              </Button>
             </BlockStack>
           </Card>
           </div>
