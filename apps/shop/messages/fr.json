@@ -572,7 +572,7 @@
     "outOfFive": "sur 5 · {count} avis",
     "shippingReturnsTitle": "Livraison et retours",
     "delivery": "Livraison",
-    "deliveryBy": "Expédié par {seller} · {shipping}",
+    "deliveryBy": "Livraison au plus tard le {date}",
     "buyerProtection": "Protection acheteur",
     "buyerProtectionText": "Remboursement si ta commande n'arrive pas ou ne correspond pas à la description.",
     "buyerProtectionIncluded": "Protection acheteur Andertal incluse"

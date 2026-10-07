@@ -225,7 +225,7 @@ export function PdpShippingReturns({ shipping = "", returnDays = 14, returnCost 
 }
 
 /** Desktop buybox (design): bonus-points pill + stock line under the price. */
-export function PdpBuyboxPerks({ inStock, points = 0 }) {
+export function PdpBuyboxPerks({ inStock, points = 0, deliveryBy = "" }) {
   const t = useTranslations("product");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "10px 0 12px" }}>
@@ -240,6 +240,7 @@ export function PdpBuyboxPerks({ inStock, points = 0 }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: inStock ? "#1E7A46" : "#B42318" }} />
         <b style={{ color: inStock ? "#1E6B3C" : "#B42318" }}>{inStock ? t("inStockShort") : t("outOfStock")}</b>
+        {inStock && deliveryBy ? <span style={{ color: "#3a352f" }}>· {t("deliveryBy", { date: deliveryBy })}</span> : null}
       </div>
     </div>
   );

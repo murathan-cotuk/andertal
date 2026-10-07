@@ -1794,6 +1794,9 @@ async function start() {
 `).catch(() => {})
         await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS return_method varchar(40) DEFAULT 'seller_pays'`).catch(() => {})
+        // Delivery estimate ("Lieferung bis …"): seller's handling + carrier transit, in business days.
+        await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS handling_days integer`).catch(() => {})
+        await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS transit_days integer`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS return_address jsonb DEFAULT '{}'::jsonb`).catch(() => {})
         await client.query(`ALTER TABLE store_order_items ADD COLUMN IF NOT EXISTS product_id text`).catch(() => {})
         // Backfill product_id for old order items that have a product_handle

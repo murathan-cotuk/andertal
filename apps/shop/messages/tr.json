@@ -589,7 +589,7 @@
     "outOfFive": "5 üzerinden · {count} değerlendirme",
     "shippingReturnsTitle": "Kargo ve iade",
     "delivery": "Teslimat",
-    "deliveryBy": "{seller} tarafından gönderilir · {shipping}",
+    "deliveryBy": "En geç {date} teslim",
     "buyerProtection": "Alıcı koruması",
     "buyerProtectionText": "Siparişin ulaşmazsa veya açıklamaya uymazsa paran iade edilir.",
     "buyerProtectionIncluded": "Andertal alıcı koruması dahil"

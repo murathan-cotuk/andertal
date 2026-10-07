@@ -589,7 +589,7 @@
     "outOfFive": "out of 5 · {count} reviews",
     "shippingReturnsTitle": "Shipping & returns",
     "delivery": "Delivery",
-    "deliveryBy": "Shipped by {seller} · {shipping}",
+    "deliveryBy": "Delivery by {date}",
     "buyerProtection": "Buyer protection",
     "buyerProtectionText": "Money back if your order doesn't arrive or doesn't match the description.",
     "buyerProtectionIncluded": "Andertal buyer protection included"

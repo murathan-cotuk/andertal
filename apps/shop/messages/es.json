@@ -572,7 +572,7 @@
     "outOfFive": "de 5 · {count} valoraciones",
     "shippingReturnsTitle": "Envío y devoluciones",
     "delivery": "Entrega",
-    "deliveryBy": "Enviado por {seller} · {shipping}",
+    "deliveryBy": "Entrega antes del {date}",
     "buyerProtection": "Protección al comprador",
     "buyerProtectionText": "Te devolvemos el dinero si tu pedido no llega o no coincide con la descripción.",
     "buyerProtectionIncluded": "Protección al comprador de Andertal incluida"

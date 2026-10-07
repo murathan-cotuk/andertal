@@ -21,6 +21,7 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import { computeGrundpreis } from "@/lib/grundpreis";
+import { estimateDeliveryDate, formatDeliveryDate } from "@/lib/delivery-estimate";
 import RatingDistribution from "@/components/product/RatingDistribution";
 import { EnergyClassBadge, LegalGroupTabs, SafetyResources, legalGroups } from "@/components/product/PdpCompliance";
 import { useMetafieldDefinitions, metafieldTitle, metafieldValue, mergeMetafieldRows } from "@/lib/metafield-definitions";
@@ -1367,6 +1368,8 @@ export default function ProductTemplate() {
   const hasShippingGroup = shippingGroupIdRaw != null && String(shippingGroupIdRaw).trim() !== "" && shippingGroup != null;
   // If a shipping group is assigned but no price exists for current market → product not shippable here
   const shippingUnavailable = hasShippingGroup && shippingPriceCents === null;
+  // "Lieferung bis …" — only when the seller set handling + transit days on the shipping group.
+  const deliveryByText = hasShippingGroup && !shippingUnavailable ? formatDeliveryDate(estimateDeliveryDate(shippingGroup), locale) : "";
   const shippingDisplay = hasShippingGroup
     ? (shippingPriceCents != null
         ? `${formatPriceCents(shippingPriceCents)} €`
@@ -1922,7 +1925,7 @@ export default function ProductTemplate() {
                 showCampaignBadge={pdpVisible("campaign_badge")}
               />
 
-              <PdpBuyboxPerks inStock={inStock} points={bonusPointsForCents(effectiveDisplayCents)} />
+              <PdpBuyboxPerks inStock={inStock} points={bonusPointsForCents(effectiveDisplayCents)} deliveryBy={deliveryByText} />
 
               <ProductPurchaseActions
                 quantity={quantity}

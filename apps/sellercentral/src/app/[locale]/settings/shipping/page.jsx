@@ -159,7 +159,7 @@ function CountryPicker({ selected, onChange, countries, copy }) {
 }
 
 /* ── Shipping groups section ─────────────────────────────────── */
-const EMPTY_GROUP_FORM = { name: "", carrier_id: "", return_method: "seller_pays", selectedCountries: [], prices: {} };
+const EMPTY_GROUP_FORM = { name: "", carrier_id: "", return_method: "seller_pays", handling_days: "", transit_days: "", selectedCountries: [], prices: {} };
 
 function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
   const [groups, setGroups] = useState([]);
@@ -198,6 +198,8 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
       name: g.name || "",
       carrier_id: g.carrier_id || "",
       return_method: g.return_method === "customer_ships" ? "customer_ships" : "seller_pays",
+      handling_days: g.handling_days != null ? String(g.handling_days) : "",
+      transit_days: g.transit_days != null ? String(g.transit_days) : "",
       selectedCountries,
       prices,
     });
@@ -239,6 +241,8 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
             name: form.name,
             carrier_id: form.carrier_id || null,
             return_method: form.return_method || "seller_pays",
+            handling_days: form.handling_days === "" ? null : Number(form.handling_days),
+            transit_days: form.transit_days === "" ? null : Number(form.transit_days),
             prices: pricesPayload,
           }),
         });
@@ -249,6 +253,8 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
             name: form.name,
             carrier_id: form.carrier_id || null,
             return_method: form.return_method || "seller_pays",
+            handling_days: form.handling_days === "" ? null : Number(form.handling_days),
+            transit_days: form.transit_days === "" ? null : Number(form.transit_days),
             prices: pricesPayload,
           }),
         });
@@ -356,6 +362,29 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
               value={form.return_method || "seller_pays"}
               onChange={(v) => setForm((f) => ({ ...f, return_method: v }))}
             />
+
+            {/* Delivery estimate on the product page ("Lieferung bis …"), in business days */}
+            <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
+              <TextField
+                type="number"
+                min={0}
+                max={30}
+                label={lt(locale, "Handling time (business days)", "Hazırlık süresi (iş günü)", "Délai de préparation (jours ouvrés)", "Tiempo de preparación (días hábiles)", "Tempo di preparazione (giorni lavorativi)", "Bearbeitungszeit (Werktage)")}
+                value={form.handling_days}
+                onChange={(v) => setForm((f) => ({ ...f, handling_days: v }))}
+                autoComplete="off"
+              />
+              <TextField
+                type="number"
+                min={0}
+                max={30}
+                label={lt(locale, "Transit time (business days)", "Kargo süresi (iş günü)", "Délai d'acheminement (jours ouvrés)", "Tiempo de tránsito (días hábiles)", "Tempo di transito (giorni lavorativi)", "Laufzeit (Werktage)")}
+                value={form.transit_days}
+                onChange={(v) => setForm((f) => ({ ...f, transit_days: v }))}
+                autoComplete="off"
+                helpText={lt(locale, "Both set → the product page shows \"Delivery by …\" (weekends and German public holidays skipped). Empty = no date shown.", "İkisi de girilirse ürün sayfasında \"En geç … teslim\" gösterilir (hafta sonu ve resmî tatiller atlanır). Boş = tarih gösterilmez.", "Les deux renseignés → la page produit affiche « Livraison au plus tard le … ». Vide = aucune date.", "Ambos → la página muestra «Entrega antes del …». Vacío = sin fecha.", "Entrambi → la pagina mostra «Consegna entro …». Vuoto = nessuna data.", "Beide gesetzt → die Produktseite zeigt „Lieferung bis …“ (Wochenenden und bundesweite Feiertage ausgenommen). Leer = kein Datum.")}
+              />
+            </InlineGrid>
 
             <BlockStack gap="200">
               <Text variant="bodySm" fontWeight="semibold">{copy.selectCountries}</Text>

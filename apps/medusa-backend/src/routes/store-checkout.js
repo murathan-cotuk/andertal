@@ -2018,9 +2018,17 @@ const adminHubShippingGroupsGET = async (req, res) => {
   }
 }
 
+/** Business-day count for the delivery estimate: integer 0–30, empty → null (no estimate shown). */
+const shippingDaysValue = (v) => {
+  if (v === undefined) return undefined
+  if (v === null || v === '') return null
+  const n = Math.round(Number(v))
+  return Number.isFinite(n) && n >= 0 && n <= 30 ? n : null
+}
+
 const adminHubShippingGroupPOST = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  const { name, carrier_id, prices, return_method } = req.body || {}
+  const { name, carrier_id, prices, return_method, handling_days, transit_days } = req.body || {}
   if (!name) return res.status(400).json({ message: 'name required' })
   const callerSellerId = req.sellerUser?.seller_id || null
   const rm = return_method === 'customer_ships' ? 'customer_ships' : 'seller_pays'
@@ -2030,8 +2038,8 @@ const adminHubShippingGroupPOST = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
     const r = await client.query(
-      `INSERT INTO store_shipping_groups (name, carrier_id, seller_id, return_method) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [name.trim(), carrier_id || null, callerSellerId, rm]
+      `INSERT INTO store_shipping_groups (name, carrier_id, seller_id, return_method, handling_days, transit_days) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name.trim(), carrier_id || null, callerSellerId, rm, shippingDaysValue(handling_days) ?? null, shippingDaysValue(transit_days) ?? null]
     )
     const group = r.rows[0]
     if (Array.isArray(prices) && prices.length > 0) {
@@ -2056,7 +2064,7 @@ const adminHubShippingGroupPOST = async (req, res) => {
 const adminHubShippingGroupPATCH = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const id = (req.params.id || '').trim()
-  const { name, carrier_id, prices, return_method } = req.body || {}
+  const { name, carrier_id, prices, return_method, handling_days, transit_days } = req.body || {}
   const isSuperuser = req.sellerUser?.is_superuser || false
   const callerSellerId = req.sellerUser?.seller_id
   let client
@@ -2069,14 +2077,16 @@ const adminHubShippingGroupPATCH = async (req, res) => {
       const own = await client.query(`SELECT id FROM store_shipping_groups WHERE id=$1::uuid AND seller_id=$2`, [id, callerSellerId])
       if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Nicht erlaubt' }) }
     }
-    if (name !== undefined || carrier_id !== undefined || return_method !== undefined) {
+    if (name !== undefined || carrier_id !== undefined || return_method !== undefined || handling_days !== undefined || transit_days !== undefined) {
       const sets = []; const vals = []
       if (name !== undefined) { vals.push(name.trim()); sets.push(`name=$${vals.length}`) }
       if (carrier_id !== undefined) { vals.push(carrier_id || null); sets.push(`carrier_id=$${vals.length}`) }
       if (return_method !== undefined) {
         const rm = return_method === 'customer_ships' ? 'customer_ships' : 'seller_pays'
-        vals.push(rm); sets.push(`return_method=$${vals.length}`)
+        vals.push(rm); sets.push(`return_method=${vals.length}`)
       }
+      if (handling_days !== undefined) { vals.push(shippingDaysValue(handling_days)); sets.push(`handling_days=${vals.length}`) }
+      if (transit_days !== undefined) { vals.push(shippingDaysValue(transit_days)); sets.push(`transit_days=${vals.length}`) }
       sets.push(`updated_at=now()`)
       vals.push(id)
       await client.query(`UPDATE store_shipping_groups SET ${sets.join(',')} WHERE id=$${vals.length}::uuid`, vals)
@@ -2140,7 +2150,7 @@ const storeShippingGroupsGET = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const groups = await client.query('SELECT id, name FROM store_shipping_groups ORDER BY created_at ASC')
+    const groups = await client.query('SELECT id, name, handling_days, transit_days FROM store_shipping_groups ORDER BY created_at ASC')
     const prices = await client.query('SELECT group_id, country_code, price_cents FROM store_shipping_prices')
     // Superuser-disabled countries (admin_hub_country_overrides) are stripped out here, at the
     // single source every shop surface reads from (cart/checkout/product pages all derive their
@@ -2158,7 +2168,7 @@ const storeShippingGroupsGET = async (req, res) => {
       if (!pricesByGroup[p.group_id]) pricesByGroup[p.group_id] = {}
       pricesByGroup[p.group_id][cc] = Number(p.price_cents)
     }
-    const result = (groups.rows || []).map(g => ({ id: g.id, name: g.name, prices: pricesByGroup[g.id] || {} }))
+    const result = (groups.rows || []).map(g => ({ id: g.id, name: g.name, handling_days: g.handling_days ?? null, transit_days: g.transit_days ?? null, prices: pricesByGroup[g.id] || {} }))
     res.json({ groups: result })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
