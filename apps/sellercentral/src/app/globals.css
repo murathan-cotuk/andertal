@@ -722,3 +722,39 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
 .sc-bulk-bar .Polaris-Button--variantPrimary { --pc-button-bg: var(--andertal-brand) !important; --pc-button-bg-hover: #f59a2c !important; background: var(--andertal-brand) !important; }
 .sc-bulk-bar .Polaris-Button--variantPrimary * { color: var(--andertal-ink) !important; }
 .sc-bulk-bar .Polaris-Button--variantPlain * { color: rgba(255, 255, 255, 0.85) !important; }
+/* Mobile bottom tab bar (Konsept s36) — only on narrow screens */
+.sc-mobile-tabbar { display: none; }
+@media (max-width: 47.99em) {
+  .sc-mobile-tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 9980;
+    height: calc(58px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: #fff; border-top: 1px solid var(--andertal-line);
+  }
+  .sc-mobile-tabbar a {
+    flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    font-size: 11px; font-weight: 600; color: #5e574e; text-decoration: none;
+  }
+  .sc-mobile-tabbar a.is-active { color: var(--andertal-brand-text); }
+  .andertal-scroll-wrapper { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}
+/* Orders: card list on phones, table on larger screens (Konsept s36) */
+.sc-orders-cards { display: none; }
+@media (max-width: 47.99em) {
+  .sc-orders-cards { display: grid; gap: 8px; margin-bottom: 8px; }
+  .sc-orders-table { display: none; }
+  .sc-order-card { display: block; background: #fff; border: 1px solid var(--andertal-line); border-radius: 16px; padding: 12px 14px; color: var(--andertal-ink); text-decoration: none; }
+}
+/* Sticky save bar (Konsept s34/s35/s37) */
+.sc-unsaved-bar {
+  position: fixed; z-index: 9985; right: 0; bottom: 0; left: var(--pg-layout-width-nav-base, 240px);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 20px; background: #fff; border-top: 1px solid var(--andertal-line);
+  box-shadow: 0 -6px 18px rgba(29, 27, 24, 0.06);
+}
+.sc-unsaved-discard { border: none; background: none; color: var(--andertal-brand-text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 10px; }
+.sc-unsaved-save { border: none; background: var(--andertal-ink); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; padding: 0 22px; height: 40px; border-radius: 999px; }
+.sc-unsaved-save:disabled, .sc-unsaved-discard:disabled { opacity: 0.6; cursor: default; }
+.andertal-page-content { padding-bottom: 72px; }
+@media (max-width: 47.99em) {
+  .sc-unsaved-bar { left: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); padding: 8px 12px; }
+}

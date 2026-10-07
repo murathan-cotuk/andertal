@@ -49,6 +49,8 @@ import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 import { getNotificationsCopy } from "@/lib/notifications-i18n";
 import { statusLabel as localizeStatus } from "@/lib/status-labels";
 import { __registerToast } from "@/lib/toast";
+import MobileTabBar from "@/components/sc/MobileTabBar";
+import UnsavedBar from "@/components/sc/UnsavedBar";
 
 const discardBtnStyles = `
   .andertal-discard-topbar-btn,
@@ -1335,39 +1337,6 @@ export default function PolarisLayout({ children }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <GroupedDropdownSearch />
           </div>
-          {unsaved?.isDirty && (
-            <>
-              <style>{discardBtnStyles}</style>
-              <div className="andertal-discard-topbar-btn">
-                <Button
-                  size="slim"
-                  variant="tertiary"
-                  onClick={() => unsaved.runDiscard()}
-                  style={{
-                    background: "#4d4d4d",
-                    color: "#ffffff",
-                    border: "1px solid #5c5c5c",
-                  }}
-                >
-                  Discard
-                </Button>
-              </div>
-              <Button
-                size="medium"
-                variant="secondary"
-                onClick={() => unsaved.runSave()}
-                style={{
-                  background: "#fff",
-                  color: "#1d1b18",
-                  border: "2px solid #1d1b18",
-                  fontWeight: 600,
-                  minWidth: 80,
-                }}
-              >
-                Save
-              </Button>
-            </>
-          )}
         </div>
       }
     />
@@ -1651,6 +1620,9 @@ export default function PolarisLayout({ children }) {
           </div>
         </div>
       </Frame>
+      {/* Mobile bottom tab bar (Konsept s36) — hidden on desktop via CSS */}
+      <MobileTabBar />
+      <UnsavedBar unsaved={unsaved} />
       {/* Seller impersonation bottom tab bar */}
       <SellerImperBar />
     </AppProvider>

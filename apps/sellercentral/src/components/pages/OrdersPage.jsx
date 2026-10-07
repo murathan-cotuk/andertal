@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { statusLabel } from "@/lib/status-labels";
 import styled from "styled-components";
@@ -25,7 +25,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
-import { ScPageHeader, ScTabs, ScBulkBar, ScKpiTiles } from "@/components/sc/ScPage";
+import { ScPageHeader, ScTabs, ScBulkBar, ScKpiTiles, ScStatusPill } from "@/components/sc/ScPage";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -1555,6 +1555,36 @@ export default function OrdersPage() {
         )}
       </FilterBar>
 
+      {/* Mobile (Konsept s36): order cards instead of the wide table */}
+      <div className="sc-orders-cards">
+        {visibleOrders.length === 0 && !loading && (
+          <div style={{ padding: 16, textAlign: "center", color: "#5e574e", fontSize: 13 }}>{ui.noOrders || "—"}</div>
+        )}
+        {visibleOrders.map((o) => {
+          const name = [o.first_name, o.last_name].filter(Boolean).join(" ") || o.email || "—";
+          const items = Array.isArray(o.items) ? o.items.reduce((n, it) => n + (Number(it.quantity) || 1), 0) : null;
+          return (
+            <Link key={o.id} href={`/orders/${o.id}`} className="sc-order-card">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <strong style={{ fontSize: 15 }}>#{o.order_number || String(o.id).slice(0, 8)}</strong>
+                <span style={{ fontSize: 12, color: "#5e574e" }}>{fmtDate(o.created_at)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 2 }}>
+                <span style={{ fontSize: 13, color: "#3a352f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {name}{items != null ? ` · ${items} ${lt(locale, "items", "ürün", "art.", "art.", "art.", "Art.")}` : ""}
+                </span>
+                <strong style={{ fontSize: 14 }}>{fmtCents(o.total_cents || 0)}</strong>
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {o.payment_status && <ScStatusPill status={o.payment_status} label={statusLabel(locale, o.payment_status)} />}
+                {o.delivery_status && <ScStatusPill status={o.delivery_status} label={statusLabel(locale, o.delivery_status)} />}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="sc-orders-table">
       <TableCard>
         <div style={{ overflowX: "auto", width: "100%" }}>
         <table style={{ width: "100%", minWidth: visibleCols.reduce((s, c) => s + colWidths[COL_DEFS.indexOf(c)], 0), borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
@@ -1686,6 +1716,7 @@ export default function OrdersPage() {
         </table>
         </div>
       </TableCard>
+      </div>
     </PageContainer>
   );
 }
