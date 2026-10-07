@@ -10,6 +10,12 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-07 — B: müşteri iptal/iade hataları (bitti)
+
+- **Hata (canlı)**: shop'un `getMedusaClient().request` hata durumunda istisna atmaz, `{ __error }` döner. Sipariş detayındaki **iade formu ve iade takip formu bunu kontrol etmiyordu** → reddedilen iade (ör. süre dolmuş) müşteriye "Rücksendung angefragt" (başarılı) gösteriyordu. Artık `__error` kontrol edilip hata gösteriliyor.
+- Backend iptal/iade hatalarına sabit `code` eklendi (`not_cancellable`, `already_shipped`, `cancel_window_expired`, `contact_support`, `no_items`, `invalid_item`; mevcut `already_returned`, `quantity_exceeds`, `return_period_expired`). Shop istemcisi `code` + `details` taşır; `src/lib/order-error-text.js` kodu `orderErrors` mesajlarıyla 6 dile çevirir (bilinmeyen kodda backend metni). Sipariş detay ve liste sayfalarında iptal + iade.
+- Build: shop EXIT 0; backend `npm test` geçti.
+
 ## 2026-10-07 — Yeni iş listesi alındı (sıra TASKS.md'de)
 
 1. Cursor handoff (`docs/HANDOFF-cursor-plan-sc-variation-compliance.md`) Faz 0 → 0b → 0c → 0e → 0d → 0f → 1 → 2 → 3. Her faz bitince burada kayıt.
