@@ -7,6 +7,7 @@ import { Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Select, Butto
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 // Per-category compliance profile override (follow-up to docs/HUKUKI.md's automatic keyword-based
 // assignment, which isn't always right — e.g. a subcategory like "washing machines" may need a
 // different profile than its parent "electronics"). Inheritance from the nearest ancestor stays
@@ -502,7 +503,7 @@ export default function ComplianceProfilesPage() {
                                 size="slim"
                                 tone="critical"
                                 variant="tertiary"
-                                onClick={() => handleRemoveCustomField(f.key)}
+                                onClick={async () => { if (await confirmRemoval()) { handleRemoveCustomField(f.key); } }}
                                 loading={customSaving}
                               >
                                 {c.removeField}

@@ -12,7 +12,11 @@ import ProductEditPage from "@/components/pages/products/ProductEditPage";
 export default function ProductDetailRoute() {
   const params = useParams();
   const router = useRouter();
-  const idOrHandle = params?.id;
+  // After the first save of a new product the page stays mounted: createdId takes over from the
+  // "new" route param (address bar updated in place, no reload → no "leave site?" prompt).
+  const [createdId, setCreatedId] = useState(null);
+  const routeId = params?.id;
+  const idOrHandle = createdId || routeId;
   const [product, setProduct] = useState(null);
   const [sellerListings, setSellerListings] = useState([]);
   const [eanSiblings, setEanSiblings] = useState([]);
@@ -21,6 +25,16 @@ export default function ProductDetailRoute() {
   const client = getMedusaAdminClient();
 
   const isNewProduct = idOrHandle === "new";
+
+  const handleCreated = useCallback((created, qs = "") => {
+    const id = String(created?.id || "");
+    if (!id) return;
+    setCreatedId(id);
+    if (typeof window !== "undefined") {
+      const nextPath = window.location.pathname.replace(/\/new\/?$/, `/${encodeURIComponent(id)}`);
+      window.history.replaceState(window.history.state, "", `${nextPath}${qs || ""}`);
+    }
+  }, []);
 
   const fetchProduct = useCallback(async () => {
     if (!idOrHandle || isNewProduct) return;
@@ -101,6 +115,7 @@ export default function ProductDetailRoute() {
         idOrHandle={idOrHandle}
         isNew={isNewProduct}
         onReload={fetchProduct}
+        onCreated={handleCreated}
         sellerListings={sellerListings}
         eanSiblings={eanSiblings}
       />

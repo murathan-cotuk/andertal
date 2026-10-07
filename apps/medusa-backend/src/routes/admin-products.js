@@ -478,14 +478,15 @@ const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
     console.warn('queueMetafieldSuggestionsAndSanitizePayload scan:', e && e.message)
     return result
   }
-  if (scanned.pendingByKey.size > 0) {
+  const toPropose = scanned.proposalsByKey || scanned.pendingByKey
+  if (toPropose.size > 0) {
     try {
       const existingPending = await dbQ(
         `SELECT id, key, label, proposed_values FROM admin_hub_metafield_pending WHERE seller_id = $1 AND status = 'pending'`,
         [sid]
       )
       const existingByKey = new Map((existingPending.rows || []).map((r) => [r.key, r]))
-      for (const [key, rec] of scanned.pendingByKey.entries()) {
+      for (const [key, rec] of toPropose.entries()) {
         const vals = Array.from(rec.values)
         const label = rec.label || maps.labelByKey.get(key) || key
         const existing = existingByKey.get(key)
@@ -585,17 +586,49 @@ const applyGpsrInheritanceAndValidate = (metadataObj, variantsArr) => {
  * Draft/archived products are never blocked so sellers can keep working.
  * Uses the already-connected pg client to avoid a second connection.
  */
-const validateBrandForPublish = async (client, meta, status) => {
+/**
+ * A brand is "registered" once its trademark / reseller authorization was approved
+ * (docs/BRAND.md: own_registered → verified, authorized_reseller → reseller).
+ */
+const isRegisteredBrandRow = (row) =>
+  ['verified', 'reseller'].includes(String(row?.verification_level || ''))
+  || (['own_registered', 'authorized_reseller'].includes(String(row?.brand_type || '')) && String(row?.status || 'active') === 'active')
+
+/**
+ * Publish gate for a product's brand. `sellerId` = the seller who lists it (null for platform /
+ * superuser products). Rules (docs/BRAND.md):
+ *   - brand must be active (pending / rejected / superseded → draft)
+ *   - a brand REGISTERED by another seller may only be listed by a seller who holds an approved
+ *     registration or reseller authorization for the same brand name themselves
+ *   - unregistered ("own", unverified) brands can be listed freely
+ */
+const validateBrandForPublish = async (client, meta, status, sellerId = null) => {
   try {
-    if (String(status || '').toLowerCase() !== 'published') return { ok: true }
+    const st = String(status || '').toLowerCase()
+    if (st !== 'published' && st !== 'active') return { ok: true }
     const m = meta && typeof meta === 'object' ? meta : {}
     const brandId = String(m.brand_id || '').trim()
     if (!brandId) return { ok: true }
-    const r = await client.query('SELECT status, name FROM admin_hub_brands WHERE id = $1', [brandId])
+    const r = await client.query('SELECT status, name, seller_id, brand_type, verification_level FROM admin_hub_brands WHERE id = $1', [brandId])
     const row = r.rows && r.rows[0]
     if (!row) return { ok: true } // unknown/deleted brand ref → don't block on brand grounds
-    if (String(row.status || 'active') === 'active') return { ok: true }
-    return { ok: false, message: `Brand authorization pending: "${row.name || brandId}" is not approved yet (status: ${row.status}).` }
+    if (String(row.status || 'active') !== 'active') {
+      return { ok: false, message: `Brand authorization pending: "${row.name || brandId}" is not approved yet (status: ${row.status}).` }
+    }
+    const sid = String(sellerId || '').trim()
+    if (sid && sid !== 'default' && row.seller_id && String(row.seller_id) !== sid && isRegisteredBrandRow(row)) {
+      const own = await client.query(
+        `SELECT 1 FROM admin_hub_brands
+          WHERE seller_id = $1 AND lower(trim(name)) = lower(trim($2)) AND status = 'active'
+            AND (verification_level IN ('verified', 'reseller') OR brand_type IN ('own_registered', 'authorized_reseller'))
+          LIMIT 1`,
+        [sid, row.name],
+      )
+      if (!own.rows.length) {
+        return { ok: false, message: `Brand "${row.name}" is registered by another seller — submit your own registration or reseller authorization (Marken → Berechtigung) before listing under it.` }
+      }
+    }
+    return { ok: true }
   } catch (_) {
     // Fail open: if the brand table/columns are not migrated yet, do not block publishing
     return { ok: true }
@@ -782,7 +815,7 @@ const createAdminHubProductDb = async (body) => {
     const metadata = metaObj ? JSON.stringify(metaObj) : null
     const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
-    const brandGate = await validateBrandForPublish(client, metaObj || {}, status)
+    const brandGate = await validateBrandForPublish(client, metaObj || {}, status, (body.seller || body.seller_id || '').trim() || null)
     if (!brandGate.ok) {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
       if (status.toLowerCase() === 'published') status = 'draft'
@@ -970,7 +1003,7 @@ const updateAdminHubProductDb = async (id, body) => {
     const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
     if (!skipComplianceGates) {
-      const brandGate = await validateBrandForPublish(client, metadataObj || {}, status)
+      const brandGate = await validateBrandForPublish(client, metadataObj || {}, status, existing.seller_id || null)
       if (!brandGate.ok) {
         complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
         if (String(status || '').toLowerCase() === 'published') status = 'draft'
@@ -1653,7 +1686,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       await lc.connect()
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
-      const status = body.status !== undefined ? String(body.status || 'active') : null
+      let status = body.status !== undefined ? String(body.status || 'active') : null
       const skuVal = body.sku !== undefined ? (body.sku || null) : null
       const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
@@ -1661,6 +1694,10 @@ const adminHubProductByIdPUT = async (req, res) => {
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
       const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
       const listingSellerMeta = buildListingSellerMeta(listedEan)
+      if (brandId && status) {
+        const listingBrandGate = await validateBrandForPublish(lc, { brand_id: brandId }, status, callerSellerId)
+        if (!listingBrandGate.ok) status = 'draft'
+      }
       const existingListing = await lc.query(
         `SELECT id FROM admin_hub_seller_listings
          WHERE product_id = $1 AND seller_id = $2
@@ -1760,7 +1797,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       await lc.connect()
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
-      const status = body.status !== undefined ? String(body.status || 'active') : null
+      let status = body.status !== undefined ? String(body.status || 'active') : null
       const skuVal = body.sku !== undefined ? (body.sku || null) : null
       const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
@@ -1768,6 +1805,10 @@ const adminHubProductByIdPUT = async (req, res) => {
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
       const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
       const listingSellerMeta = buildListingSellerMeta(listedEan)
+      if (brandId && status) {
+        const listingBrandGate = await validateBrandForPublish(lc, { brand_id: brandId }, status, callerSellerId)
+        if (!listingBrandGate.ok) status = 'draft'
+      }
       const existingListing = await lc.query(
         `SELECT id FROM admin_hub_seller_listings
          WHERE product_id = $1 AND seller_id = $2
@@ -2621,5 +2662,7 @@ module.exports = function createAdminProductsRouter() {
 
 module.exports.getAdminHubProductByIdOrHandleDb = getAdminHubProductByIdOrHandleDb
 module.exports.updateAdminHubProductDb = updateAdminHubProductDb
+module.exports.validateBrandForPublish = validateBrandForPublish
+module.exports.isRegisteredBrandRow = isRegisteredBrandRow
 module.exports.getProductsDbClient = getProductsDbClient
 module.exports.listAdminHubProductsDb = listAdminHubProductsDb

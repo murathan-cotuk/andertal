@@ -89,6 +89,9 @@ const keepMetafieldsAndQueueUnknown = (arr, maps, pendingByKey) => {
   return out
 }
 
+// Variation values are the seller's own product axes (e.g. Design: "s", "b"). Unknown ones are
+// PROPOSED to the catalog (superuser review + notification) but never block the product — only
+// unknown Eigenschaften in `metafields` (shop filters) do.
 const scanVariationGroups = (groups, maps, pendingByKey) => {
   if (!Array.isArray(groups)) return groups
   return groups.map((g) => {
@@ -137,24 +140,29 @@ const applyPendingFlags = (meta, pendingByKey) => {
 
 const scanProductCatalogPending = (metadata, variants, maps) => {
   const meta = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+  // Unknown catalog values never block a product any more (owner decision 2026-10-07: sellers must
+  // not be stopped or warned). They are only PROPOSED to the catalog → superuser reviews them in
+  // Content → Metaobjects (+ notification). pendingByKey therefore stays empty, which also clears
+  // the old _catalog_approval_pending flag on every rescan / save.
   const pendingByKey = new Map()
+  const proposalOnlyByKey = new Map()
   if (Array.isArray(meta.metafields)) {
-    meta.metafields = keepMetafieldsAndQueueUnknown(meta.metafields, maps, pendingByKey)
+    meta.metafields = keepMetafieldsAndQueueUnknown(meta.metafields, maps, proposalOnlyByKey)
   }
   if (Array.isArray(meta.variation_groups)) {
-    meta.variation_groups = scanVariationGroups(meta.variation_groups, maps, pendingByKey)
+    meta.variation_groups = scanVariationGroups(meta.variation_groups, maps, proposalOnlyByKey)
   }
   let nextVariants = variants
   if (Array.isArray(variants)) {
     nextVariants = variants.map((v) => {
       const row = { ...(v || {}) }
       if (Array.isArray(row.metafields)) {
-        row.metafields = keepMetafieldsAndQueueUnknown(row.metafields, maps, pendingByKey)
+        row.metafields = keepMetafieldsAndQueueUnknown(row.metafields, maps, proposalOnlyByKey)
       }
       if (row.metadata && typeof row.metadata === 'object') {
         const vm = { ...row.metadata }
         if (Array.isArray(vm.metafields)) {
-          vm.metafields = keepMetafieldsAndQueueUnknown(vm.metafields, maps, pendingByKey)
+          vm.metafields = keepMetafieldsAndQueueUnknown(vm.metafields, maps, proposalOnlyByKey)
         }
         row.metadata = vm
       }
@@ -162,7 +170,15 @@ const scanProductCatalogPending = (metadata, variants, maps) => {
     })
   }
   applyPendingFlags(meta, pendingByKey)
-  return { metadata: meta, variants: nextVariants, pendingByKey }
+  // Everything to queue for superuser review = blocking metafields + non-blocking variation values.
+  const proposalsByKey = new Map()
+  for (const src of [pendingByKey, proposalOnlyByKey]) {
+    for (const [key, rec] of src.entries()) {
+      if (!proposalsByKey.has(key)) proposalsByKey.set(key, { values: new Set(), label: rec.label })
+      for (const v of rec.values) proposalsByKey.get(key).values.add(v)
+    }
+  }
+  return { metadata: meta, variants: nextVariants, pendingByKey, proposalsByKey }
 }
 
 const productHasPendingCatalogMetafields = (product) => {

@@ -19,7 +19,7 @@ import {
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 import { useUI } from "@/lib/ui-strings";
 import { getShippingCopy } from "@/lib/shipping-i18n";
 import { getCountryList } from "@/lib/countries";
@@ -147,7 +147,7 @@ function CountryPicker({ selected, onChange, countries, copy }) {
                 <span key={code} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "var(--p-color-bg-fill-secondary, #f3eee6)", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, color: "#3a352f" }}>
                   <span style={{ fontWeight: 600, color: "#5e574e", fontSize: 11 }}>{code}</span>
                   {country?.label}
-                  <button type="button" onClick={() => remove(code)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#a39a8d", marginLeft: 2 }}>×</button>
+                  <button type="button" onClick={async () => { if (await confirmRemoval()) { remove(code); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#a39a8d", marginLeft: 2 }}>×</button>
                 </span>
               );
             })}

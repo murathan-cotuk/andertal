@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { useLt } from "@/lib/use-locale-text";
 import { dateLocaleFor } from "@/lib/locale-text";
+import { confirmRemoval } from "@/lib/confirm-delete";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getNotificationsPageCopy } from "@/lib/notifications-page-i18n";
 import {
@@ -266,6 +267,7 @@ export default function NotificationsPage() {
   };
 
   const deleteSelected = async () => {
+    if (!(await confirmRemoval())) return;
     if (selected.size === 0) return;
     setBusy(true);
     try {

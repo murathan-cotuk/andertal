@@ -998,15 +998,11 @@ export default function PolarisLayout({ children }) {
             <button
               type="button"
               onClick={async () => {
+                // Opening the bell must NOT mark everything read — that used to zero the list before
+                // it was even shown (new items vanished unseen). Refresh only; "mark all read" is
+                // an explicit button in the panel.
                 setNotifOpen((v) => !v);
-                if (!notifOpen) {
-                  try {
-                    await getMedusaAdminClient().markNotificationsSeen();
-                    await refreshNotifications();
-                  } catch {
-                    // ignore
-                  }
-                }
+                if (!notifOpen) refreshNotifications().catch(() => {});
               }}
               style={{ ...topBarIconStyle }}
               title={notifCopy.title}
@@ -1022,7 +1018,23 @@ export default function PolarisLayout({ children }) {
             </button>
             {notifOpen && (
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 400, maxWidth: "calc(100vw - 24px)", background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e6dfd4", zIndex: 9999 }}>
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3eee6", fontSize: 13, fontWeight: 700, color: "#1d1b18" }}>{notifCopy.title}</div>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3eee6", fontSize: 13, fontWeight: 700, color: "#1d1b18", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span>{notifCopy.title}</span>
+                  {notifUnread > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await getMedusaAdminClient().markNotificationsSeen();
+                          await refreshNotifications();
+                        } catch { /* ignore */ }
+                      }}
+                      style={{ border: "none", background: "none", color: "#a65300", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
+                    >
+                      {lt(locale, "Mark all as read", "Tümünü okundu işaretle", "Tout marquer comme lu", "Marcar todo como leído", "Segna tutto come letto", "Alle als gelesen markieren")}
+                    </button>
+                  )}
+                </div>
                 <div style={{ maxHeight: 420, overflowY: "auto" }}>
                   {(!notifData?.recent_orders?.length &&
                     !notifData?.recent_returns?.length &&
@@ -1161,7 +1173,9 @@ export default function PolarisLayout({ children }) {
                       )}
                       {(notifData?.recent_product_change_requests || []).map((cr) => {
                         const isSellerInfo = !cr.product_id && (cr.title || cr.reference_id);
-                        const href = cr.product_id
+                        const href = cr.kind === "metafield_pending"
+                          ? `/content/metaobjects?pending=${encodeURIComponent(cr.key || "")}`
+                          : cr.product_id
                           ? `/products/${cr.product_id}`
                           : (cr.reference_id || cr.seller_id ? `/sellers/${cr.reference_id || cr.seller_id}` : "/products/inventory");
                         return (

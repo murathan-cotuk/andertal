@@ -482,8 +482,13 @@ module.exports = function createNotificationsRouter() {
         if (sup) {
           recentMetafieldPending = await client.query(
             `SELECT mp.id, mp.key, mp.label, mp.proposed_values, mp.seller_id, mp.created_at,
+                    'metafield_pending' AS kind,
+                    ('Neue Werte für „' || COALESCE(NULLIF(mp.label, ''), mp.key) || '“') AS title,
+                    (COALESCE(su.store_name, mp.seller_id) || ': ' ||
+                      COALESCE((SELECT string_agg(v, ', ') FROM jsonb_array_elements_text(mp.proposed_values) v), '')) AS body,
                     (s.read_at IS NOT NULL) AS read
              FROM admin_hub_metafield_pending mp
+             LEFT JOIN seller_users su ON su.seller_id = mp.seller_id AND su.sub_of_seller_id IS NULL
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'metafield_pending' AND s.source_id = mp.id
              WHERE mp.status = 'pending'

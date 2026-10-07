@@ -16,7 +16,7 @@ import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { lt } from "@/lib/locale-text";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 
 const LOCALE_TABS = [
   { value: "de", label: "DE" },
@@ -309,7 +309,7 @@ export default function SellersContractPage() {
                       <InlineStack gap="100">
                         <Button size="slim" disabled={idx === 0} onClick={() => moveSection(idx, -1)}>{t.moveUp}</Button>
                         <Button size="slim" disabled={idx === draft.sections.length - 1} onClick={() => moveSection(idx, 1)}>{t.moveDown}</Button>
-                        <Button size="slim" tone="critical" onClick={() => removeSection(idx)}>{t.remove}</Button>
+                        <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeSection(idx); } }}>{t.remove}</Button>
                       </InlineStack>
                     </InlineStack>
                     <TextField label={t.heading} value={sec.heading} onChange={(v) => updateSection(idx, { heading: v })} autoComplete="off" />

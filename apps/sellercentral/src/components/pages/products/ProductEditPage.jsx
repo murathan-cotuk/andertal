@@ -37,6 +37,7 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import InfoIconTooltip from "@/components/InfoIconTooltip";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import { buildBrandOptions } from "@/lib/brand-options";
 import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
@@ -48,6 +49,7 @@ import {
   isChangeRequestSkipField,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
+import { confirmRemoval } from "@/lib/confirm-delete";
 import {
   ProductSectionHeading,
   ProductSectionRule,
@@ -200,6 +202,19 @@ function resolveMetaDefLabel(def, key, uiLocale) {
   }
   if (def?.label != null && String(def.label).trim()) return String(def.label).trim();
   return key;
+}
+
+/**
+ * Display label of a catalog (Eigenschaft) value in the UI language. The value itself stays the
+ * canonical (DE) string — one value across all languages — and the translation comes from the
+ * definition's values_i18n (Metaobjects page).
+ */
+function resolveMetaDefValueLabel(def, value, uiLocale) {
+  const v = String(value ?? "");
+  const loc = String(uiLocale || "de").slice(0, 2).toLowerCase();
+  if (!v || loc === "de") return v;
+  const t = def?.values_i18n?.[loc]?.[v];
+  return t != null && String(t).trim() ? String(t).trim() : v;
 }
 
 function filterMetaDefsForCatalog(definitions) {
@@ -531,7 +546,7 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
-export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [], eanSiblings = [] }) {
+export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, onCreated, sellerListings = [], eanSiblings = [] }) {
   const router = useRouter();
   const locale = useLocale();
   const pe = useMemo(() => productEditCopy(locale), [locale]);
@@ -1519,6 +1534,38 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         allTranslations[locKey] = { ...row, handle: locFromTitle };
       }
       allTranslations.de = { ...(allTranslations.de || {}), handle: canonicalHandle };
+      // Catalog-linked variation groups (Eigenschaften): the storefront reads per-product labels
+      // (option.labels[loc], translations[loc].variation_groups[i].name) — fill them from the
+      // definition's translations so e.g. "Farbe / Schwarz" shows as "Color / Black" in English.
+      if (Array.isArray(metadata.variation_groups)) {
+        const VG_LOCS = ["en", "tr", "fr", "es", "it"];
+        metadata.variation_groups = metadata.variation_groups.map((g, gi) => {
+          const def = g?.metafield_key ? metaDefs[g.metafield_key] : null;
+          if (!def) return g;
+          for (const L of VG_LOCS) {
+            const tl = def.label_i18n?.[L]?.label;
+            if (!tl || !String(tl).trim()) continue;
+            const locData = { ...(allTranslations[L] || {}) };
+            const arr = Array.isArray(locData.variation_groups) ? [...locData.variation_groups] : [];
+            while (arr.length <= gi) arr.push({});
+            arr[gi] = { ...arr[gi], name: String(tl).trim() };
+            locData.variation_groups = arr;
+            allTranslations[L] = locData;
+          }
+          return {
+            ...g,
+            name: String(def.label || g.name || ""),
+            options: (g.options || []).map((o) => {
+              const labels = { ...(o?.labels && typeof o.labels === "object" ? o.labels : {}) };
+              for (const L of VG_LOCS) {
+                const tv = def.values_i18n?.[L]?.[o?.value];
+                if (tv != null && String(tv).trim()) labels[L] = String(tv).trim();
+              }
+              return { ...o, labels };
+            }),
+          };
+        });
+      }
       metadata.translations = allTranslations;
       // variation_groups already in metadata (kept in sync by applyVariantGroups); re-serialize for safety
       if (variantGroups.length > 0) {
@@ -1642,23 +1689,34 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             });
           }
         } else {
-          const backendComplianceWarning = created?.compliance_warning || res?.product?.compliance_warning || "";
-          if (backendComplianceWarning || softComplianceWarning) {
-            setMessage({ type: "warning", text: backendComplianceWarning || softComplianceWarning });
-          } else {
-            setMessage({ type: "success", text: withAutoTranslateNote(locale === "en" ? "Product created." : locale === "tr" ? "Ürün oluşturuldu." : locale === "fr" ? "Produit créé." : locale === "es" ? "Producto creado." : locale === "it" ? "Prodotto creato." : "Produkt erstellt.", locale, res?.product?.auto_translated_locales || created?.auto_translated_locales) });
-          }
+          // First save of a new product: incomplete is fine — it is stored as a draft and the
+          // seller keeps working. No compliance warnings here (they show on later saves).
+          const incomplete = !!(created?.compliance_warning || res?.product?.compliance_warning || softComplianceWarning)
+            || String(created?.status || "").toLowerCase() === "draft";
+          setMessage({
+            type: "success",
+            text: withAutoTranslateNote(
+              incomplete
+                ? (locale === "en" ? "Saved as draft — you can complete the remaining details any time." : locale === "tr" ? "Taslak olarak kaydedildi — eksik bilgileri istediğin zaman tamamlayabilirsin." : locale === "fr" ? "Enregistré comme brouillon — vous pouvez compléter le reste à tout moment." : locale === "es" ? "Guardado como borrador: puedes completar el resto cuando quieras." : locale === "it" ? "Salvato come bozza — puoi completare il resto in qualsiasi momento." : "Als Entwurf gespeichert — die restlichen Angaben kannst du jederzeit ergänzen.")
+                : (locale === "en" ? "Product created." : locale === "tr" ? "Ürün oluşturuldu." : locale === "fr" ? "Produit créé." : locale === "es" ? "Producto creado." : locale === "it" ? "Prodotto creato." : "Produkt erstellt."),
+              locale,
+              res?.product?.auto_translated_locales || created?.auto_translated_locales,
+            ),
+          });
         }
-        onReload?.();
-        // router.push here is a hard browser navigation (see i18n/navigation.js) — with isDirty
-        // still true, the native "leave site?" prompt fires on a save that already succeeded.
-        // Clear it first so a successful save never asks the seller to confirm leaving.
+        // Stay on the page: no browser navigation (that triggered the native "leave site?"
+        // prompt). The route switches to the created id in place and reloads the saved product;
+        // further saves update this product instead of creating another one.
+        setBaselineSnapshot(productSnapshot(product));
         unsaved?.setDirty(false);
         if (created?.id) {
           const qs = res?.metafield_suggestions_submitted
             ? "?change_request=1"
             : (res?.deduplicated ? "?catalog_listing=1" : "");
-          router.push(`/products/${created.id}${qs}`);
+          if (typeof onCreated === "function") onCreated(created, qs);
+          else router.push(`/products/${created.id}${qs}`);
+        } else {
+          onReload?.();
         }
         return true;
       }
@@ -1912,7 +1970,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         type: "success",
         text: isSuperuser
           ? (locale === "en" ? "Metafield saved in catalog." : locale === "tr" ? "Metafield katalogda kaydedildi." : locale === "fr" ? "Métachamp enregistré dans le catalogue." : locale === "es" ? "Metacampo guardado en el catálogo." : locale === "it" ? "Metacampo salvato nel catalogo." : "Metafeld wurde im Katalog gespeichert.")
-          : (locale === "en" ? "Suggestion submitted — a superuser can approve it under Content → Metaobjects. Save the product: it will not appear in the shop until the new title/value is approved." : locale === "tr" ? "Öneri gönderildi — süper kullanıcı İçerik → Metaobjects altında onaylayabilir. Ürünü kaydedin: yeni başlık/değer onaylanana kadar shop’ta görünmez." : locale === "fr" ? "Suggestion soumise — un superuser peut l'approuver sous Contenu → Metaobjects. Enregistrez le produit : il restera masqué en boutique jusqu'à approbation." : locale === "es" ? "Sugerencia enviada — un superusuario puede aprobarla en Contenido → Metaobjetos. Guarda el producto: no aparecerá en la tienda hasta que se apruebe." : locale === "it" ? "Suggerimento inviato — un superuser può approvarlo in Contenuto → Metaoggetti. Salva il prodotto: resta nascosto nello shop fino all'approvazione." : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern: Es bleibt im Shop unsichtbar, bis Titel/Wert freigegeben sind."),
+          : (locale === "en" ? "Added — save the product to keep it." : locale === "tr" ? "Eklendi — kalıcı olması için ürünü kaydet." : locale === "fr" ? "Ajouté — enregistrez le produit pour le conserver." : locale === "es" ? "Añadido: guarda el producto para conservarlo." : locale === "it" ? "Aggiunto — salva il prodotto per mantenerlo." : "Hinzugefügt — Produkt speichern, um es zu übernehmen."),
       });
     } catch (e) {
       setNewCatalogMetaErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : locale === "fr" ? "Erreur." : locale === "es" ? "Error." : locale === "it" ? "Errore." : "Fehler"));
@@ -1985,6 +2043,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
   const categorySummaryPath = categoryBreadcrumbFromFlatList(categories, getMeta(product, "category_id"));
   const brandIdSummary = getMeta(product, "brand_id");
+  const brandSelect = buildBrandOptions({
+    brands, sellerId: currentSellerId, isSuperuser, currentId: brandIdSummary,
+    t: (en, tr, fr, es, it, de) => (locale === "en" ? en : locale === "tr" ? tr : locale === "fr" ? fr : locale === "es" ? es : locale === "it" ? it : de),
+  });
   const brandSummaryLabel = brandIdSummary
     ? (brands || []).find((b) => String(b.id) === String(brandIdSummary))?.name || ""
     : "";
@@ -2057,6 +2119,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const getGroupDisplayName = (gi) => {
     const g = variantGroups[gi];
     if (!g) return "";
+    if (g.metafield_key && metaDefs[g.metafield_key]) return resolveMetaDefLabel(metaDefs[g.metafield_key], g.metafield_key, locale);
     if (String(locale).toLowerCase() === "de") return g.name || "";
     const trLoc = (meta.translations || {})[locale] || {};
     const arr = trLoc.variation_groups;
@@ -2432,9 +2495,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   /** Link a group to a catalog Eigenschaft (metafield definition) — name follows the definition's label; "" unlinks back to free text. */
   const vg_setGroupMetaKey = (gi, key) => {
     const def = key ? metaDefs[key] : null;
-    const label = def ? resolveMetaDefLabel(def, key, locale) : "";
+    // Canonical group name = the definition's DE label (shown per UI language via label_i18n).
+    const canonical = def ? String(def.label || key) : "";
     applyVariantGroups(variantGroups.map((g, i) =>
-      i === gi ? { ...g, metafield_key: key || undefined, name: key ? label : g.name } : g
+      i === gi ? { ...g, metafield_key: key || undefined, name: key ? canonical : g.name } : g
     ));
   };
   const vg_addOption = (gi) =>
@@ -2857,23 +2921,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Box>
       )}
 
-      {!isSuperuser && (meta._catalog_approval_pending || (Array.isArray(meta._pending_catalog_metafields) && meta._pending_catalog_metafields.length > 0)) && (
-        <Box paddingBlockEnd="200">
-          <Banner tone="warning">
-            {locale === "en"
-              ? "This product uses Eigenschaften or variation values waiting for superuser approval. It will not appear in the shop until they are approved (Content → Metaobjects)."
-              : locale === "tr"
-                ? "Bu ürün, superuser onayı bekleyen Eigenschaften veya varyasyon değerleri kullanıyor. Onaylanana kadar shop’ta görünmez (İçerik → Metaobjects)."
-                : locale === "fr"
-                  ? "Ce produit utilise des Eigenschaften ou des valeurs de variante en attente d'approbation superuser. Il restera masqué en boutique jusqu'à approbation (Contenu → Metaobjects)."
-                  : locale === "es"
-                    ? "Este producto usa Eigenschaften o valores de variante pendientes de aprobación. No aparecerá en la tienda hasta que se aprueben (Contenido → Metaobjetos)."
-                    : locale === "it"
-                      ? "Questo prodotto usa Eigenschaften o valori variante in attesa di approvazione. Resta nascosto nello shop fino all'approvazione (Contenuto → Metaoggetti)."
-                      : "Dieses Produkt verwendet Eigenschaften- oder Variantenwerte, die auf Superuser-Freigabe warten. Es erscheint erst im Shop, wenn sie unter Content → Metaobjects freigegeben sind."}
-          </Banner>
-        </Box>
-      )}
+      {/* Catalog proposals (new Eigenschaften / values) are a superuser-only review step — sellers are never warned or blocked. */}
 
       {!isNew && pendingChangeRequests.length > 0 && (
         <Box paddingBlockEnd="200">
@@ -3342,21 +3390,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             <Box minWidth="240px" flex="1">
                               <Select
                                 label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                                options={[
-                                  { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
-                                  ...(brands || [])
-                                    .filter((b) => (b.status || "active") === "active" || b.id === getMeta(product, "brand_id"))
-                                    .map((b) => {
-                                      const pending = (b.status || "active") !== "active";
-                                      const superseded = b.status === "superseded";
-                                      const pendingSuffix = superseded
-                                        ? ` (${locale === "en" ? "superseded by registered brand" : locale === "tr" ? "tescilli marka tarafından geçersiz kılındı" : locale === "fr" ? "remplacé par une marque déposée" : locale === "es" ? "reemplazado por marca registrada" : locale === "it" ? "sostituito da brand registrato" : "durch registrierte Marke ersetzt"})`
-                                        : pending
-                                        ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
-                                        : "";
-                                      return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
-                                    }),
-                                ]}
+                                options={brandSelect.options}
                                 value={getMeta(product, "brand_id") || ""}
                                 onChange={isCatalogLocked ? undefined : (v) => updateMeta("brand_id", v || undefined)}
                                 disabled={isCatalogLocked}
@@ -3367,6 +3401,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     ? (locale === "en" ? "This brand was superseded after another seller registered it officially. Submit your own proof to sell under it again." : locale === "tr" ? "Bu marka başka bir satıcı tarafından resmi olarak tescil edildiği için geçersiz kılındı. Bu marka altında tekrar satış yapmak için kendi belgenizi gönderin." : locale === "fr" ? "Cette marque a été remplacée après son enregistrement officiel par un autre vendeur. Soumettez votre propre preuve pour vendre à nouveau sous cette marque." : locale === "es" ? "Esta marca fue reemplazada después de que otro vendedor la registrara oficialmente. Envíe su propia prueba para volver a vender bajo esta marca." : locale === "it" ? "Questo brand è stato sostituito dopo che un altro venditore lo ha registrato ufficialmente. Invia una tua prova per tornare a vendere con questo brand." : "Diese Marke wurde ersetzt, nachdem ein anderer Verkäufer sie offiziell registriert hat. Reichen Sie einen eigenen Nachweis ein, um wieder unter dieser Marke zu verkaufen.")
                                     : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
                                     ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
+                                    : brandSelect.hasLockedRegistered
+                                    ? (locale === "en" ? "Brands registered by another seller need your own registration or reseller authorization (Brands page)." : locale === "tr" ? "Başka bir satıcının tescilli markası için kendi tescil veya yetkili satıcı belgen gerekir (Markalar sayfası)." : locale === "fr" ? "Les marques déposées par un autre vendeur nécessitent votre propre enregistrement ou autorisation de revendeur (page Marques)." : locale === "es" ? "Las marcas registradas por otro vendedor requieren tu propio registro o autorización de distribuidor (página Marcas)." : locale === "it" ? "I brand registrati da un altro venditore richiedono la tua registrazione o autorizzazione da rivenditore (pagina Brand)." : "Von einem anderen Verkäufer registrierte Marken brauchen deine eigene Registrierung oder Händlerberechtigung (Seite Marken).")
                                     : undefined
                                 }
                               />
@@ -3559,7 +3595,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     onDragEnd={handleMediaDragEnd}
                   >
                     <img src={resolveMediaUrl(url)} alt="" referrerPolicy="no-referrer" />
-                    <button type="button" className="product-media-remove" onClick={() => removeMedia(i)} aria-label="Remove image">×</button>
+                    <button type="button" className="product-media-remove" onClick={async () => { if (await confirmRemoval()) { removeMedia(i); } }} aria-label="Remove image">×</button>
                     {mediaUrls.length > 1 && <span className="product-media-drag-hint">⠿ {locale === "en" ? "Drag" : locale === "tr" ? "Sürükle" : locale === "fr" ? "Glisser" : locale === "es" ? "Arrastrar" : locale === "it" ? "Trascina" : "Ziehen"}</span>}
                   </div>
                 ))}
@@ -4004,7 +4040,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         <Text as="span" variant="bodySm" tone="subdued">
                           {pe.optionsCount((group.options || []).filter((o) => o.value.trim()).length)}
                         </Text>
-                        <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
+                        <Button size="slim" variant="plain" tone="critical" onClick={async () => { if (await confirmRemoval()) { vg_removeGroup(gi); } }}>
                           {ui.remove}
                         </Button>
                       </div>
@@ -4034,7 +4070,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 )}
                               </div>
                               {group.metafield_key ? (
-                                <span style={{ fontSize: 13, color: "var(--p-color-text)", minWidth: 64, padding: "0 4px" }}>{getOptionInputValue(opt)}</span>
+                                <span
+                                  style={{ fontSize: 13, color: "var(--p-color-text)", minWidth: 64, padding: "0 4px" }}
+                                  title={String(opt.value || "")}
+                                >
+                                  {resolveMetaDefValueLabel(metaDefs[group.metafield_key], opt.value, locale) || getOptionInputValue(opt)}
+                                </span>
                               ) : (
                                 <input
                                   type="text"
@@ -4049,7 +4090,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   placeholder="Value"
                                 />
                               )}
-                              <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
+                              <button type="button" className="vg-remove-btn" onClick={async () => { if (await confirmRemoval()) { vg_removeOption(gi, oi); } }} title="Remove option">×</button>
                             </div>
                           ))}
                           {group.metafield_key ? (
@@ -4057,8 +4098,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               const def = metaDefs[group.metafield_key];
                               const used = (group.options || []).map((o) => String(o.value || "").trim());
                               const search = vgValueSearch[gi] || "";
-                              const availableVals = (def?.values || []).filter((v) => !used.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
-                              const canAddCustom = search.trim() && !used.includes(search.trim()) && !(def?.values || []).includes(search.trim());
+                              const q = search.toLowerCase();
+                              const availableVals = (def?.values || []).filter((v) => !used.includes(v)
+                                && (v.toLowerCase().includes(q) || resolveMetaDefValueLabel(def, v, locale).toLowerCase().includes(q)));
+                              const typedMatchesTranslation = (def?.values || []).some((v) => resolveMetaDefValueLabel(def, v, locale).toLowerCase() === search.trim().toLowerCase());
+                              const canAddCustom = search.trim() && !used.includes(search.trim()) && !(def?.values || []).includes(search.trim()) && !typedMatchesTranslation;
                               return (
                                 <Popover
                                   active={!!vgValuePopover[gi]}
@@ -4088,7 +4132,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                             onClick={() => { vg_addLinkedOptionValue(gi, v); setVgValueSearch((p) => ({ ...p, [gi]: "" })); setVgValuePopover((p) => ({ ...p, [gi]: false })); }}
                                             style={{ padding: "6px 8px", fontSize: 13, cursor: "pointer", borderRadius: 4 }}
                                           >
-                                            {v}
+                                            {resolveMetaDefValueLabel(def, v, locale)}
+                                            {resolveMetaDefValueLabel(def, v, locale) !== v && (
+                                              <span style={{ color: "var(--p-color-text-subdued)", fontSize: 11, marginLeft: 6 }}>({v})</span>
+                                            )}
                                           </div>
                                         ))}
                                         {canAddCustom && (
@@ -4362,7 +4409,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <BlockStack gap="150">
                   <ProductSectionHeading>{pe.eigenschaften}</ProductSectionHeading>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "en" ? "Only metafields with set values — or those selected via \"Add metafield\" — are shown (not the entire catalog). Custom titles/values need superuser approval; until then the product stays hidden in the shop." : locale === "tr" ? "Yalnızca değer atanmış metafield'lar — veya \"Metafield ekle\" ile seçilenler — gösterilir (tüm katalog değil). Özel başlık/değerler superuser onayı ister; onaylanana kadar ürün shop’ta görünmez." : locale === "fr" ? "Seuls les métachamps avec des valeurs définies — ou sélectionnés via \"Ajouter un métachamp\" — sont affichés (pas l'ensemble du catalogue). Titres/valeurs personnalisés : approbation superuser, sinon le produit reste masqué." : locale === "es" ? "Solo se muestran los metacampos con valores establecidos — o los seleccionados mediante \"Agregar metacampo\" — (no el catálogo completo). Títulos/valores propios requieren aprobación; hasta entonces el producto no aparece en la tienda." : locale === "it" ? "Vengono mostrati solo i metacampi con valori impostati — o quelli selezionati tramite \"Aggiungi metacampo\" — (non l'intero catalogo). Titoli/valori personalizzati richiedono approvazione; fino ad allora il prodotto resta nascosto." : 'Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen" ausgewählte — werden angezeigt (nicht der gesamte Katalog). Eigene Titel/Werte brauchen Superuser-Freigabe; bis dahin bleibt das Produkt im Shop unsichtbar.'}
+                    {locale === "en" ? "Only metafields with set values — or those selected via \"Add metafield\" — are shown (not the entire catalog)." : locale === "tr" ? "Yalnızca değer atanmış metafield'lar — veya \"Metafield ekle\" ile seçilenler — gösterilir (tüm katalog değil)." : locale === "fr" ? "Seuls les métachamps avec des valeurs définies — ou sélectionnés via \"Ajouter un métachamp\" — sont affichés (pas l'ensemble du catalogue)." : locale === "es" ? "Solo se muestran los metacampos con valores establecidos — o los seleccionados mediante \"Agregar metacampo\" — (no el catálogo completo)." : locale === "it" ? "Vengono mostrati solo i metacampi con valori impostati — o quelli selezionati tramite \"Aggiungi metacampo\" — (non l'intero catalogo)." : 'Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen" ausgewählte — werden angezeigt (nicht der gesamte Katalog).'}
                   </Text>
                 </BlockStack>
                 {Object.keys(metaDefs).length === 0 ? (
@@ -4381,8 +4428,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
                         const isOpen = !!metaDefPopover[defKey];
                         const search = metaDefSearch[defKey] || "";
-                        const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
-                        const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
+                        // Values stay canonical (DE); search matches canonical OR the UI-language label.
+                        const sq = search.toLowerCase();
+                        const availableVals = (def.values || []).filter(v => !selected.includes(v)
+                          && (v.toLowerCase().includes(sq) || resolveMetaDefValueLabel(def, v, locale).toLowerCase().includes(sq)));
+                        const typedIsKnownTranslation = (def.values || []).some(v => resolveMetaDefValueLabel(def, v, locale).toLowerCase() === search.trim().toLowerCase());
+                        const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim()) && !typedIsKnownTranslation;
                         const toggleVal = (val) => {
                           const others = metafieldsList.filter(m => m.key !== defKey);
                           const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
@@ -4430,7 +4481,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     <Tag key={val} onRemove={() => {
                                       const others = metafieldsList.filter(m => m.key !== defKey);
                                       updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
-                                    }}>{val}</Tag>
+                                    }}>{resolveMetaDefValueLabel(def, val, locale)}</Tag>
                                   ))}
                                 </InlineStack>
                               )}
@@ -4469,7 +4520,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                             setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
                                             setMetaDefPopover(p => ({ ...p, [defKey]: false }));
                                           }}
-                                        >{val}</div>
+                                        >
+                                          {resolveMetaDefValueLabel(def, val, locale)}
+                                          {resolveMetaDefValueLabel(def, val, locale) !== val && (
+                                            <span style={{ color: "var(--p-color-text-subdued)", fontSize: 11, marginLeft: 6 }}>({val})</span>
+                                          )}
+                                        </div>
                                       ))}
                                       {canAddCustom && (
                                         <div
@@ -4996,7 +5052,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         </div>
                         <button
                           type="button"
-                          onClick={() => removeProductFile(i)}
+                          onClick={async () => { if (await confirmRemoval()) { removeProductFile(i); } }}
                           style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}
                           title={locale === "en" ? "Remove" : locale === "tr" ? "Kaldır" : locale === "fr" ? "Supprimer" : locale === "es" ? "Eliminar" : locale === "it" ? "Rimuovi" : "Entfernen"}
                         >✕</button>

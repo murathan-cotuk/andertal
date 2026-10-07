@@ -28,7 +28,7 @@ import { mergeLoadedShopStyles, isWarmHomeSaved, WARM_HOME_LAYOUT, CUSTOM_HOME_L
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import SearchableGroupedSelect from "@/components/inputs/SearchableGroupedSelect";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
 import { createContext, useContext } from "react";
@@ -717,7 +717,7 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
                   {c.moveDown}
                 </Button>
                 {(container.slides || []).length > 1 && (
-                  <Button size="slim" tone="critical" onClick={() => removeSlide(idx)}>{c.remove}</Button>
+                  <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeSlide(idx); } }}>{c.remove}</Button>
                 )}
               </InlineStack>
             </InlineStack>
@@ -1168,7 +1168,7 @@ function ImageGridEditor({ container, onChange, deviceTab = 0, editLang = "de" }
                 <Button size="slim" disabled={idx === 0} onClick={() => moveImg(idx, -1)}>↑</Button>
                 <Button size="slim" disabled={idx === (container.images || []).length - 1} onClick={() => moveImg(idx, 1)}>↓</Button>
                 {(container.images || []).length > 1 && (
-                  <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>{c.remove}</Button>
+                  <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeImg(idx); } }}>{c.remove}</Button>
                 )}
               </InlineStack>
             </InlineStack>
@@ -1432,7 +1432,7 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="h3" variant="headingSm">{c.imageN(idx + 1)}</Text>
                   {(container.images || []).length > 1 && (
-                    <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>{c.remove}</Button>
+                    <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeImg(idx); } }}>{c.remove}</Button>
                   )}
                 </InlineStack>
                 <ImageField value={gi(img, "url", editLang)} onPick={() => setPickerIdx(idx)} onClear={() => updateImg(idx, "url", "")} />
@@ -1593,7 +1593,7 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                     <InlineStack gap="200">
                       <Button size="slim" disabled={idx === 0} onClick={() => moveCollection(idx, -1)}>{c.moveUp}</Button>
                       <Button size="slim" disabled={idx === chosen.length - 1} onClick={() => moveCollection(idx, 1)}>{c.moveDown}</Button>
-                      <Button size="slim" tone="critical" onClick={() => removeCollection(entry.id)}>{c.remove}</Button>
+                      <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeCollection(entry.id); } }}>{c.remove}</Button>
                     </InlineStack>
                   </InlineStack>
                   <TextField
@@ -1808,7 +1808,7 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                         <Button size="slim" disabled={idx === 0} onClick={() => moveImg(idx, -1)}>↑</Button>
                         <Button size="slim" disabled={idx === n - 1} onClick={() => moveImg(idx, 1)}>↓</Button>
                         {n > 1 && (
-                          <Button size="slim" tone="critical" onClick={() => removeImg(idx)}>{c.remove}</Button>
+                          <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeImg(idx); } }}>{c.remove}</Button>
                         )}
                       </InlineStack>
                     </InlineStack>
@@ -2586,7 +2586,7 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveCollection(idx, -1)}>{c.moveUp}</Button>
                 <Button size="slim" disabled={idx === chosen.length - 1} onClick={() => moveCollection(idx, 1)}>{c.moveDown}</Button>
-                <Button size="slim" tone="critical" onClick={() => removeCollection(idx)}>{c.remove}</Button>
+                <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeCollection(idx); } }}>{c.remove}</Button>
               </InlineStack>
             </InlineStack>
             <TextField
@@ -2738,7 +2738,7 @@ function AccordionEditor({ container, onChange, editLang = "de" }) {
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
                 <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
-                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>{c.remove}</Button>}
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeItem(idx); } }}>{c.remove}</Button>}
               </InlineStack>
             </InlineStack>
             <TextField label={c.questionTitle} value={gi(item, "question", editLang)} onChange={(v) => updateItemI18n(idx, "question", v)} autoComplete="off" />
@@ -2818,7 +2818,7 @@ function TabsEditor({ container, onChange, editLang = "de" }) {
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveTab(idx, -1)}>↑</Button>
                 <Button size="slim" disabled={idx === tabs.length - 1} onClick={() => moveTab(idx, 1)}>↓</Button>
-                {tabs.length > 1 && <Button size="slim" tone="critical" onClick={() => removeTab(idx)}>{c.remove}</Button>}
+                {tabs.length > 1 && <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeTab(idx); } }}>{c.remove}</Button>}
               </InlineStack>
             </InlineStack>
             <TextField label={c.tabLabel} value={gi(tab, "label", editLang)} onChange={(v) => updateTabI18n(idx, "label", v)} autoComplete="off" placeholder={c.tabLabelPh} />
@@ -2979,7 +2979,7 @@ function BlogCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de
                 <InlineStack gap="200">
                   <Button size="slim" disabled={idx === 0} onClick={() => movePost(idx, -1)}>↑</Button>
                   <Button size="slim" disabled={idx === posts.length - 1} onClick={() => movePost(idx, 1)}>↓</Button>
-                  {posts.length > 1 && <Button size="slim" tone="critical" onClick={() => removePost(idx)}>{c.remove}</Button>}
+                  {posts.length > 1 && <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removePost(idx); } }}>{c.remove}</Button>}
                 </InlineStack>
               </InlineStack>
               <Select
@@ -3110,7 +3110,7 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
         <InlineStack key={idx} gap="300" wrap={false} blockAlign="center">
           <div style={{ flex: 1 }}><TextField label={c.name} value={h.name || ""} onChange={(v) => updateHidden(idx, "name", v)} autoComplete="off" /></div>
           <div style={{ flex: 1 }}><TextField label={c.fieldValue} value={h.value || ""} onChange={(v) => updateHidden(idx, "value", v)} autoComplete="off" /></div>
-          <Button size="slim" tone="critical" onClick={() => removeHidden(idx)}>✕</Button>
+          <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeHidden(idx); } }}>✕</Button>
         </InlineStack>
       ))}
       <Button size="slim" onClick={addHidden}>{c.addHiddenField}</Button>
@@ -3196,7 +3196,7 @@ function FeatureGridEditor({ container, onChange, editLang = "de" }) {
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
                 <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
-                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>{c.remove}</Button>}
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeItem(idx); } }}>{c.remove}</Button>}
               </InlineStack>
             </InlineStack>
             <InlineStack gap="400" wrap={false}>
@@ -3293,7 +3293,7 @@ function TestimonialsEditor({ container, onChange, editLang = "de" }) {
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveItem(idx, -1)}>↑</Button>
                 <Button size="slim" disabled={idx === items.length - 1} onClick={() => moveItem(idx, 1)}>↓</Button>
-                {items.length > 1 && <Button size="slim" tone="critical" onClick={() => removeItem(idx)}>{c.remove}</Button>}
+                {items.length > 1 && <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeItem(idx); } }}>{c.remove}</Button>}
               </InlineStack>
             </InlineStack>
             <TextField label={c.quote} value={gi(item, "quote", editLang)} onChange={(v) => updateItemI18n(idx, "quote", v)} multiline={3} autoComplete="off" />
@@ -4244,7 +4244,7 @@ function LayoutSectionEditor({ container, onChange, deviceTab = 0, editLang = "d
                         )}
                         <Box paddingBlockStart="400">
                           <InlineStack align="end">
-                            <Button size="slim" tone="critical" onClick={() => removeChildAt(i)}>{c.remove}</Button>
+                            <Button size="slim" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeChildAt(i); } }}>{c.remove}</Button>
                           </InlineStack>
                         </Box>
                       </Box>

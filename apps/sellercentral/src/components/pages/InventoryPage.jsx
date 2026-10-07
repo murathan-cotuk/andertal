@@ -36,6 +36,7 @@ import {
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { SettingsIcon } from "@shopify/polaris-icons";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
 const EXCEL_BORDER = "1px solid #e6dfd4";
 
@@ -1241,6 +1242,7 @@ function InventoryProductRow({
                   type="button"
                   onClick={async (e) => {
                     e.stopPropagation();
+                    if (!(await confirmRemoval())) return;
                     try {
                       await medusaClient.deleteAdminHubProduct(product.id);
                       setProducts((prev) => prev.filter((p) => p.id !== product.id));
@@ -1972,7 +1974,7 @@ export default function InventoryPage() {
             </Text>
             <button
               type="button"
-              onClick={() => deleteManualGroup(group)}
+              onClick={async () => { if (await confirmRemoval()) { deleteManualGroup(group); } }}
               style={{ marginLeft: "auto", border: "none", background: "none", color: "#5e574e", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}
               title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "en" ? "Ungroup (products stay untouched)" : locale === "fr" ? "Dissocier (les produits sont conservés)" : locale === "es" ? "Desagrupar (los productos se mantienen)" : locale === "it" ? "Separa (i prodotti restano invariati)" : "Gruppierung aufheben (Produkte bleiben erhalten)"}
             >

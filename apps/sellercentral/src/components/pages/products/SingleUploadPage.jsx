@@ -24,6 +24,7 @@ import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect
 import { getSingleUploadCopy } from "@/lib/products-pages-i18n";
 import { userError } from "@/lib/api-error-messages";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const VARIANT_TYPES = [
   { name: "Color", commonOptions: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Pink", "Purple", "Orange", "Gray", "Brown", "Silver", "Gold"] },
   { name: "Size", commonOptions: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"] },
@@ -412,7 +413,7 @@ export default function SingleUploadPage() {
                               onChange={(value) => applyCommonVariantOptions(vIdx, VARIANT_TYPES.find((v) => v.name === value))}
                             />
                           </InlineStack>
-                          <Button variant="plain" tone="critical" onClick={() => removeVariant(vIdx)}>
+                          <Button variant="plain" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeVariant(vIdx); } }}>
                             {copy.removeVariant}
                           </Button>
                         </InlineStack>
@@ -454,7 +455,7 @@ export default function SingleUploadPage() {
                               variant="plain"
                               tone="critical"
                               size="slim"
-                              onClick={() => removeVariantOption(vIdx, oIdx)}
+                              onClick={async () => { if (await confirmRemoval()) { removeVariantOption(vIdx, oIdx); } }}
                             >
                               {copy.remove}
                             </Button>

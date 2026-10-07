@@ -34,9 +34,11 @@ import {
   PRODUCT_SECTION_STYLES,
 } from "@/components/products/ProductSection";
 import { lt } from "@/lib/locale-text";
+import { buildBrandOptions } from "@/lib/brand-options";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 /** Same shape as ProductEditPage's getMeta/updateMeta, but reads/writes the VARIANT's own
  * metadata — each variant is an independent sellable unit; the parent only groups them.
  * Category/brand typically follow the parent via parent_locked_fields. */
@@ -914,18 +916,13 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <Select
                       label={t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}
                       labelHidden
-                      options={[
-                        { label: t("— None —", "— Yok —", "— Aucune —", "— Ninguna —", "— Nessuna —", "— Keine —"), value: "" },
-                        ...(brands || [])
-                          .filter((b) => (b.status || "active") === "active" || b.id === effectiveMeta("brand_id"))
-                          .map((b) => {
-                            const pending = (b.status || "active") !== "active";
-                            const pendingSuffix = pending
-                              ? ` (${t("pending authorization", "onay bekliyor", "autorisation en attente", "autorización pendiente", "autorizzazione in attesa", "Autorisierung ausstehend")})`
-                              : "";
-                            return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
-                          }),
-                      ]}
+                      options={buildBrandOptions({
+                        brands,
+                        sellerId: typeof window !== "undefined" ? window.localStorage.getItem("sellerId") : null,
+                        isSuperuser,
+                        currentId: effectiveMeta("brand_id"),
+                        t,
+                      }).options}
                       value={effectiveMeta("brand_id") || ""}
                       onChange={(val) => updateVariantMeta("brand_id", val || undefined)}
                       disabled={isFieldLocked("brand_id")}
@@ -1016,7 +1013,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 {variantMediaUrls.map((url, i) => (
                   <div key={i} className="product-media-item">
                     <img src={resolveMediaUrl(url)} alt="" />
-                    <button type="button" className="product-media-remove" onClick={() => removeVariantMedia(i)}>
+                    <button type="button" className="product-media-remove" onClick={async () => { if (await confirmRemoval()) { removeVariantMedia(i); } }}>
                       ×
                     </button>
                   </div>

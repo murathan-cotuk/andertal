@@ -23,6 +23,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import { routing } from "@/i18n/routing";
 import { getUI } from "@/lib/ui-strings";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const ALL_SHOP_LOCALES = [
   { code: "en", label: "English" },
   { code: "de", label: "Deutsch" },
@@ -854,7 +855,7 @@ export default function GeneralSettingsPage() {
                         <a href={current.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, textDecoration: "underline" }}>
                           {current.name || current.url}
                         </a>
-                        <Button size="slim" variant="plain" tone="critical" onClick={() => removeDocument(slot.id)}>
+                        <Button size="slim" variant="plain" tone="critical" onClick={async () => { if (await confirmRemoval()) { removeDocument(slot.id); } }}>
                           {ui.delete || "Remove"}
                         </Button>
                       </InlineStack>

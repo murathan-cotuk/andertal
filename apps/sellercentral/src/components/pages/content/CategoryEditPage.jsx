@@ -20,6 +20,7 @@ import { userError } from "@/lib/api-error-messages";
 import { productStatusLabel, productStatusBadgeTone } from "@/lib/product-status-labels";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
   return (typeof env === "string" ? env : "").trim() || (typeof window !== "undefined" ? "http://localhost:9000" : "");
@@ -597,7 +598,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                             size="slim"
                             variant="plain"
                             tone="critical"
-                            onClick={() => removeProductFromCategory(p.id)}
+                            onClick={async () => { if (await confirmRemoval()) { removeProductFromCategory(p.id); } }}
                             loading={removingProductId === p.id}
                             disabled={!!removingProductId}
                           >

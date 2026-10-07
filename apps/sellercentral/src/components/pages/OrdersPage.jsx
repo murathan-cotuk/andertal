@@ -22,7 +22,7 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
@@ -835,7 +835,7 @@ function ManualOrderModal({ onClose, onCreated, locale = "de" }) {
               <Button
                 size="slim"
                 tone="critical"
-                onClick={() => removeItem(i)}
+                onClick={async () => { if (await confirmRemoval()) { removeItem(i); } }}
                 accessibilityLabel="Remove item"
               >
                 ×

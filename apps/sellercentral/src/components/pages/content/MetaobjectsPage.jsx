@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Page, Card, Text, Button, TextField, Badge, Select,
   BlockStack, InlineStack, Box, Spinner, Banner, Modal, Tag,
@@ -10,7 +10,7 @@ import { useLocale } from "next-intl";
 import { getMetaobjectsCopy, METAOBJECT_LANGS, slugifyMetaKey, resolveSafeMetaobjectKey, localizedMetaobjectLabel, localizedMetaobjectValue } from "@/lib/metaobjects-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { getUI } from "@/lib/ui-strings";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { confirmDelete, confirmRemoval } from "@/lib/confirm-delete";
 
 const client = getMedusaAdminClient();
 
@@ -183,6 +183,15 @@ export default function MetaobjectsPage() {
     return la.localeCompare(lb);
   }), [definitions, viewLang]);
 
+  const listRef = useRef(null);
+  const [listShadow, setListShadow] = useState({ top: false, bottom: false });
+  const updateListShadows = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const top = el.scrollTop > 2;
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+    setListShadow((p) => (p.top === top && p.bottom === bottom ? p : { top, bottom }));
+  }, []);
   const filteredKeys = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return sortedKeys;
@@ -198,6 +207,19 @@ export default function MetaobjectsPage() {
       return hay.includes(q);
     });
   }, [sortedKeys, search, definitions]);
+
+  // Keep the active title visible (keyboard / programmatic selection) and refresh scroll fades.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const row = selectedKey ? el.querySelector(`[data-mo-key="${CSS.escape(selectedKey)}"]`) : null;
+    if (row) {
+      const r = row.getBoundingClientRect();
+      const b = el.getBoundingClientRect();
+      if (r.top < b.top + 24 || r.bottom > b.bottom) row.scrollIntoView({ block: "nearest" });
+    }
+    updateListShadows();
+  }, [selectedKey, filteredKeys, updateListShadows]);
 
   const selected = selectedKey ? definitions[selectedKey] : null;
 
@@ -449,62 +471,125 @@ export default function MetaobjectsPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(220px, 280px) minmax(0, 1fr)",
+              gridTemplateColumns: "minmax(220px, 290px) minmax(0, 1fr)",
               gap: 12,
-              alignItems: "stretch",
+              alignItems: "start",
               minHeight: 420,
             }}
           >
-            <Card padding="0">
-              <Box padding="300">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingSm">{c.titles}</Text>
-                  <TextField
-                    label={c.searchTitles}
-                    labelHidden
-                    value={search}
-                    onChange={setSearch}
-                    placeholder={c.searchTitles}
-                    autoComplete="off"
-                    clearButton
-                    onClearButtonClick={() => setSearch("")}
-                  />
-                </BlockStack>
-              </Box>
-              <div style={{ borderTop: "1px solid #e6dfd4", maxHeight: 560, overflowY: "auto" }}>
-                {filteredKeys.length === 0 ? (
-                  <Box padding="400"><Text as="p" tone="subdued" variant="bodySm">{sortedKeys.length ? c.noMatch : c.emptyHeading}</Text></Box>
-                ) : filteredKeys.map((key) => {
-                  const def = definitions[key];
-                  const active = key === selectedKey;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setSelectedKey(key)}
-                      style={{
-                        display: "flex",
-                        width: "100%",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        padding: "8px 12px",
-                        border: "none",
-                        borderLeft: active ? "3px solid #1d1b18" : "3px solid transparent",
-                        background: active ? "#f3eee6" : "#fff",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {localizedMetaobjectLabel(def, viewLang) || key}
-                      </span>
-                      <Badge>{(def?.values || []).length}</Badge>
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
+            {/* Title list: sticky panel sized to the viewport, own scroll that never drags the page
+                (overscroll contain), letter sections with sticky headers, ↑/↓ from the search box,
+                active row kept in view, top/bottom fade when more content is hidden. */}
+            <style>{`
+              .mo-list { scrollbar-width: thin; scrollbar-color: #d6cdbf transparent; overscroll-behavior: contain; scroll-behavior: smooth; }
+              .mo-list::-webkit-scrollbar { width: 8px; }
+              .mo-list::-webkit-scrollbar-thumb { background: #d6cdbf; border-radius: 8px; border: 2px solid #fff; }
+              .mo-list::-webkit-scrollbar-track { background: transparent; }
+              .mo-row:hover { background: #faf7f2 !important; }
+              .mo-row:focus-visible { outline: 2px solid #a65300; outline-offset: -2px; }
+            `}</style>
+            <div style={{ position: "sticky", top: 12 }}>
+              <Card padding="0">
+                <div style={{ display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 150px)", minHeight: 320 }}>
+                  <Box padding="300">
+                    <BlockStack gap="200">
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="h2" variant="headingSm">{c.titles}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {search.trim() ? `${filteredKeys.length} / ${sortedKeys.length}` : sortedKeys.length}
+                        </Text>
+                      </InlineStack>
+                      <div
+                        onKeyDown={(e) => {
+                          if (!filteredKeys.length) return;
+                          const idx = Math.max(0, filteredKeys.indexOf(selectedKey));
+                          if (e.key === "ArrowDown") { e.preventDefault(); setSelectedKey(filteredKeys[Math.min(filteredKeys.length - 1, filteredKeys.indexOf(selectedKey) < 0 ? 0 : idx + 1)]); }
+                          else if (e.key === "ArrowUp") { e.preventDefault(); setSelectedKey(filteredKeys[Math.max(0, idx - 1)]); }
+                          else if (e.key === "Enter" && filteredKeys.indexOf(selectedKey) < 0) { e.preventDefault(); setSelectedKey(filteredKeys[0]); }
+                        }}
+                      >
+                        <TextField
+                          label={c.searchTitles}
+                          labelHidden
+                          value={search}
+                          onChange={setSearch}
+                          placeholder={c.searchTitles}
+                          autoComplete="off"
+                          clearButton
+                          onClearButtonClick={() => setSearch("")}
+                        />
+                      </div>
+                    </BlockStack>
+                  </Box>
+                  <div
+                    ref={listRef}
+                    className="mo-list"
+                    onScroll={updateListShadows}
+                    style={{
+                      borderTop: "1px solid #e6dfd4",
+                      overflowY: "auto",
+                      flex: 1,
+                      minHeight: 0,
+                      boxShadow: [
+                        listShadow.top ? "inset 0 10px 8px -8px rgba(31,27,22,.12)" : "",
+                        listShadow.bottom ? "inset 0 -10px 8px -8px rgba(31,27,22,.12)" : "",
+                      ].filter(Boolean).join(", ") || "none",
+                    }}
+                  >
+                    {filteredKeys.length === 0 ? (
+                      <Box padding="400"><Text as="p" tone="subdued" variant="bodySm">{sortedKeys.length ? c.noMatch : c.emptyHeading}</Text></Box>
+                    ) : filteredKeys.map((key, i) => {
+                      const def = definitions[key];
+                      const active = key === selectedKey;
+                      const label = localizedMetaobjectLabel(def, viewLang) || key;
+                      const letter = (label.trim()[0] || "#").toLocaleUpperCase();
+                      const prevLabel = i > 0 ? (localizedMetaobjectLabel(definitions[filteredKeys[i - 1]], viewLang) || filteredKeys[i - 1]) : "";
+                      const prevLetter = i > 0 ? (prevLabel.trim()[0] || "#").toLocaleUpperCase() : null;
+                      return (
+                        <Fragment key={key}>
+                          {letter !== prevLetter && (
+                            <div style={{ position: "sticky", top: 0, zIndex: 1, background: "#faf7f2", borderBottom: "1px solid #f3eee6", padding: "3px 12px", fontSize: 11, fontWeight: 700, color: "#a39a8d", letterSpacing: 0.5 }}>
+                              {letter}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="mo-row"
+                            data-mo-key={key}
+                            aria-current={active ? "true" : undefined}
+                            onClick={() => setSelectedKey(key)}
+                            style={{
+                              display: "flex",
+                              width: "100%",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              padding: "8px 12px",
+                              border: "none",
+                              borderBottom: "1px solid #f8f4ee",
+                              borderLeft: active ? "3px solid #a65300" : "3px solid transparent",
+                              background: active ? "#fcebd5" : "#fff",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ display: "block", fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "#7f3f00" : "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {label}
+                              </span>
+                              {label !== key && (
+                                <span style={{ display: "block", fontSize: 11, color: "#a39a8d", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{key}</span>
+                              )}
+                            </span>
+                            <Badge>{(def?.values || []).length}</Badge>
+                          </button>
+                        </Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+            </div>
 
             <Card>
               {!selected ? (
@@ -524,7 +609,7 @@ export default function MetaobjectsPage() {
                       <InlineStack gap="200">
                         <Button size="slim" onClick={() => openEditTitle(selectedKey)}>{ui.edit}</Button>
                         <Button size="slim" onClick={() => openNewValue(selectedKey)} disabled={isSaving}>+ {c.addValue}</Button>
-                        <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(selectedKey)} loading={isSaving}>
+                        <Button size="slim" tone="critical" variant="plain" onClick={async () => { if (await confirmRemoval()) { deleteDef(selectedKey); } }} loading={isSaving}>
                           {ui.delete}
                         </Button>
                       </InlineStack>
@@ -555,7 +640,7 @@ export default function MetaobjectsPage() {
                           {isSuperuser ? (
                             <InlineStack gap="100">
                               <Button size="slim" onClick={() => openEditValue(selectedKey, val)}>{ui.edit}</Button>
-                              <Button size="slim" tone="critical" variant="plain" onClick={() => removeValue(selectedKey, val)}>{ui.delete}</Button>
+                              <Button size="slim" tone="critical" variant="plain" onClick={async () => { if (await confirmRemoval()) { removeValue(selectedKey, val); } }}>{ui.delete}</Button>
                             </InlineStack>
                           ) : null}
                         </div>

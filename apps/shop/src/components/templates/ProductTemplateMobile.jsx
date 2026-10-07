@@ -20,6 +20,7 @@ import { categoryPathQuery } from "@/lib/store-categories-url";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
+import { useMetafieldDefinitions, metafieldTitle, metafieldValue } from "@/lib/metafield-definitions";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
@@ -1186,6 +1187,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplateMobile() {
+  const mfDefs = useMetafieldDefinitions();
   const tUi = useTranslations("shopUi");
   useMarkProductPage();
   const params = useParams();
@@ -2003,10 +2005,10 @@ export default function ProductTemplateMobile() {
                 {metaRows.map(({ key, label, value }) => <tr key={key}><th>{label}</th><td>{value}</td></tr>)}
                 {dimensionsDisplay && <tr><th>{localizeSectionLabel("abmessungen", locale)}</th><td>{dimensionsDisplay}</td></tr>}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
-                  <tr key={`mf-${i}`}><th>{localizeMetaKey(f.key, locale)}</th><td>{f.value}</td></tr>
+                  <tr key={`mf-${i}`}><th>{metafieldTitle(f.key, locale, mfDefs)}</th><td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td></tr>
                 ))}
                 {variantMetafields.map((f, i) => (
-                  <tr key={`vmf-${i}`}><th>{localizeMetaKey(f.key, locale)}</th><td>{f.value}</td></tr>
+                  <tr key={`vmf-${i}`}><th>{metafieldTitle(f.key, locale, mfDefs)}</th><td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td></tr>
                 ))}
               </tbody>
             </MetaTable>
@@ -2127,14 +2129,14 @@ export default function ProductTemplateMobile() {
                 )}
                 {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
                   <tr key={`mf-${i}`}>
-                    <th>{localizeMetaKey(f.key, locale)}</th>
-                    <td>{f.value}</td>
+                    <th>{metafieldTitle(f.key, locale, mfDefs)}</th>
+                    <td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td>
                   </tr>
                 ))}
                 {variantMetafields.map((f, i) => (
                   <tr key={`vmf-${i}`}>
-                    <th>{localizeMetaKey(f.key, locale)}</th>
-                    <td>{f.value}</td>
+                    <th>{metafieldTitle(f.key, locale, mfDefs)}</th>
+                    <td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td>
                   </tr>
                 ))}
               </tbody>

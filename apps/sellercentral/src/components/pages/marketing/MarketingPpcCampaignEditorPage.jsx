@@ -34,6 +34,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { useLocale } from "next-intl";
 import { getMarketingPpcEditorCopy, getAudienceOptions, shopGoalOptionsForLocale, targetOptionsForLocale } from "@/lib/marketing-i18n";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
 const VIDEO_MAX_BYTES = 120 * 1024 * 1024;
 const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
@@ -972,7 +973,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                 {kw}
                                 <button
                                   type="button"
-                                  onClick={() => removeKeyword(kw)}
+                                  onClick={async () => { if (await confirmRemoval()) { removeKeyword(kw); } }}
                                   style={{
                                     border: "none",
                                     background: "none",

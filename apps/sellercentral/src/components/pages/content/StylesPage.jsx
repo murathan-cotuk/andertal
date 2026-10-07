@@ -86,6 +86,7 @@ import { getUI } from "@/lib/ui-strings";
 import { getStylesPageCopy } from "@/lib/styles-page-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 function normalizeHexForColorInput(val) {
   if (!val || typeof val !== "string") return "#ffffff";
   let s = val.trim();
@@ -1215,7 +1216,7 @@ function ProductBadgesCard({ locale, client, ui }) {
                 <Badge tone={b.active ? "success" : undefined}>{b.active ? t.active : t.inactive}</Badge>
                 <Button size="slim" onClick={() => handleToggleActive(b)}>{b.active ? t.inactive : t.active}</Button>
                 <Button size="slim" onClick={() => openEdit(b)}>{t.edit}</Button>
-                <Button size="slim" tone="critical" variant="plain" onClick={() => handleDelete(b.id)}>{t.delete}</Button>
+                <Button size="slim" tone="critical" variant="plain" onClick={async () => { if (await confirmRemoval()) { handleDelete(b.id); } }}>{t.delete}</Button>
               </InlineStack>
             </div>
           ))}

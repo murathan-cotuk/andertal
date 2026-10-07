@@ -25,6 +25,7 @@ import { userError } from "@/lib/api-error-messages";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { getCollectionEditCopy } from "@/lib/collection-edit-i18n";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
   const url = (typeof env === "string" ? env : "").trim();
@@ -468,7 +469,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                               <td style={{ padding: "8px 12px" }}>{typeof price === "number" ? (price % 1 === 0 ? price : price.toFixed(2)) : price} €</td>
                               <td style={{ padding: "8px 12px" }}>{qty}</td>
                               <td style={{ padding: "8px 12px" }}>
-                                <Button size="slim" tone="critical" variant="plain" onClick={() => removeProductFromCollection(p.id)} loading={removingProductId === p.id}>{c.remove}</Button>
+                                <Button size="slim" tone="critical" variant="plain" onClick={async () => { if (await confirmRemoval()) { removeProductFromCollection(p.id); } }} loading={removingProductId === p.id}>{c.remove}</Button>
                               </td>
                             </tr>
                           );

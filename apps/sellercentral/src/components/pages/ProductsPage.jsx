@@ -8,6 +8,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
@@ -786,7 +787,7 @@ export default function ProductsPage() {
                       {getCategoryName(catId)}
                       <CategoryCloseButton
                         type="button"
-                        onClick={() => removeCategory(catId)}
+                        onClick={async () => { if (await confirmRemoval()) { removeCategory(catId); } }}
                         title="Remove category"
                       >
                         <i className="fas fa-times" />
@@ -889,7 +890,7 @@ export default function ProductsPage() {
                     </div>
                     <Button
                       type="button"
-                      onClick={() => removeVariant(variantIndex)}
+                      onClick={async () => { if (await confirmRemoval()) { removeVariant(variantIndex); } }}
                       style={{ padding: "8px 12px", backgroundColor: "#ef4444", color: "white" }}
                     >
                       <i className="fas fa-trash" />
@@ -929,7 +930,7 @@ export default function ProductsPage() {
                       />
                       <Button
                         type="button"
-                        onClick={() => removeVariantOption(variantIndex, optionIndex)}
+                        onClick={async () => { if (await confirmRemoval()) { removeVariantOption(variantIndex, optionIndex); } }}
                         style={{ padding: "8px 12px", backgroundColor: "#ef4444", color: "white" }}
                       >
                         <i className="fas fa-times" />

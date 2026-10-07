@@ -11,6 +11,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { statusLabel } from "@/lib/status-labels";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 function fmtCents(c, locale) {
   const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
@@ -623,7 +624,7 @@ export default function CustomerDetailPage() {
                                 {d.expires_at ? fmtDateShort(d.expires_at, locale) : "—"}
                               </td>
                               <td style={{ padding: "8px 0", textAlign: "right" }}>
-                                <button type="button" onClick={() => handleDeleteDiscount(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>{ui.delete}</button>
+                                <button type="button" onClick={async () => { if (await confirmRemoval()) { handleDeleteDiscount(d.id); } }} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 12 }}>{ui.delete}</button>
                               </td>
                             </tr>
                           );

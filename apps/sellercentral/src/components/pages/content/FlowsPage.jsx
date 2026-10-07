@@ -9,6 +9,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
+import { confirmRemoval } from "@/lib/confirm-delete";
 const client = getMedusaAdminClient();
 
 /** Locales stored per automation email step (must match backend FLOW_SAVE_LOCALES). */
@@ -2041,7 +2042,7 @@ export default function FlowsPage() {
                             >
                               {flow.status === "active" ? t.pause : t.activate}
                             </Button>
-                            <Button size="slim" tone="critical" variant="plain" disabled={isToggling} onClick={() => deleteFlow(flow.id)}>
+                            <Button size="slim" tone="critical" variant="plain" disabled={isToggling} onClick={async () => { if (await confirmRemoval()) { deleteFlow(flow.id); } }}>
                               {t.delete}
                             </Button>
                           </InlineStack>
@@ -2194,7 +2195,7 @@ export default function FlowsPage() {
                             onChange={(v) => patchEditStep(idx, { step_type: v })}
                           />
                         </Box>
-                        <Button tone="critical" variant="plain" size="slim" onClick={() => removeEditStep(idx)}>
+                        <Button tone="critical" variant="plain" size="slim" onClick={async () => { if (await confirmRemoval()) { removeEditStep(idx); } }}>
                           {t.removeStepBtn}
                         </Button>
                       </InlineStack>
