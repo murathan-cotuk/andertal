@@ -1231,5 +1231,16 @@
     "sellerShippingFree": "Ücretsiz",
     "sellerFreeShippingHint": "{seller} satıcısından {amount} € daha ekleyin, kargo ücretsiz",
     "sellerShippingMarketplace": "Andertal"
+  },
+  "orderErrors": {
+    "not_cancellable": "Bu sipariş artık iptal edilemez.",
+    "already_shipped": "Sipariş yola çıktı — teslim aldıktan sonra iade talebi oluşturabilirsin.",
+    "cancel_window_expired": "Anında iptal süresi doldu. Ürünü teslim aldıktan sonra iade edebilirsin.",
+    "contact_support": "Bunu otomatik yapamıyoruz — lütfen müşteri hizmetleriyle iletişime geç.",
+    "no_items": "Lütfen iade için en az bir ürün seç.",
+    "invalid_item": "Bu ürün bu siparişe ait değil.",
+    "already_returned": "Bu ürün için zaten bir iade talebi var.",
+    "quantity_exceeds": "Adet, iade edilebilecek miktardan fazla.",
+    "return_period_expired": "İade süresi doldu (teslimattan itibaren {days} gün)."
   }
 }

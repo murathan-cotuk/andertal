@@ -3176,7 +3176,7 @@ const storeReturnRequestPOST = async (req, res) => {
     const { reason = '', notes = '', items: rawItems } = req.body || {}
     if (!Array.isArray(rawItems) || rawItems.length === 0) {
       await client.end()
-      return res.status(400).json({ message: 'Bitte wählen Sie mindestens einen Artikel für die Retoure aus.' })
+      return res.status(400).json({ code: 'no_items', message: 'Bitte wählen Sie mindestens einen Artikel für die Retoure aus.' })
     }
 
     const oiRes = await client.query(
@@ -3196,7 +3196,7 @@ const storeReturnRequestPOST = async (req, res) => {
       const oi = byId.get(orderItemId)
       if (!oi) {
         await client.end()
-        return res.status(400).json({ message: 'Ungültiger Artikel in der Retoure.' })
+        return res.status(400).json({ code: 'invalid_item', message: 'Ungültiger Artikel in der Retoure.' })
       }
       const stillReturnable = left.get(String(oi.id)) || 0
       if (stillReturnable <= 0) {
@@ -3420,27 +3420,27 @@ const storeOrdersCancelPOST = async (req, res) => {
     }
     if (['refunded', 'retoure', 'retoure_anfrage'].includes(os)) {
       await client.end()
-      return res.status(400).json({ message: 'Diese Bestellung kann nicht mehr storniert werden.' })
+      return res.status(400).json({ code: 'not_cancellable', message: 'Diese Bestellung kann nicht mehr storniert werden.' })
     }
     const ds = String(row.delivery_status || 'offen').toLowerCase()
     if (['versendet', 'zugestellt', 'shipped', 'delivered'].includes(ds)) {
       await client.end()
-      return res.status(400).json({ message: 'Die Bestellung wurde bereits versendet.' })
+      return res.status(400).json({ code: 'already_shipped', message: 'Die Bestellung wurde bereits versendet.' })
     }
     if (row.tracking_number != null && String(row.tracking_number).trim() !== '') {
       await client.end()
-      return res.status(400).json({ message: 'Sendungsverfolgung aktiv — Stornierung nicht möglich.' })
+      return res.status(400).json({ code: 'already_shipped', message: 'Sendungsverfolgung aktiv — Stornierung nicht möglich.' })
     }
     if (
       String(row.stripe_transfer_status || '').toLowerCase() === 'completed' ||
       String(row.stripe_payout_status || '').toLowerCase() === 'paid'
     ) {
       await client.end()
-      return res.status(400).json({ message: 'Auszahlung bereits erfolgt — bitte den Support kontaktieren.' })
+      return res.status(400).json({ code: 'contact_support', message: 'Auszahlung bereits erfolgt — bitte den Support kontaktieren.' })
     }
     if (!row.policy_cancel_ok) {
       await client.end()
-      return res.status(400).json({ message: 'Stornierungsfrist abgelaufen.' })
+      return res.status(400).json({ code: 'cancel_window_expired', message: 'Stornierungsfrist abgelaufen.' })
     }
 
     const totalCents = Number(row.total_cents || 0)
@@ -3453,7 +3453,7 @@ const storeOrdersCancelPOST = async (req, res) => {
     if (totalCents > 0) {
       if (!piId) {
         await client.end()
-        return res.status(400).json({ message: 'Keine Zahlungsreferenz — bitte den Support kontaktieren.' })
+        return res.status(400).json({ code: 'contact_support', message: 'Keine Zahlungsreferenz — bitte den Support kontaktieren.' })
       }
       if (!secretKey) {
         await client.end()

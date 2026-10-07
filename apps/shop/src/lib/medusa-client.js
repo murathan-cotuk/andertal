@@ -45,18 +45,22 @@ class MedusaClient {
     try {
       const response = await fetch(url, config);
       if (!response.ok) {
-        let message = response.statusText || `HTTP ${response.status}`;
+        let message = response.statusText || `HTTP ${response.status}`
+        let code = null
+        let details = null;
         try {
           const text = await response.text();
           if (text && text.trim().startsWith("{")) {
             const body = JSON.parse(text);
-            message = body.message || body.error || body.msg || message;
+            message = body.message || body.error || body.msg || message
+            code = body.code || null
+            details = body;
           }
         } catch (_) {}
         if (process.env.NODE_ENV === "development") {
           console.warn(`[MedusaClient] ${response.status} ${endpoint}:`, message);
         }
-        return { __error: true, status: response.status, message };
+        return { __error: true, status: response.status, message, code, details };
       }
       return await response.json();
     } catch (error) {
@@ -98,11 +102,15 @@ class MedusaClient {
 
       if (!response.ok) {
         let message = response.statusText || `HTTP ${response.status}`
+        let code = null
+        let details = null
         try {
           const text = await response.text()
           if (text && text.trim().startsWith('{')) {
             const body = JSON.parse(text)
             message = body.message || body.error || body.msg || message
+            code = body.code || null
+            details = body
           }
         } catch (_) {
           // ignore parse errors, use statusText
@@ -110,7 +118,7 @@ class MedusaClient {
         if (process.env.NODE_ENV === 'development') {
           console.warn(`[MedusaClient] ${response.status} ${endpoint}:`, message)
         }
-        return { __error: true, status: response.status, message }
+        return { __error: true, status: response.status, message, code, details }
       }
 
       return await response.json()
@@ -389,7 +397,7 @@ class MedusaClient {
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify({}),
     })
-    if (res?.__error) throw new Error(res.message || 'Cancellation failed')
+    if (res?.__error) throw Object.assign(new Error(res.message || 'Cancellation failed'), { code: res.code, details: res.details })
     return res
   }
 

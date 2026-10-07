@@ -1231,5 +1231,16 @@
     "sellerShippingFree": "Free",
     "sellerFreeShippingHint": "{amount} € more from {seller} for free shipping",
     "sellerShippingMarketplace": "Andertal"
+  },
+  "orderErrors": {
+    "not_cancellable": "This order can no longer be cancelled.",
+    "already_shipped": "The order is already on its way — please request a return once it arrives.",
+    "cancel_window_expired": "The window for an instant cancellation has passed. You can return the goods once they arrive.",
+    "contact_support": "We can't do this automatically — please contact our customer service.",
+    "no_items": "Please select at least one item to return.",
+    "invalid_item": "This item does not belong to the order.",
+    "already_returned": "A return has already been requested for this item.",
+    "quantity_exceeds": "The quantity is higher than what can still be returned.",
+    "return_period_expired": "The return period has ended ({days} days from delivery)."
   }
 }

@@ -1231,5 +1231,16 @@
     "sellerShippingFree": "Kostenlos",
     "sellerFreeShippingHint": "Noch {amount} € bei {seller} bis zum kostenlosen Versand",
     "sellerShippingMarketplace": "Andertal"
+  },
+  "orderErrors": {
+    "not_cancellable": "Diese Bestellung kann nicht mehr storniert werden.",
+    "already_shipped": "Die Bestellung ist bereits unterwegs — bitte nach Erhalt eine Rücksendung anfragen.",
+    "cancel_window_expired": "Die Frist für eine Sofort-Stornierung ist abgelaufen. Nach Erhalt kannst du die Ware zurücksenden.",
+    "contact_support": "Das können wir nicht automatisch erledigen — bitte kontaktiere unseren Kundenservice.",
+    "no_items": "Bitte wähle mindestens einen Artikel für die Rücksendung aus.",
+    "invalid_item": "Dieser Artikel gehört nicht zu der Bestellung.",
+    "already_returned": "Für diesen Artikel wurde bereits eine Rücksendung angefragt.",
+    "quantity_exceeds": "Die Menge ist größer als die noch rücksendbare Menge.",
+    "return_period_expired": "Die Rückgabefrist ist abgelaufen ({days} Tage ab Lieferung)."
   }
 }

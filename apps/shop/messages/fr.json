@@ -1214,5 +1214,16 @@
     "sellerShippingFree": "Gratuite",
     "sellerFreeShippingHint": "Encore {amount} € chez {seller} pour la livraison gratuite",
     "sellerShippingMarketplace": "Andertal"
+  },
+  "orderErrors": {
+    "not_cancellable": "Cette commande ne peut plus être annulée.",
+    "already_shipped": "La commande est déjà en route — demande un retour après réception.",
+    "cancel_window_expired": "Le délai d'annulation immédiate est dépassé. Tu peux retourner l'article après réception.",
+    "contact_support": "Impossible automatiquement — contacte notre service client.",
+    "no_items": "Sélectionne au moins un article à retourner.",
+    "invalid_item": "Cet article n'appartient pas à la commande.",
+    "already_returned": "Un retour a déjà été demandé pour cet article.",
+    "quantity_exceeds": "La quantité dépasse ce qui peut encore être retourné.",
+    "return_period_expired": "Le délai de retour est dépassé ({days} jours après la livraison)."
   }
 }

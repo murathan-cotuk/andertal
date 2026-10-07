@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
+import { orderErrorText } from "@/lib/order-error-text";
 import { useRouter, Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -197,6 +198,7 @@ function ActionBtn({ children, onClick, color = "#3a352f", bg = "#faf7f2", disab
 /* ── Return request modal ── */
 function ReturnModal({ order, onClose, onDone }) {
   const t = useTranslations("order");
+  const tErr = useTranslations("orderErrors");
   // Only items (and quantities) still returnable — the backend reports them in return_window.
   const remaining = order?.return_window?.remaining || null;
   const maxQtyOf = (it) => (remaining ? Number(remaining[String(it.id)] || 0) : Number(it.quantity || 1));
@@ -228,11 +230,13 @@ function ReturnModal({ order, onClose, onDone }) {
     setBusy(true); setErr("");
     try {
       const token = getToken("customer");
-      await getMedusaClient().request(`/store/orders/${order.id}/return-request`, {
+      const res = await getMedusaClient().request(`/store/orders/${order.id}/return-request`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ reason, notes, items }),
       });
+      // The client returns { __error } instead of throwing — a refused request must not look successful.
+      if (res?.__error) { setErr(orderErrorText(tErr, res, t("submitError"))); setBusy(false); return; }
       onDone?.();
       onClose();
     } catch (e) { setErr(e?.message || t("submitError")); }
@@ -309,6 +313,7 @@ function ReturnModal({ order, onClose, onDone }) {
 function ReturnTrackingForm({ order, activeReturn, onSaved }) {
   const tUi = useTranslations("shopUi");
   const t = useTranslations("order");
+  const tErr = useTranslations("orderErrors");
   const [tracking, setTracking] = useState(() => String(activeReturn?.customer_tracking_number || ""));
   const [carrier, setCarrier] = useState(() => String(activeReturn?.customer_carrier_name || ""));
   const [busy, setBusy] = useState(false);
@@ -319,11 +324,12 @@ function ReturnTrackingForm({ order, activeReturn, onSaved }) {
     setBusy(true); setErr("");
     try {
       const token = getToken("customer");
-      await getMedusaClient().request(`/store/orders/${order.id}/return-tracking`, {
+      const res = await getMedusaClient().request(`/store/orders/${order.id}/return-tracking`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ tracking_number: tracking.trim(), carrier_name: carrier.trim() || undefined }),
       });
+      if (res?.__error) { setErr(orderErrorText(tErr, res, t("submitError"))); setBusy(false); return; }
       onSaved?.();
     } catch (e) { setErr(e?.message || t("submitError")); }
     setBusy(false);
@@ -369,6 +375,7 @@ function ReturnTrackingForm({ order, activeReturn, onSaved }) {
 /* ── Message modal → creates a support case, then opens /nachrichten ── */
 function MessageModal({ order, onClose }) {
   const t = useTranslations("order");
+  const tErr = useTranslations("orderErrors");
   const locale = useLocale();
   const router = useRouter();
   const items = Array.isArray(order?.items) ? order.items : [];
@@ -483,6 +490,7 @@ function MessageModal({ order, onClose }) {
 function OrderConfirmationView({ order }) {
   const tUi = useTranslations("shopUi");
   const t = useTranslations("order");
+  const tErr = useTranslations("orderErrors");
   const locale = useLocale();
   const router = useRouter();
   const items = Array.isArray(order?.items) ? order.items : [];
@@ -640,6 +648,7 @@ export default function OrderDetailPage() {
   const orderId = params?.id || "";
   const isConfirmed = searchParams?.get("confirmed") === "1";
   const t = useTranslations("order");
+  const tErr = useTranslations("orderErrors");
   const locale = useLocale();
 
   const [order, setOrder] = useState(null);
@@ -808,7 +817,7 @@ export default function OrderDetailPage() {
       setActionMsg({ type: "success", text: t("cancelSuccess") });
       await loadOrder();
     } catch (e) {
-      setActionMsg({ type: "error", text: e?.message || t("cancelFailed") });
+      setActionMsg({ type: "error", text: orderErrorText(tErr, e, t("cancelFailed")) });
     }
     setCancelBusy(false);
   };

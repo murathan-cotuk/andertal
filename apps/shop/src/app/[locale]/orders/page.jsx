@@ -12,6 +12,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { useLocale, useTranslations } from "next-intl";
+import { orderErrorText } from "@/lib/order-error-text";
 import { useRouter } from "@/i18n/navigation";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
 import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat } from "@/lib/goods-vat";
@@ -449,6 +450,7 @@ const RETOURE_REASONS = [
 function OrderCard({ order, expanded, onToggle, onRefresh }) {
   const locale = useLocale();
   const t = useTranslations("ordersPage");
+  const tErr = useTranslations("orderErrors");
   const router = useRouter();
   const items = order.items || [];
   const returns = order.returns || [];
@@ -710,7 +712,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                       headers: { Authorization: `Bearer ${token()}` },
                       body: JSON.stringify({}),
                     });
-                    if (res?.__error) throw new Error(res.message || t("cancelFailed"));
+                    if (res?.__error) throw new Error(orderErrorText(tErr, res, t("cancelFailed")));
                     setActionOk(t("cancelled"));
                     onRefresh?.();
                   });
@@ -780,7 +782,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                             .filter((x) => x.quantity > 0),
                         }),
                       });
-                      if (res?.__error) throw new Error(res.message || t("error"));
+                      if (res?.__error) throw new Error(orderErrorText(tErr, res, t("error")));
                       setActionOk(t("returnSubmitted"));
                       setShowRetoure(false);
                       onRefresh?.();
