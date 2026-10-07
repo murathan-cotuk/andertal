@@ -515,6 +515,26 @@ export default function OrderDetailPage() {
         {/* Right column */}
         <div>
           {/* Customer (+ account details, superuser only — merged into one card instead of two) */}
+          {Array.isArray(order?.shipments) && order.shipments.length > 0 && (
+            <Section title={lt(locale, "Shipments", "Gönderiler", "Expéditions", "Envíos", "Spedizioni", "Sendungen")}>
+              {order.shipments.map((sh) => (
+                <div key={sh.id} style={{ padding: "8px 0", borderBottom: "1px solid #f3eee6", fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 600, color: "#1d1b18" }}>{sh.seller_id}</span>
+                    <ScStatusPill status={sh.delivery_status} label={statusLabel(locale, sh.delivery_status)} />
+                  </div>
+                  <div style={{ color: "#5e574e", marginTop: 2 }}>
+                    {[sh.carrier_name, sh.tracking_number].filter(Boolean).join(" · ") || "—"}
+                  </div>
+                  {sh.delivery_confirmed_at && (
+                    <div style={{ color: "#1f6b35", fontSize: 12, marginTop: 2 }}>
+                      {lt(locale, "Delivery confirmed", "Teslim onaylandı", "Livraison confirmée", "Entrega confirmada", "Consegna confermata", "Zustellung bestätigt")}: {fmtDate(sh.delivery_confirmed_at)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </Section>
+          )}
           <Section title={ui.customer}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: isSuperuser ? 10 : 0 }}>
               {isSuperuser ? (

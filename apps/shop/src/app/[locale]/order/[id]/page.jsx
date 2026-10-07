@@ -872,8 +872,34 @@ export default function OrderDetailPage() {
 
           <StatusTimeline status={status} t={t} />
 
-          {/* Tracking */}
-          {order.tracking_number && (
+          {/* Tracking — multi-seller orders: one parcel per seller (order_shipments) */}
+          {(order.shipments || []).filter((p) => p.tracking_number).length > 1 ? (
+            <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
+              {(order.shipments || []).filter((p) => p.tracking_number).map((p) => {
+                const url = getTrackingUrl(p.carrier_name, p.tracking_number);
+                return (
+                  <div key={`${p.seller_id}-${p.tracking_number}`} style={{ display: "flex", alignItems: "center", gap: 8, background: "#faf7f2", borderRadius: 8, padding: "10px 14px" }}>
+                    <span style={{ fontSize: 18 }}>📦</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 1 }}>
+                        {t("shippedBy", { seller: p.seller_name || "—" })}{p.carrier_name ? ` · ${p.carrier_name}` : ""}
+                      </div>
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#a65300", fontFamily: "monospace", textDecoration: "underline" }}>{p.tracking_number}</a>
+                      ) : (
+                        <span style={{ fontSize: 13, fontFamily: "monospace", color: "#3a352f" }}>{p.tracking_number}</span>
+                      )}
+                    </div>
+                    {url && (
+                      <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#a65300", textDecoration: "none", background: "#fcebd5", borderRadius: 6, padding: "5px 10px", flexShrink: 0 }}>
+                        {t("trackButton")} →
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : order.tracking_number && (
             <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8, background: "#faf7f2", borderRadius: 8, padding: "10px 14px" }}>
               <span style={{ fontSize: 18 }}>📦</span>
               <div style={{ flex: 1, minWidth: 0 }}>

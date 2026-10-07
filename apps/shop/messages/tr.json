@@ -318,7 +318,8 @@
       "processing": "İşleniyor"
     },
     "messageCreatesCaseHint": "Mesajınız bir destek talebi olarak açılır ve Mesajlar bölümünde devam eder.",
-    "pdfLoadFailed": "PDF yüklenemedi."
+    "pdfLoadFailed": "PDF yüklenemedi.",
+    "shippedBy": "{seller} tarafından gönderildi"
   },
   "pages": {
     "orders": {

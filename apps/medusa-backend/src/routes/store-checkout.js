@@ -3057,6 +3057,24 @@ const storeOrdersMeGET = async (req, res) => {
         console.warn('storeOrdersMeGET return window:', we?.message || we)
       }
     }
+    // Per-seller parcels (multi-seller orders): carrier + tracking per seller for the customer.
+    const shipmentsByOrder = new Map()
+    if (orderIds.length > 0) {
+      try {
+        const shR = await client.query(
+          `SELECT sh.order_id, sh.seller_id, sh.carrier_name, sh.tracking_number, sh.delivery_status, sh.shipped_at,
+                  COALESCE(NULLIF(su.store_name, ''), NULLIF(su.company_name, ''), sh.seller_id) AS seller_name
+             FROM order_shipments sh LEFT JOIN seller_users su ON su.seller_id = sh.seller_id AND su.sub_of_seller_id IS NULL
+            WHERE sh.order_id = ANY($1::uuid[]) ORDER BY sh.created_at`,
+          [orderIds],
+        )
+        for (const x of shR.rows || []) {
+          const k = String(x.order_id)
+          if (!shipmentsByOrder.has(k)) shipmentsByOrder.set(k, [])
+          shipmentsByOrder.get(k).push({ seller_id: x.seller_id, seller_name: x.seller_name, carrier_name: x.carrier_name, tracking_number: x.tracking_number, delivery_status: x.delivery_status, shipped_at: x.shipped_at })
+        }
+      } catch (_) { /* table missing on a fresh DB */ }
+    }
     await client.end()
     const blockedOs = new Set(['storniert', 'refunded', 'retoure', 'retoure_anfrage'])
     const blockedDs = new Set(['versendet', 'zugestellt', 'shipped', 'delivered'])
@@ -3077,6 +3095,7 @@ const storeOrdersMeGET = async (req, res) => {
         items: itemsMap[row.id] || [],
         returns: returnsMap[row.id] || [],
         cancellation_allowed,
+        shipments: shipmentsByOrder.get(String(row.id)) || [],
         return_window: buildReturnWindow({
           order: { delivery_date: row.delivery_date, delivery_confirmed_at: confirmedAtById.get(String(row.id)) },
           items: itemsMap[row.id] || [],

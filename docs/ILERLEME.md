@@ -10,6 +10,23 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-07 — B: satıcı başına gönderi (bitti, karar 1)
+
+- Settlement şeması: `order_shipments` (sipariş × satıcı: kargo, takip no, durum offen→versendet→zugestellt, satıcı bildirimi, teslim onayı + kaynak; takip no indeksi).
+- `src/settlement/shipments.js`: `recordShipment` (yalnız ileri yönde durum; satıcının "zugestellt"i ödeme saatini BAŞLATMAZ), `confirmShipmentDelivery` (yalnız carrier_webhook / carrier_api / superuser; o satıcının ödeme saatini başlatır; tüm satıcılar teslim edilince sipariş seviyesi `delivery_confirmed_at` + `zugestellt`), `confirmDeliveryForTracking` (çok satıcılı siparişte yalnız o takip numarasının satıcısı, aksi halde eski sipariş seviyesi onayı), `findShipmentByTracking`, `listShipments`, `orderSellerIds`.
+- Ödeme saati: `refreshEligibilityForOrder` her payable için önce satıcının kendi gönderi onayını, yoksa sipariş seviyesini kullanır → tek satıcılı ve eski siparişler aynen.
+- Bağlanan yerler: Sendcloud webhook (takip no siparişte yoksa gönderilerde arar; çok satıcılıda yalnız ilgili satıcı), kargo API takip yenileme, etiket satın alma (gönderi kaydı), sipariş PATCH (satıcı = kendi gönderisi; superuser tek satıcılı siparişte o satıcı).
+- Görünüm: SC sipariş detayında "Sendungen" kartı (satıcı yalnız kendisini, superuser hepsini görür; teslim onay tarihi). Shop sipariş detayında birden fazla paket varsa "Versand durch [Händler]" satırları (6 dil). API: admin sipariş GET ve `/store/orders/me` `shipments` döner.
+- Test: `settlement.test.js` +2 (iki satıcılı sipariş: A teslim → yalnız A eligible, B bekler; B teslim → sipariş zugestellt; idempotent; güvenilmeyen kaynak reddedilir / tek satıcılı eski kural). `test:settlement` 92/92, `npm test` 195/195, SC + shop build EXIT 0.
+- Bilinen sınır: SC'deki "Tracking aktualisieren" düğmesi sipariş seviyesindeki (son girilen) takip numarasını yeniler; çok satıcılı siparişte diğer satıcının paketi Sendcloud webhook'u ile onaylanır.
+
+## 2026-10-07 — Kullanıcı kararları (sıradaki işler)
+
+1. Çok satıcılı siparişte **satıcı başına gönderi** (takip no + teslim onayı → o satıcının ödeme saati): **EVET, şimdi** (sıradaki iş).
+2. Ürün düzenleme (s34) **dil hapları + çeviri noktaları + pazar bazlı fiyat tablosu**: **EVET**.
+3. PDP/sepet **"Lieferung bis [Datum]"** için kargo grubuna hazırlık + transit gün alanı: **EVET**.
+4. Faz 3 family_link: **sonraya**.
+
 ## 2026-10-07 — B: müşteri iptal/iade hataları (bitti)
 
 - **Hata (canlı)**: shop'un `getMedusaClient().request` hata durumunda istisna atmaz, `{ __error }` döner. Sipariş detayındaki **iade formu ve iade takip formu bunu kontrol etmiyordu** → reddedilen iade (ör. süre dolmuş) müşteriye "Rücksendung angefragt" (başarılı) gösteriyordu. Artık `__error` kontrol edilip hata gösteriliyor.

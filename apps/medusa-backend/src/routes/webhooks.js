@@ -76,7 +76,16 @@ module.exports = function createWebhooksRouter({
           `SELECT id, delivery_status FROM store_orders WHERE tracking_number = $1 LIMIT 1`,
           [trackingNumber]
         )
-        const order = orderRes.rows[0]
+        let order = orderRes.rows[0]
+        if (!order) {
+          // Multi-seller orders: each seller's parcel has its own tracking number (order_shipments).
+          const shRes = await client.query(
+            `SELECT o.id, o.delivery_status FROM order_shipments sh JOIN store_orders o ON o.id = sh.order_id
+              WHERE lower(sh.tracking_number) = lower($1) LIMIT 1`,
+            [trackingNumber]
+          ).catch(() => ({ rows: [] }))
+          order = shRes.rows[0]
+        }
         if (order) {
           // Upsert shipment event
           const exists = await client.query(
@@ -91,15 +100,26 @@ module.exports = function createWebhooksRouter({
           }
           // Update order status
           if (internalStatus === 'zugestellt' && order.delivery_status !== 'zugestellt') {
-            await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid`, [order.id])
-            // Carrier-confirmed delivery starts the payout hold period (settlement).
+            // Carrier-confirmed delivery starts the payout hold period (settlement). On a
+            // multi-seller order only the seller whose parcel this is gets confirmed; the order
+            // itself turns "zugestellt" once every seller's parcel arrived (shipments.js).
+            let scope = 'order'
             try {
-              const { confirmDelivery } = require('../settlement/payables')
-              await confirmDelivery(client, order.id, { source: 'carrier_webhook', at: new Date(ts), actor: 'sendcloud' })
+              const { confirmDeliveryForTracking } = require('../settlement/shipments')
+              const r = await confirmDeliveryForTracking(client, order.id, trackingNumber, { source: 'carrier_webhook', at: new Date(ts), actor: 'sendcloud' })
+              scope = r.scope
             } catch (dErr) { console.warn('[sendcloud] confirmDelivery:', dErr?.message || dErr) }
+            if (scope === 'order') {
+              await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid`, [order.id])
+            }
             await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
           } else if (internalStatus === 'versendet' || internalStatus === 'in_transit') {
             await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+            await client.query(
+              `UPDATE order_shipments SET delivery_status='versendet', shipped_at=COALESCE(shipped_at, now()), updated_at=now()
+                WHERE lower(tracking_number)=lower($1) AND delivery_status='offen'`,
+              [trackingNumber]
+            ).catch(() => {})
           }
         } else {
           // Not an outbound order tracking number — check if it's an auto-generated return label.

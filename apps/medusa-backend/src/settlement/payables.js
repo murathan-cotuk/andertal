@@ -232,6 +232,12 @@ async function loadEligibilityContext(client, orderId) {
     [orderId],
   )).rows.length > 0
   const zeroPay = String(o.checkout_payment_kind || '') === 'platform_loyalty'
+  // Per-seller shipments (multi-seller orders): a seller's own confirmed delivery starts its hold.
+  const shipments = (await client.query(
+    'SELECT seller_id, delivery_confirmed_at FROM order_shipments WHERE order_id = $1::uuid AND delivery_confirmed_at IS NOT NULL',
+    [orderId],
+  ).catch(() => ({ rows: [] }))).rows
+  const deliveryBySeller = new Map(shipments.map((r) => [String(r.seller_id), r.delivery_confirmed_at]))
   return {
     paymentOk: String(o.payment_status) === 'bezahlt' && (o.has_payment || zeroPay),
     openDispute: disputes.some((d) => d.outcome === 'open'),
@@ -239,6 +245,7 @@ async function loadEligibilityContext(client, orderId) {
     returnSellers: returns.map((r) => realSellerId(r.seller_id)),
     pendingRefund,
     deliveryConfirmedAt: o.delivery_confirmed_at,
+    deliveryBySeller,
   }
 }
 
@@ -267,8 +274,10 @@ async function refreshEligibilityForOrder(client, orderId, now = new Date()) {
   const flags = await sellerFlags(client, [...new Set(ps.map((p) => p.seller_id))])
   for (const p of ps) {
     const f = flags.get(String(p.seller_id)) || { blocked: false, compliance: true }
+    const sellerDelivery = (ctx.deliveryBySeller && ctx.deliveryBySeller.get(String(p.seller_id))) || ctx.deliveryConfirmedAt || null
     const ev = evaluateEligibility(p, {
       ...ctx,
+      deliveryConfirmedAt: sellerDelivery,
       openReturn: ctx.returnSellers.some((s) => s == null || s === p.seller_id),
       sellerPayoutBlocked: f.blocked,
       sellerComplianceBlocked: f.compliance,
@@ -282,7 +291,7 @@ async function refreshEligibilityForOrder(client, orderId, now = new Date()) {
       `UPDATE seller_payables SET status = $2, eligible_at = $3, block_reasons = $4::text[],
               delivered_at = COALESCE(delivered_at, $5)
         WHERE id = $1 AND status NOT IN ('paid', 'in_payout')`,
-      [p.id, ev.status, ev.eligibleAt, reasons, ctx.deliveryConfirmedAt || null],
+      [p.id, ev.status, ev.eligibleAt, reasons, sellerDelivery],
     )
   }
 }

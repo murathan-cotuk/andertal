@@ -301,7 +301,8 @@
       "processing": "En proceso"
     },
     "messageCreatesCaseHint": "Tu mensaje abre un caso de soporte que continúa en Mensajes.",
-    "pdfLoadFailed": "No se pudo cargar el PDF."
+    "pdfLoadFailed": "No se pudo cargar el PDF.",
+    "shippedBy": "Enviado por {seller}"
   },
   "pages": {
     "orders": {

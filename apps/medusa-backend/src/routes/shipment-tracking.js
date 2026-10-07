@@ -444,12 +444,17 @@ module.exports = function createShipmentTrackingRouter({
         const mostRecentStatus = mostRecentEvent?.status
         let firedTrigger = null
         if (mostRecentStatus === 'zugestellt') {
-          const upd = await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           // Delivery event fetched from the carrier's API → trusted for the payout hold period.
+          // Multi-seller order: only the seller whose parcel this tracking number belongs to.
+          let scope = 'order'
           try {
-            const { confirmDelivery } = require('../settlement/payables')
-            await confirmDelivery(client, id, { source: 'carrier_api', at: mostRecentEvent?.event_time ? new Date(mostRecentEvent.event_time) : new Date(), actor: 'carrier_api' })
+            const { confirmDeliveryForTracking } = require('../settlement/shipments')
+            const r = await confirmDeliveryForTracking(client, id, trackingNumber, { source: 'carrier_api', at: mostRecentEvent?.event_time ? new Date(mostRecentEvent.event_time) : new Date(), actor: 'carrier_api' })
+            scope = r.scope
           } catch (dErr) { console.warn('confirmDelivery (carrier api):', dErr?.message || dErr) }
+          const upd = scope === 'order'
+            ? await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+            : { rowCount: 0 }
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
           if (upd.rowCount > 0) firedTrigger = 'order_delivered'
         } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
@@ -715,6 +720,11 @@ module.exports = function createShipmentTrackingRouter({
            WHERE id = $4::uuid`,
           [trackingNumber, carrierName, labelUrl, id]
         )
+        // Per-seller shipment (multi-seller orders keep each parcel's own tracking number).
+        try {
+          const { recordShipment } = require('../settlement/shipments')
+          await recordShipment(client, { orderId: id, sellerId: billingSellerId, carrierName, trackingNumber, deliveryStatus: 'versendet' })
+        } catch (shErr) { console.warn('[label] recordShipment:', shErr?.message || shErr) }
         await client.end()
         res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName, charge_method: chargeResult.charge_method })
         if (prevStatus !== 'versendet' && prevStatus !== 'zugestellt') void dispatchOrderFlowEvent('order_shipped', id)

@@ -301,7 +301,8 @@
       "processing": "In lavorazione"
     },
     "messageCreatesCaseHint": "Il messaggio apre una pratica di assistenza che prosegue in Messaggi.",
-    "pdfLoadFailed": "Impossibile caricare il PDF."
+    "pdfLoadFailed": "Impossibile caricare il PDF.",
+    "shippedBy": "Spedito da {seller}"
   },
   "pages": {
     "orders": {

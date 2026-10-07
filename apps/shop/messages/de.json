@@ -318,7 +318,8 @@
       "processing": "In Bearbeitung"
     },
     "messageCreatesCaseHint": "Ihre Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt.",
-    "pdfLoadFailed": "PDF konnte nicht geladen werden."
+    "pdfLoadFailed": "PDF konnte nicht geladen werden.",
+    "shippedBy": "Versand durch {seller}"
   },
   "pages": {
     "orders": {

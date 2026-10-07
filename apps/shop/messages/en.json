@@ -318,7 +318,8 @@
       "processing": "Processing"
     },
     "messageCreatesCaseHint": "Your message opens a support case that continues under Messages.",
-    "pdfLoadFailed": "Could not load the PDF."
+    "pdfLoadFailed": "Could not load the PDF.",
+    "shippedBy": "Shipped by {seller}"
   },
   "pages": {
     "orders": {

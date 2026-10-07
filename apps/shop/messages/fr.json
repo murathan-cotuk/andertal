@@ -301,7 +301,8 @@
       "processing": "En traitement"
     },
     "messageCreatesCaseHint": "Votre message ouvre un dossier d’assistance, à suivre dans Messages.",
-    "pdfLoadFailed": "Impossible de charger le PDF."
+    "pdfLoadFailed": "Impossible de charger le PDF.",
+    "shippedBy": "Expédié par {seller}"
   },
   "pages": {
     "orders": {

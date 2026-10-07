@@ -631,3 +631,53 @@ withDb('Widerruf: return of all of a seller\'s items refunds the outbound shippi
   // Nothing left to refund.
   assert.equal(await s.suggestReturnRefund(c, rest), null)
 })
+
+withDb('multi-seller order: each seller\'s own shipment delivery starts only its own payout hold', async (c) => {
+  await h.addSeller(c, 'seller_a')
+  await h.addSeller(c, 'seller_b')
+  const { order } = await h.addPaidOrder(c, {
+    items: [{ seller: 'seller_a', price: 5000 }, { seller: 'seller_b', price: 3000 }],
+    shippingBySeller: { seller_a: 490, seller_b: 390 },
+  })
+  await s.createPayablesForOrder(c, order.id)
+
+  // Seller A ships and its parcel is confirmed by the carrier 20 days ago; B only ships.
+  await s.recordShipment(c, { orderId: order.id, sellerId: 'seller_a', carrierName: 'DHL', trackingNumber: 'A123' })
+  await s.recordShipment(c, { orderId: order.id, sellerId: 'seller_b', carrierName: 'DPD', trackingNumber: 'B456' })
+  // A seller-reported "zugestellt" must not start the clock.
+  await s.recordShipment(c, { orderId: order.id, sellerId: 'seller_b', deliveryStatus: 'zugestellt', sellerReportedDelivered: true })
+  assert.equal((await s.findShipmentByTracking(c, 'a123')).seller_id, 'seller_a')
+  const r1 = await s.confirmShipmentDelivery(c, { orderId: order.id, sellerId: 'seller_a', source: 'carrier_webhook', at: new Date(Date.now() - 20 * DAY) })
+  assert.equal(r1.changed, true)
+  assert.equal(r1.orderDelivered, false)
+
+  const byseller = async () => {
+    const ps = await payablesOf(c, order.id)
+    return Object.fromEntries(['seller_a', 'seller_b'].map((sid) => [sid, ps.filter((p) => p.seller_id === sid).map((p) => p.status)]))
+  }
+  let st = await byseller()
+  assert.ok(st.seller_a.every((x) => x === 'eligible'), 'A is past its 14-day hold')
+  assert.ok(st.seller_b.every((x) => x === 'pending'), 'B is still waiting for its delivery')
+  assert.equal((await c.query('SELECT delivery_confirmed_at FROM store_orders WHERE id = $1', [order.id])).rows[0].delivery_confirmed_at, null)
+
+  // B's parcel confirmed now → B pending (hold running), order counts as delivered.
+  const r2 = await s.confirmShipmentDelivery(c, { orderId: order.id, sellerId: 'seller_b', source: 'carrier_api', at: new Date() })
+  assert.equal(r2.orderDelivered, true)
+  st = await byseller()
+  assert.ok(st.seller_a.every((x) => x === 'eligible'))
+  assert.ok(st.seller_b.every((x) => x === 'pending'))
+  const o = (await c.query('SELECT delivery_status, delivery_confirmed_at FROM store_orders WHERE id = $1', [order.id])).rows[0]
+  assert.equal(o.delivery_status, 'zugestellt')
+  assert.ok(o.delivery_confirmed_at)
+  // idempotent + untrusted sources refused
+  assert.equal((await s.confirmShipmentDelivery(c, { orderId: order.id, sellerId: 'seller_a', source: 'carrier_webhook' })).changed, false)
+  await assert.rejects(s.confirmShipmentDelivery(c, { orderId: order.id, sellerId: 'seller_a', source: 'seller' }), /untrusted/)
+})
+
+withDb('single-seller order without shipment rows keeps the order-level delivery rule', async (c) => {
+  await h.addSeller(c, 'seller_a')
+  const { order } = await h.addPaidOrder(c, { items: [{ seller: 'seller_a', price: 5000 }] })
+  await s.createPayablesForOrder(c, order.id)
+  await h.deliver(c, order.id, 20)
+  assert.ok((await payablesOf(c, order.id)).every((p) => p.status === 'eligible'))
+})

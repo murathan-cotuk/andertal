@@ -179,6 +179,12 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
             isFirstOrder = Number(prevR.rows[0]?.cnt || 0) === 0
           } catch (_) {}
         }
+        // Per-seller shipments: a seller sees only its own parcel, the superuser all of them.
+        let shipments = []
+        try {
+          const shR = await client.query('SELECT * FROM order_shipments WHERE order_id = $1::uuid ORDER BY created_at', [row.id])
+          shipments = (shR.rows || []).filter((sh) => isSuperuser || !callerSellerId || String(sh.seller_id) === String(callerSellerId))
+        } catch (_) {}
         await client.end()
         const paidTotal = resolveOrderPaidTotalCents(row)
         res.json({
@@ -192,6 +198,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
             customer_number: customerNumber,
             is_registered: isRegistered,
             is_first_order: isFirstOrder,
+            shipments,
           },
         })
       } catch (e) {
@@ -447,7 +454,28 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const policy = authorizeOrderPatch(req.body, prevRow, { isSuperuser: isSuperuserCaller })
         if (!policy.ok) { await client.end(); return res.status(policy.status).json({ message: policy.message, field: policy.field }) }
         const orderStatusChangedToProcessing = order_status === 'in_bearbeitung' && prevRow.order_status !== 'in_bearbeitung'
-        await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+        await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = ${params.length}::uuid`, params)
+        // Per-seller shipment record (multi-seller orders keep each seller's parcel separately).
+        // A seller's own "zugestellt" is display only; superuser / carrier confirmations count.
+        if (tracking_number !== undefined || carrier_name !== undefined || delivery_status) {
+          try {
+            const { recordShipment, orderSellerIds } = require('../settlement/shipments')
+            let shipSeller = isSuperuserCaller ? null : callerSid
+            if (isSuperuserCaller) {
+              const sellers = await orderSellerIds(client, id)
+              if (sellers.length === 1) shipSeller = sellers[0]
+            }
+            if (shipSeller) {
+              await recordShipment(client, {
+                orderId: id, sellerId: shipSeller,
+                carrierName: carrier_name !== undefined ? carrier_name : null,
+                trackingNumber: tracking_number !== undefined ? tracking_number : null,
+                deliveryStatus: delivery_status || null,
+                sellerReportedDelivered: !isSuperuserCaller && delivery_status === 'zugestellt',
+              })
+            }
+          } catch (shErr) { console.warn('[orders] recordShipment:', shErr?.message || shErr) }
+        }
         if (isSuperuserCaller && payment_status && String(payment_status) !== String(prevRow.payment_status || '')) {
           const { auditFinance } = require('../settlement/ledger')
           await auditFinance(client, { actor: `superuser:${req.sellerUser?.email || ''}`, action: 'order_payment_status_manual_change', entityType: 'order', entityId: id, details: { from: prevRow.payment_status, to: payment_status } }).catch(() => {})

@@ -359,6 +359,25 @@ const STATEMENTS = [
   `ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS tax_id_country varchar(2)`,
   `ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS business_registration_number text`,
   `ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS business_registration_country varchar(2)`,
+  // ── Per-seller shipments (multi-seller orders): one row per order × seller. Delivery of a
+  // seller's shipment starts THAT seller's payout hold; without a row the order-level
+  // delivery_confirmed_at applies (single-seller and legacy orders unchanged).
+  `CREATE TABLE IF NOT EXISTS order_shipments (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     order_id uuid NOT NULL,
+     seller_id varchar(255) NOT NULL,
+     carrier_name text,
+     tracking_number text,
+     delivery_status varchar(20) NOT NULL DEFAULT 'offen' CHECK (delivery_status IN ('offen', 'versendet', 'zugestellt')),
+     shipped_at timestamptz,
+     seller_reported_delivered_at timestamptz,
+     delivery_confirmed_at timestamptz,
+     delivery_confirmed_source varchar(30),
+     created_at timestamptz NOT NULL DEFAULT now(),
+     updated_at timestamptz NOT NULL DEFAULT now(),
+     UNIQUE (order_id, seller_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_order_shipments_tracking ON order_shipments (lower(tracking_number)) WHERE tracking_number IS NOT NULL`,
 ]
 
 /**
