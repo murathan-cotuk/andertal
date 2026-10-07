@@ -300,6 +300,8 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
     return () => { cancelled = true; };
   }, [client]);
 
+  // Whether the category profile asks for WEEE / EPREL (reported by ComplianceFieldsSection).
+  const [variantCompliance, setVariantCompliance] = useState({ weee: false, eprel: false });
   const [baselineSnapshot, setBaselineSnapshot] = useState(() =>
     initialProduct ? JSON.stringify(normalizeForCompareProduct(initialProduct)) : null,
   );
@@ -1637,7 +1639,21 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                   return getMeta(obj, key, fb);
                 }}
                 updateMeta={updateVariantMeta}
+                onResolved={setVariantCompliance}
               />
+              {/* WEEE on the variant too — every variant is its own product (handoff Faz 2 parity). */}
+              {(variantCompliance.weee || effectiveMeta("weee_number")) && (
+                <TextField
+                  label="WEEE-Reg.-Nummer"
+                  requiredIndicator={variantCompliance.weee}
+                  error={variantCompliance.weee && !String(effectiveMeta("weee_number") || "").trim() ? t("Required", "Zorunlu alan", "Champ obligatoire", "Campo obligatorio", "Campo obbligatorio", "Pflichtfeld") : undefined}
+                  value={effectiveMeta("weee_number") || ""}
+                  onChange={(val) => updateVariantMeta("weee_number", val || undefined)}
+                  placeholder="DE12345678"
+                  helpText={t("Electrical waste registration number (ElektroG)", "Elektronik atık kayıt numarası (ElektroG)", "Numéro d'enregistrement DEEE (ElektroG)", "Número de registro RAEE (ElektroG)", "Numero di registrazione RAEE (ElektroG)", "Elektroaltgeräte-Registrierungsnummer (ElektroG)")}
+                  autoComplete="off"
+                />
+              )}
 
               <ProductSectionRule />
               <ProductSectionHeading>

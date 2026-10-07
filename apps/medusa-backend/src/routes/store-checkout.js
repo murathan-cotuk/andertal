@@ -13,6 +13,7 @@ const { getOrderPdfFilename } = require('../order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
 const { pickCountryMerchandiseCents, normalizeCountryCode, isValidEuVatIdFormat } = require('../goods-vat')
+const { resolveCatalogUnitPriceCents } = require('../line-unit-price')
 const { checkVatIdViaVies } = require('../vies-check')
 const { resolveProductCommissionOverride, resolveSellerCommissionRate } = require('../commission-rate')
 const { quoteCartShipping, shippingBySellerMap, loadFreeShippingThresholds, normalizeCountry: normalizeShippingCountry } = require('../shipping-quote')
@@ -294,7 +295,7 @@ const resolveCartCouponDiscountSync = async (client, items, rawCouponCode, custo
     const productIds = list.map((it) => String(it.product_id || '')).filter(Boolean)
     if (productIds.length) {
       const lq = await client.query(
-        `SELECT DISTINCT seller_id FROM admin_hub_seller_listings WHERE product_id::text = ANY($1::text[]) AND status = 'active'`,
+        `SELECT DISTINCT seller_id FROM admin_hub_seller_listings WHERE product_id::text = ANY($1::text[]) AND status IN ('active', 'published')`,
         [productIds]
       )
       sellersViaListings = (lq.rows || []).map((r) => String(r.seller_id || '')).filter(Boolean)
@@ -882,7 +883,7 @@ const storeCartLineItemsPOST = async (req, res) => {
     const lineIsOwner = !!(productSellerId && lineSellerId && productSellerId === lineSellerId)
     if (lineSellerId && !lineIsOwner) {
       const listingRow = await client.query(
-        `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status = 'active' LIMIT 1`,
+        `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status IN ('active', 'published') LIMIT 1`,
         [String(product.id || productId), lineSellerId]
       )
       if (listingRow.rows[0] && Number(listingRow.rows[0].price_cents) > 0) {
@@ -890,17 +891,15 @@ const storeCartLineItemsPOST = async (req, res) => {
         listingApplied = true
       }
     }
-    const variantPrices = rawVariants.length && variantIndex >= 0 && rawVariants[variantIndex]
-      && rawVariants[variantIndex].metadata && typeof rawVariants[variantIndex].metadata === 'object'
-      ? rawVariants[variantIndex].metadata.prices
-      : null
-    const exactCountryPrice = pickCountryMerchandiseCents(variantPrices, destCountry, { fallbackDe: false })
-      || pickCountryMerchandiseCents(meta.prices, destCountry, { fallbackDe: false })
-    if (exactCountryPrice != null) unitPriceCents = exactCountryPrice
-    else if (!listingApplied) {
-      const fallbackPrice = pickCountryMerchandiseCents(variantPrices, destCountry, { fallbackDe: true })
-        || pickCountryMerchandiseCents(meta.prices, destCountry, { fallbackDe: true })
-      if (fallbackPrice != null) unitPriceCents = fallbackPrice
+    // A second seller's listing price stands; otherwise the variant's own price wins over the
+    // parent's (src/line-unit-price.js). The parent's per-country price used to overwrite both.
+    if (!listingApplied) {
+      unitPriceCents = resolveCatalogUnitPriceCents({
+        variant: resolvedVar.variant || (variantIndex >= 0 ? rawVariants[variantIndex] : null),
+        meta,
+        productPriceCents: priceCents,
+        country: destCountry,
+      })
     }
     const sellerForCamp = lineSellerId || ''
     if (sellerForCamp) {
@@ -3040,6 +3039,24 @@ const storeOrdersMeGET = async (req, res) => {
       }
     }
 
+    // Withdrawal window per order (src/withdrawal.js): deadline from the latest known delivery,
+    // longest promised return period, quantities still returnable.
+    const { buildReturnWindow } = require('../withdrawal')
+    const confirmedAtById = new Map()
+    const returnDaysByProduct = new Map()
+    if (orderIds.length > 0) {
+      try {
+        const dr = await client.query('SELECT id, delivery_confirmed_at FROM store_orders WHERE id = ANY($1::uuid[])', [orderIds])
+        for (const x of dr.rows || []) confirmedAtById.set(String(x.id), x.delivery_confirmed_at)
+        const pids = [...new Set(Object.values(itemsMap).flat().map((i) => i && i.product_id).filter(Boolean).map(String))]
+        if (pids.length) {
+          const pr = await client.query(`SELECT id::text AS id, metadata->>'return_days' AS rd FROM admin_hub_products WHERE id::text = ANY($1::text[])`, [pids])
+          for (const x of pr.rows || []) if (x.rd != null) returnDaysByProduct.set(x.id, Number(x.rd))
+        }
+      } catch (we) {
+        console.warn('storeOrdersMeGET return window:', we?.message || we)
+      }
+    }
     await client.end()
     const blockedOs = new Set(['storniert', 'refunded', 'retoure', 'retoure_anfrage'])
     const blockedDs = new Set(['versendet', 'zugestellt', 'shipped', 'delivered'])
@@ -3060,6 +3077,12 @@ const storeOrdersMeGET = async (req, res) => {
         items: itemsMap[row.id] || [],
         returns: returnsMap[row.id] || [],
         cancellation_allowed,
+        return_window: buildReturnWindow({
+          order: { delivery_date: row.delivery_date, delivery_confirmed_at: confirmedAtById.get(String(row.id)) },
+          items: itemsMap[row.id] || [],
+          returns: returnsMap[row.id] || [],
+          returnDaysByProduct,
+        }),
       }
     })
     res.json({ orders })
@@ -3140,7 +3163,7 @@ const storeReturnRequestPOST = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
     const orderR = await client.query(
-      `SELECT id, order_number, delivery_status, delivery_date, total_cents, seller_id FROM store_orders WHERE id = $1::uuid
+      `SELECT id, order_number, delivery_status, delivery_date, delivery_confirmed_at, total_cents, seller_id FROM store_orders WHERE id = $1::uuid
        AND (
          ($3::uuid IS NOT NULL AND customer_id = $3::uuid)
          OR (email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($2)))
@@ -3149,19 +3172,6 @@ const storeReturnRequestPOST = async (req, res) => {
     )
     if (!orderR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
     const order = orderR.rows[0]
-    const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null
-    if (deliveryDate) {
-      const daysSince = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24)
-      if (daysSince > 14) {
-        await client.end()
-        return res.status(400).json({ message: 'Rückgabefrist abgelaufen. Rückgabe ist nur innerhalb von 14 Tagen nach Lieferung möglich.' })
-      }
-    }
-    const existR = await client.query(
-      "SELECT id FROM store_returns WHERE order_id = $1::uuid AND status NOT IN ('abgelehnt','abgeschlossen')",
-      [orderId]
-    )
-    if (existR.rows.length > 0) { await client.end(); return res.status(409).json({ message: 'Es gibt bereits eine offene Retouranfrage für diese Bestellung.' }) }
 
     const { reason = '', notes = '', items: rawItems } = req.body || {}
     if (!Array.isArray(rawItems) || rawItems.length === 0) {
@@ -3175,6 +3185,11 @@ const storeReturnRequestPOST = async (req, res) => {
       [orderId],
     )
     const byId = new Map((oiRes.rows || []).map((r) => [String(r.id), r]))
+    // Several returns per order are fine — only quantities already in a non-rejected return
+    // are no longer returnable (src/withdrawal.js).
+    const { remainingReturnable, withdrawalDeadline, deliveryInstant, returnPeriodDays } = require('../withdrawal')
+    const prevReturns = (await client.query('SELECT status, items FROM store_returns WHERE order_id = $1::uuid', [orderId])).rows
+    const left = remainingReturnable(oiRes.rows || [], prevReturns)
     const normalized = []
     for (const raw of rawItems) {
       const orderItemId = String(raw.order_item_id || raw.id || '').trim()
@@ -3183,10 +3198,15 @@ const storeReturnRequestPOST = async (req, res) => {
         await client.end()
         return res.status(400).json({ message: 'Ungültiger Artikel in der Retoure.' })
       }
-      const qty = Math.max(1, Math.min(Number(oi.quantity) || 1, Math.round(Number(raw.quantity) || Number(oi.quantity) || 1)))
-      if (qty > Number(oi.quantity || 1)) {
+      const stillReturnable = left.get(String(oi.id)) || 0
+      if (stillReturnable <= 0) {
         await client.end()
-        return res.status(400).json({ message: 'Retourmenge überschreitet die bestellte Menge.' })
+        return res.status(409).json({ code: 'already_returned', message: 'Für diesen Artikel gibt es bereits eine Retoure.' })
+      }
+      const qty = Math.max(1, Math.min(stillReturnable, Math.round(Number(raw.quantity) || stillReturnable)))
+      if (Math.round(Number(raw.quantity) || 0) > stillReturnable) {
+        await client.end()
+        return res.status(400).json({ code: 'quantity_exceeds', message: 'Retourmenge überschreitet die noch retournierbare Menge.' })
       }
       const sid = String(oi.seller_id || order.seller_id || '').trim() || null
       normalized.push({
@@ -3197,6 +3217,27 @@ const storeReturnRequestPOST = async (req, res) => {
         unit_price_cents: Number(oi.unit_price_cents || 0),
         seller_id: sid,
       })
+    }
+
+    // Withdrawal period: 14 days (or the longer period promised on the product page) from
+    // delivery, ending at the end of the last day in Europe/Berlin. No deadline before delivery.
+    const deliveredAt = deliveryInstant(order)
+    if (deliveredAt) {
+      const pids = [...new Set(normalized.map((it) => it.product_id).filter(Boolean).map(String))]
+      const metas = pids.length
+        ? (await client.query('SELECT metadata FROM admin_hub_products WHERE id::text = ANY($1::text[])', [pids]).catch(() => ({ rows: [] }))).rows.map((r) => r.metadata || {})
+        : []
+      const days = returnPeriodDays(metas)
+      const deadline = withdrawalDeadline(deliveredAt, days)
+      if (deadline && Date.now() > deadline.getTime()) {
+        await client.end()
+        return res.status(400).json({
+          code: 'return_period_expired',
+          return_days: days,
+          deadline: deadline.toISOString(),
+          message: `Rückgabefrist abgelaufen. Rückgabe ist nur innerhalb von ${days} Tagen nach Lieferung möglich.`,
+        })
+      }
     }
 
     // Multi-seller: one return per seller (MVP)

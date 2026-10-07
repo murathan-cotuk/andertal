@@ -21,7 +21,8 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import { computeGrundpreis } from "@/lib/grundpreis";
-import { useMetafieldDefinitions, metafieldTitle, metafieldValue } from "@/lib/metafield-definitions";
+import { EnergyClassBadge, LegalGroupTabs, SafetyResources, legalGroups } from "@/components/product/PdpCompliance";
+import { useMetafieldDefinitions, metafieldTitle, metafieldValue, mergeMetafieldRows } from "@/lib/metafield-definitions";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
@@ -785,6 +786,8 @@ const META_HIDDEN_KEYS = [
   "inci_list", "responsible_person_eu", "ingredients", "allergens", "best_before", "nutrition_values",
   "daily_dose", "warning_text", "age_warning", "fiber_composition", "care_symbols", "safety_data_sheet_url",
   "tpd_compliance_ref", "age_verification", "ce_class", "udi", "authorized_representative", "isbn",
+  "packaging_unit", "packaging_unit_plural",
+  "energy_class_grade", "energy_class_scale", "safety_information_text", "safety_information_pdf",
 ];
 
 /** Normalize barcode digits for multi-offer / by_ean lookup. */
@@ -931,6 +934,7 @@ function buildMetaRows(meta, locale) {
     .filter(([k, v]) => {
       const key = keyLower(k);
       if (hidden.has(key)) return false;
+      if (key.startsWith("custom_")) return false; // category legal fields → legal tabs
       return META_ATTR_KEYS.some((m) => key.includes(m)) || (typeof v === "string" && v && !k.startsWith("_"));
     })
     .map(([k, v]) => ({ key: k, label: localizeMetaKey(k, locale || "de"), value: String(v) }));
@@ -1407,9 +1411,11 @@ export default function ProductTemplate() {
       ? variantCountryPrice
       : (variant?.prices?.[0]?.amount != null
           ? Number(variant.prices[0].amount)
-          : (parentCountryPrice != null
+          : (Number(variant?.own_price_cents) > 0
+            ? Number(variant.own_price_cents) // variant's own price beats the parent's (as in checkout)
+            : (parentCountryPrice != null
               ? parentCountryPrice
-              : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
+              : (product.price != null ? Math.round(Number(product.price) * 100) : 0))));
   const uvpCountryCents = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
@@ -1452,11 +1458,26 @@ export default function ProductTemplate() {
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const variantMetafields = Array.isArray(variant?.metadata?.metafields) ? variant.metadata.metafields.filter((f) => f?.key && f?.value) : [];
+  // One row per key, values joined; the variant's value wins over the parent's (handoff Faz 0).
+  const metafieldRows = mergeMetafieldRows(meta.metafields, variantMetafields);
   const metaRows = buildMetaRows(meta, locale);
 
   // Grundpreis (unit price) — e.g. "1 kg = 50,00 €"
   // Computed against the price actually shown in the buy box (campaign price included).
   const grundpreis = (cents) => computeGrundpreis(meta, variant?.metadata, cents, formatPriceCents);
+  // Legal fields: the variant's own non-empty values win over the parent's (variant = real product).
+  const legalMeta = { ...meta };
+  for (const [k, v] of Object.entries(variant?.metadata || {})) {
+    if (v != null && typeof v !== "object" && String(v).trim() !== "") legalMeta[k] = v;
+  }
+  const gpsrLabels = {
+    hersteller: String(tUi("manufacturer")).replace(/:\s*$/, ""),
+    hersteller_information: String(tUi("manufacturerInfo")).replace(/:\s*$/, ""),
+    verantwortliche_person_information: String(tUi("responsiblePerson")).replace(/:\s*$/, ""),
+  };
+  // Statutory warranty "learn more" link: superuser setting (Content → product page), default CMS page.
+  const warrantyHref = String(pdpSettings?.warranty_info_url || "").trim()
+    || `${(marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`}/pages/gewaehrleistung`;
 
   // Combined dimensions row — "H × B × T cm" (only if at least one value is set)
   const dimensionsDisplay = (() => {
@@ -1807,7 +1828,7 @@ export default function ProductTemplate() {
               <button type="button" onClick={goNext} className="px-3 py-1 border rounded hover:bg-gray-100">›</button>
             </div>
           )}
-          <MobileVariantsWrap>{variantSelectorContent}</MobileVariantsWrap>
+          <MobileVariantsWrap><EnergyClassBadge meta={meta} variantMeta={variant?.metadata} locale={locale} resolveUrl={resolveImageUrl} />{variantSelectorContent}</MobileVariantsWrap>
         </GalleryCol>
 
         <PageRight>
@@ -1847,7 +1868,7 @@ export default function ProductTemplate() {
             </p>
           )}
 
-          <DesktopOnly>{variantSelectorContent}</DesktopOnly>
+          <DesktopOnly><EnergyClassBadge meta={meta} variantMeta={variant?.metadata} locale={locale} resolveUrl={resolveImageUrl} />{variantSelectorContent}</DesktopOnly>
 
           {bulletPoints.length > 0 && pdpVisible("bullet_points") && (
             <BulletList>
@@ -1856,7 +1877,7 @@ export default function ProductTemplate() {
               ))}
             </BulletList>
           )}
-          {pdpVisible("properties_table") && (metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
+          {pdpVisible("properties_table") && (metaRows.length > 0 || dimensionsDisplay || metafieldRows.length > 0) && (
             <MetaTable>
               <tbody>
                 {metaRows.map(({ key, label, value }) => (
@@ -1871,18 +1892,7 @@ export default function ProductTemplate() {
                     <td>{dimensionsDisplay}</td>
                   </tr>
                 )}
-                {Array.isArray(meta.metafields) && meta.metafields.filter((f) => f?.key && f?.value).map((f, i) => (
-                  <tr key={`mf-${i}`}>
-                    <th>{metafieldTitle(f.key, locale, mfDefs)}</th>
-                    <td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td>
-                  </tr>
-                ))}
-                {variantMetafields.map((f, i) => (
-                  <tr key={`vmf-${i}`}>
-                    <th>{metafieldTitle(f.key, locale, mfDefs)}</th>
-                    <td>{metafieldValue(f.key, f.value, locale, mfDefs)}</td>
-                  </tr>
-                ))}
+                {metafieldRows.map((r) => (<tr key={`mf-${r.key}`}><th>{metafieldTitle(r.key, locale, mfDefs)}</th><td>{r.values.map((v) => metafieldValue(r.key, v, locale, mfDefs)).join(", ")}</td></tr>))}
               </tbody>
             </MetaTable>
           )}
@@ -1948,7 +1958,7 @@ export default function ProductTemplate() {
                   return [
                     ...pdpOrderedKeys(pdpSettings || {}, "buybox_info", ["shipping_cost", "return_info", "seller"]).map((k) => rowByKey[k]),
                     ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
-                    ...(meta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(meta.weee_number) }] : []),
+                    ...(legalMeta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(legalMeta.weee_number) }] : []),
                   ];
                 })().filter(Boolean).map(({ label, value, href }) => (
                   <InfoRow key={label}>
@@ -1960,12 +1970,6 @@ export default function ProductTemplate() {
                     </InfoValue>
                   </InfoRow>
                 ))}
-                {meta.eprel_number && (
-                  <InfoRow>
-                    <InfoLabel>{localizeMetaKey("eprel_number", locale)}</InfoLabel>
-                    <InfoValue>{String(meta.eprel_number)}</InfoValue>
-                  </InfoRow>
-                )}
               </InfoList>
             </BuyboxInner>
           </BuyboxCard>
@@ -2063,36 +2067,20 @@ export default function ProductTemplate() {
           </DescriptionSection>
         )}
 
-        {(() => {
-          if (!pdpVisible("product_safety")) return null;
-          const extraCompliance = EXTRA_COMPLIANCE_KEYS.filter((k) => meta[k] != null && String(meta[k]).trim() !== "");
-          if (!meta.hersteller && !meta.hersteller_information && !meta.verantwortliche_person_information && extraCompliance.length === 0) return null;
-          return (
-            <DescriptionSection id="produktsicherheit" as="section">
-              <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
-                {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
-              </h3>
-              {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>{tUi("manufacturer")}</strong> {String(meta.hersteller)}</p>}
-              {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("manufacturerInfo")}</strong><br />{String(meta.hersteller_information)}</p>}
-              {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("responsiblePerson")}</strong><br />{String(meta.verantwortliche_person_information)}</p>}
-              {extraCompliance.map((key, i) => {
-                const value = String(meta[key]);
-                const label = localizeMetaKey(key, locale);
-                const isUrl = /^https?:\/\//i.test(value);
-                return (
-                  <p key={key} style={{ marginBottom: i === extraCompliance.length - 1 ? 0 : 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}>
-                    <strong>{label}:</strong>{" "}
-                    {isUrl ? (
-                      <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb" }}>
-                        {{ de: "Dokument ansehen", en: "View document", tr: "Belgeyi görüntüle", fr: "Voir le document", it: "Vedi documento", es: "Ver documento" }[locale] ?? "Dokument ansehen"}
-                      </a>
-                    ) : value}
-                  </p>
-                );
-              })}
-            </DescriptionSection>
-          );
-        })()}
+        {pdpVisible("product_safety") && (
+          <DescriptionSection id="sicherheit-ressourcen" as="section">
+            <SafetyResources meta={legalMeta} locale={locale} warrantyHref={warrantyHref} resolveUrl={resolveImageUrl} />
+          </DescriptionSection>
+        )}
+
+        {pdpVisible("product_safety") && legalGroups(legalMeta).length > 0 && (
+          <DescriptionSection id="produktsicherheit" as="section">
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
+              {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
+            </h3>
+            <LegalGroupTabs meta={legalMeta} locale={locale} labels={gpsrLabels} resolveUrl={resolveImageUrl} />
+          </DescriptionSection>
+        )}
 
         {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
           <DescriptionSection as="section">

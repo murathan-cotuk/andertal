@@ -3480,7 +3480,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             <BlockStack gap="300">
               <ProductSectionHeading>{pe.media}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "en" ? "New image uploads: JPEG or PNG, minimum 1000×1000 px; the server saves square WebP (1000×1000) for the shop." : locale === "tr" ? "Yeni görsel yüklemeleri: JPEG veya PNG, minimum 1000×1000 px; sunucu mağaza için kare WebP (1000×1000) kaydeder." : locale === "fr" ? "Nouveaux téléchargements d'images : JPEG ou PNG, minimum 1000×1000 px ; le serveur enregistre du WebP carré (1000×1000) pour la boutique." : locale === "es" ? "Nuevas subidas de imágenes: JPEG o PNG, mínimo 1000×1000 px; el servidor guarda WebP cuadrado (1000×1000) para la tienda." : locale === "it" ? "Nuovi caricamenti di immagini: JPEG o PNG, minimo 1000×1000 px; il server salva WebP quadrato (1000×1000) per il negozio." : "Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop."}
+                {lt(locale, "Product images: JPEG, PNG, WebP or AVIF, longest side at least 1000 px. Saved as square WebP (up to 2000×2000); non-square images are padded with white, never cropped.", "Ürün görselleri: JPEG, PNG, WebP veya AVIF, uzun kenar en az 1000 px. Kare WebP olarak kaydedilir (en fazla 2000×2000); kare olmayan görseller kırpılmaz, beyazla tamamlanır.", "Images produit : JPEG, PNG, WebP ou AVIF, côté le plus long min. 1000 px. Enregistrées en WebP carré (jusqu'à 2000×2000) ; les images non carrées sont complétées de blanc, jamais recadrées.", "Imágenes de producto: JPEG, PNG, WebP o AVIF, lado más largo mín. 1000 px. Se guardan como WebP cuadrado (hasta 2000×2000); las no cuadradas se completan con blanco, nunca se recortan.", "Immagini prodotto: JPEG, PNG, WebP o AVIF, lato più lungo min. 1000 px. Salvate come WebP quadrato (fino a 2000×2000); le immagini non quadrate vengono completate di bianco, mai ritagliate.", "Produktbilder: JPEG, PNG, WebP oder AVIF, längere Seite mindestens 1000 px. Gespeichert als quadratisches WebP (bis 2000×2000); nicht quadratische Bilder werden weiß ergänzt, nie beschnitten.")}
               </Text>
               {locale !== "de" && (
                 <Text as="p" variant="bodySm" tone="subdued">
@@ -4059,7 +4059,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               labelHidden
                               options={[
                                 { label: lt(locale, "Custom (free text)", "Serbest metin", "Texte libre", "Texto libre", "Testo libero", "Frei (Text)"), value: "" },
-                                ...Object.keys(metaDefs).map((k) => ({ label: resolveMetaDefLabel(metaDefs[k], k, locale), value: k })),
+                                // label + key, so two Eigenschaften with similar names can never be confused (handoff Faz 1)
+                                ...Object.keys(metaDefs).map((k) => {
+                                  const lab = resolveMetaDefLabel(metaDefs[k], k, locale);
+                                  return { label: lab.toLowerCase() === k.toLowerCase() ? lab : `${lab} (${k})`, value: k };
+                                }),
                               ]}
                               value={group.metafield_key || ""}
                               onChange={(v) => vg_setGroupMetaKey(gi, v)}
@@ -5020,33 +5024,37 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Text as="p" variant="bodySm" tone="subdued">
                 {locale === "en" ? "Product files (e.g. product data sheet, energy label) — shown in the shop below the product description. WEEE/EPREL registration numbers only appear here when the product's category requires them." : locale === "tr" ? "Ürün dosyaları (örn. ürün veri sayfası, enerji etiketi) — mağazada ürün açıklamasının altında gösterilir. WEEE/EPREL kayıt numaraları yalnızca ürünün kategorisi gerektiriyorsa burada görünür." : locale === "fr" ? "Fichiers produit (ex. fiche technique, étiquette énergétique) — affichés dans la boutique sous la description. Les numéros WEEE/EPREL n'apparaissent ici que si la catégorie du produit les exige." : locale === "es" ? "Archivos de producto (ej. ficha técnica, etiqueta energética), mostrados en la tienda debajo de la descripción. Los números WEEE/EPREL solo aparecen aquí si la categoría del producto los exige." : locale === "it" ? "File prodotto (es. scheda tecnica, etichetta energetica), mostrati nel negozio sotto la descrizione. I numeri WEEE/EPREL compaiono qui solo se richiesti dalla categoria del prodotto." : "Produktdateien (z. B. Produktdatenblatt, EEK-Label) — werden im Shop unter der Produktbeschreibung angezeigt. WEEE-/EPREL-Registrierungsnummern erscheinen hier nur, wenn die Kategorie des Produkts sie verlangt."}
               </Text>
-              {(complianceApplies.weee || getMeta(product, "weee_number") || complianceApplies.eprel || getMeta(product, "eprel_number")) && (
-                <InlineStack gap="300" wrap>
-                  {(complianceApplies.weee || getMeta(product, "weee_number")) && (
-                    <Box minWidth="240px" flex="1">
-                      <TextField
-                        label="WEEE-Reg.-Nummer"
-                        value={getMeta(product, "weee_number") || ""}
-                        onChange={(v) => updateMeta("weee_number", v || null)}
-                        placeholder="DE12345678"
-                        helpText={locale === "en" ? "Electrical waste registration number (ElektroG)" : locale === "tr" ? "Elektronik atık kayıt numarası (ElektroG)" : locale === "fr" ? "Numéro d'enregistrement déchets électroniques (ElektroG)" : locale === "es" ? "Número de registro de residuos eléctricos (ElektroG)" : locale === "it" ? "Numero di registrazione rifiuti elettrici (ElektroG)" : "Elektroaltgeräte-Registrierungsnummer (ElektroG)"}
-                        autoComplete="off"
-                      />
-                    </Box>
-                  )}
-                  {(complianceApplies.eprel || getMeta(product, "eprel_number")) && (
-                    <Box minWidth="240px" flex="1">
-                      <TextField
-                        label="EPREL-Nummer"
-                        value={getMeta(product, "eprel_number") || ""}
-                        onChange={(v) => updateMeta("eprel_number", v || null)}
-                        placeholder="123456"
-                        helpText={locale === "en" ? "EU energy label registration number" : locale === "tr" ? "AB enerji etiketi kayıt numarası" : locale === "fr" ? "Numéro d'enregistrement étiquette énergie UE" : locale === "es" ? "Número de registro etiqueta energética UE" : locale === "it" ? "Numero di registrazione etichetta energetica UE" : "EU-Energielabel-Registrierungsnummer"}
-                        autoComplete="off"
-                      />
-                    </Box>
-                  )}
-                </InlineStack>
+              {/* WEEE (ElektroG) — its own block; EPREL lives in the category section's EPREL group. */}
+              {(complianceApplies.weee || getMeta(product, "weee_number")) && (
+                <BlockStack gap="200">
+                  <Text as="h3" variant="bodySm" fontWeight="semibold">{lt(locale, "WEEE / electrical waste (ElektroG)", "WEEE / elektronik atık (ElektroG)", "DEEE / déchets électriques (ElektroG)", "RAEE / residuos eléctricos (ElektroG)", "RAEE / rifiuti elettrici (ElektroG)", "WEEE / Elektroaltgeräte (ElektroG)")}</Text>
+                  <Box maxWidth="360px">
+                    <TextField
+                      label="WEEE-Reg.-Nummer"
+                      requiredIndicator={complianceApplies.weee}
+                      error={complianceApplies.weee && !String(getMeta(product, "weee_number") || "").trim() ? lt(locale, "Required", "Zorunlu alan", "Champ obligatoire", "Campo obligatorio", "Campo obbligatorio", "Pflichtfeld") : undefined}
+                      value={getMeta(product, "weee_number") || ""}
+                      onChange={(v) => updateMeta("weee_number", v || null)}
+                      placeholder="DE12345678"
+                      helpText={lt(locale, "Electrical waste registration number (ElektroG, stiftung ear)", "Elektronik atık kayıt numarası (ElektroG, stiftung ear)", "Numéro d'enregistrement DEEE (ElektroG, stiftung ear)", "Número de registro RAEE (ElektroG, stiftung ear)", "Numero di registrazione RAEE (ElektroG, stiftung ear)", "Elektroaltgeräte-Registrierungsnummer (ElektroG, stiftung ear)")}
+                      autoComplete="off"
+                    />
+                  </Box>
+                </BlockStack>
+              )}
+              {/* A saved EPREL number on a category that no longer asks for it stays visible here. */}
+              {!complianceApplies.eprel && getMeta(product, "eprel_number") && (
+                <BlockStack gap="200">
+                  <Text as="h3" variant="bodySm" fontWeight="semibold">{lt(locale, "EPREL / energy label", "EPREL / enerji etiketi", "EPREL / étiquette énergie", "EPREL / etiqueta energética", "EPREL / etichetta energetica", "EPREL / Energielabel")}</Text>
+                  <Box maxWidth="360px">
+                    <TextField
+                      label="EPREL-Nummer"
+                      value={getMeta(product, "eprel_number") || ""}
+                      onChange={(v) => updateMeta("eprel_number", v || null)}
+                      autoComplete="off"
+                    />
+                  </Box>
+                </BlockStack>
               )}
 
               {/* Product files */}

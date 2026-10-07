@@ -2050,6 +2050,13 @@ async function start() {
         } catch (settlementErr) {
           console.error('[settlement] schema migration FAILED — payouts stay disabled until fixed:', settlementErr && settlementErr.message)
         }
+        // JTL partner 1 % ledger (docs/jtl.md) — separate from seller money; must come after settlement.
+        try {
+          const { ensureJtlPartnerSchema } = require('./src/jtl-partner')
+          await ensureJtlPartnerSchema(client)
+        } catch (jtlErr) {
+          console.error('[jtl-partner] schema migration failed:', jtlErr && jtlErr.message)
+        }
         await client.end()
         log.info('Admin Hub and support-case tables ready')
       } catch (migErr) {
@@ -2512,6 +2519,13 @@ async function start() {
     // --- Canonical settlement API (payables / ledger / refunds / payouts / Custom payout account): src/routes/settlement.js ---
     const createSettlementRouter = require('./src/routes/settlement')
     httpApp.use('/', createSettlementRouter({ loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform }))
+    // JTL partner 1 % (docs/jtl.md): Billing → JTL API (superuser) + opt-in quarterly auto report.
+    const createJtlPartnerRouter = require('./src/routes/jtl-partner')
+    httpApp.use('/', createJtlPartnerRouter())
+    setTimeout(() => {
+      createJtlPartnerRouter.runJtlAutoReport().catch((e) => console.warn('[jtl-partner] auto report:', e && e.message))
+      setInterval(() => createJtlPartnerRouter.runJtlAutoReport().catch((e) => console.warn('[jtl-partner] auto report:', e && e.message)), 6 * 60 * 60 * 1000)
+    }, 90 * 1000)
 
     // --- Seller Health (Analysen → Seller Health): scoring engine + config + history: src/routes/seller-health.js ---
     const createSellerHealthRouter = require('./src/routes/seller-health')

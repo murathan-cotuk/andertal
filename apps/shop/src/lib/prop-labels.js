@@ -57,7 +57,9 @@ export function localizeMetaKey(key, locale) {
   if (entry) {
     return entry[locale] || entry.de || entry.en || key;
   }
-  return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Category-specific legal fields are stored as custom_<name> — show just the name (handoff Faz 0d).
+  const base = k.startsWith("custom_") ? k.slice(7) : k;
+  return base.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export const SECTION_LABELS = {

@@ -48,11 +48,14 @@ const copy = (locale) => {
     selectFirst: t("Select a category above to see and change its compliance profile.", "Uyumluluk profilini görmek ve değiştirmek için yukarıdan bir kategori seçin.", "Wählen Sie oben eine Kategorie, um deren Compliance-Profil zu sehen und zu ändern."),
     requiredFields: t("Required fields from the profile", "Profilden gelen zorunlu alanlar", "Pflichtfelder aus dem Profil"),
     noProfileFields: t("No profile fields for this category.", "Bu kategori için profil alanı yok.", "Keine Profilfelder für diese Kategorie."),
-    customFieldsTitle: t("Manual required fields for this category", "Bu kategori için manuel zorunlu alanlar", "Manuelle Pflichtfelder für diese Kategorie"),
+    customFieldsTitle: t("Manual fields for this category", "Bu kategori için manuel alanlar", "Manuelle Felder für diese Kategorie"),
+    requirement: t("Requirement", "Zorunluluk", "Verbindlichkeit"),
+    makeOptional: t("Make optional", "İsteğe bağlı yap", "Optional machen"),
+    makeRequired: t("Make required", "Zorunlu yap", "Pflicht machen"),
     customFieldsHint: t(
-      "These apply only to this exact category (not inherited by subcategories). They appear as required fields in the product's Legal tab.",
-      "Bunlar yalnızca bu kategori için geçerlidir (alt kategorilere miras alınmaz). Ürünün Yasal sekmesinde zorunlu alan olarak görünür.",
-      "Diese gelten nur für genau diese Kategorie (werden nicht an Unterkategorien vererbt). Sie erscheinen im Rechtlich-Tab des Produkts als Pflichtfeld.",
+      "These apply only to this exact category (not inherited by subcategories). They appear in the product's Legal tab — as required (red *, blocks publishing) or optional.",
+      "Bunlar yalnızca bu kategori için geçerlidir (alt kategorilere miras alınmaz). Ürünün Yasal sekmesinde görünür — zorunlu (kırmızı *, yayını engeller) veya isteğe bağlı.",
+      "Diese gelten nur für genau diese Kategorie (werden nicht an Unterkategorien vererbt). Sie erscheinen im Rechtlich-Tab des Produkts — als Pflichtfeld (rotes *, blockiert die Veröffentlichung) oder optional.",
     ),
     noCustomFields: t("No manual fields added yet.", "Henüz manuel alan eklenmedi.", "Noch keine manuellen Felder hinzugefügt."),
     fieldLabel: t("Field label", "Alan adı", "Feldbezeichnung"),
@@ -103,6 +106,7 @@ export default function ComplianceProfilesPage() {
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState("text");
   const [newFieldOptions, setNewFieldOptions] = useState("");
+  const [newFieldRequired, setNewFieldRequired] = useState("required"); // "required" | "optional"
   const [customSaving, setCustomSaving] = useState(false);
 
   // Inline editor for a PROFILE field (edit label/type/options as a per-category override, or
@@ -281,6 +285,7 @@ export default function ComplianceProfilesPage() {
         {
           label,
           type: newFieldType,
+          required: newFieldRequired !== "optional",
           ...(newFieldType === "select"
             ? { options: newFieldOptions.split(",").map((o) => o.trim()).filter(Boolean) }
             : {}),
@@ -291,6 +296,7 @@ export default function ComplianceProfilesPage() {
       setNewFieldLabel("");
       setNewFieldType("text");
       setNewFieldOptions("");
+      setNewFieldRequired("required");
     } catch (e) {
       setMessage({ type: "error", text: e?.message || c.customSaveError });
     }
@@ -309,6 +315,21 @@ export default function ComplianceProfilesPage() {
       setMessage({ type: "error", text: e?.message || c.customSaveError });
     }
     setCustomSaving(false);
+  };
+
+  // Flip one manual field between Required and Optional (missing flag = required).
+  const toggleCustomFieldRequired = async (key) => {
+    if (!categoryId) return;
+    setFieldSaving(key);
+    setMessage({ type: "", text: "" });
+    try {
+      const next = (schema?.own_custom_fields || []).map((f) => (f.key === key ? { ...f, required: f.required === false } : f));
+      await getMedusaAdminClient().setCategoryComplianceCustomFields(categoryId, next, schema?.own_disabled_fields);
+      await loadSchema(categoryId);
+    } catch (e) {
+      setMessage({ type: "error", text: e?.message || c.customSaveError });
+    }
+    setFieldSaving(null);
   };
 
   const typeLabel = (type) => (
@@ -487,6 +508,7 @@ export default function ComplianceProfilesPage() {
                           <InlineStack gap="200" blockAlign="center">
                             <Text as="span" fontWeight="medium">{f.label}</Text>
                             <Badge tone="attention">{typeLabel(f.type)}</Badge>
+                            <Badge tone={f.required === false ? undefined : "critical"}>{f.required === false ? c.optionalBadge : c.requiredBadge}</Badge>
                             {f.type === "select" && f.options?.length ? (
                               <Text as="span" tone="subdued" variant="bodySm">{f.options.join(", ")}</Text>
                             ) : null}
@@ -498,6 +520,13 @@ export default function ComplianceProfilesPage() {
                                 onClick={() => startEditField(f)}
                               >
                                 {c.editField}
+                              </Button>
+                              <Button
+                                size="slim"
+                                onClick={() => toggleCustomFieldRequired(f.key)}
+                                loading={fieldSaving === f.key}
+                              >
+                                {f.required === false ? c.makeRequired : c.makeOptional}
                               </Button>
                               <Button
                                 size="slim"
@@ -573,6 +602,14 @@ export default function ComplianceProfilesPage() {
                       options={CUSTOM_FIELD_TYPES.map((t) => ({ label: typeLabel(t), value: t }))}
                       value={newFieldType}
                       onChange={setNewFieldType}
+                    />
+                  </div>
+                  <div style={{ minWidth: 150 }}>
+                    <Select
+                      label={c.requirement}
+                      options={[{ label: c.requiredBadge, value: "required" }, { label: c.optionalBadge, value: "optional" }]}
+                      value={newFieldRequired}
+                      onChange={setNewFieldRequired}
                     />
                   </div>
                   {newFieldType === "select" && (

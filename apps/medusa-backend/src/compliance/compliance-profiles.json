@@ -22,7 +22,9 @@
       ],
       "optional_fields": [
         "safety_warnings",
-        "recall_procedure"
+        "recall_procedure",
+        "safety_information_text",
+        "safety_information_pdf"
       ],
       "blocked_publish_without": [
         "hersteller",
@@ -65,13 +67,16 @@
       "inherits": "electronics_weee",
       "required_fields": [
         "eprel_number",
+        "energy_class_grade",
         "energy_label_image"
       ],
       "optional_fields": [
+        "energy_class_scale",
         "energy_label_qr"
       ],
       "blocked_publish_without": [
         "eprel_number",
+        "energy_class_grade",
         "energy_label_image"
       ]
     },
@@ -476,12 +481,12 @@
       },
       "validation_regex": null,
       "help_text_i18n": {
-        "de": "Nummer aus der EU-EPREL-Datenbank für energiekennzeichnungspflichtige Produkte.",
-        "en": "Number from the EU EPREL database for energy-labelled products.",
-        "tr": "Enerji etiketli ürünler için AB EPREL veritabanı numarası.",
-        "fr": "Numéro de la base EPREL de l'UE pour les produits à étiquette énergie.",
-        "es": "Número de la base EPREL de la UE para productos con etiqueta energética.",
-        "it": "Numero dalla banca dati EPREL UE per prodotti con etichetta energetica."
+        "de": "Registriernummer Ihres Modells in der EU-Produktdatenbank EPREL (eprel.ec.europa.eu), z. B. 123456. Hersteller/Importeure registrieren jedes energiekennzeichnungspflichtige Modell dort.",
+        "en": "Registration number of your model in the EU product database EPREL (eprel.ec.europa.eu), e.g. 123456. Manufacturers/importers register every energy-labelled model there.",
+        "tr": "Modelinizin AB ürün veritabanı EPREL'deki (eprel.ec.europa.eu) kayıt numarası, örn. 123456. Üreticiler/ithalatçılar enerji etiketli her modeli oraya kaydeder.",
+        "fr": "Numéro d'enregistrement de votre modèle dans la base EPREL (eprel.ec.europa.eu), ex. 123456. Fabricants/importateurs y enregistrent chaque modèle soumis à l'étiquette énergie.",
+        "es": "Número de registro de su modelo en la base de datos EPREL (eprel.ec.europa.eu), p. ej. 123456. Fabricantes/importadores registran allí cada modelo con etiqueta energética.",
+        "it": "Numero di registrazione del modello nella banca dati EPREL (eprel.ec.europa.eu), es. 123456. Produttori/importatori vi registrano ogni modello con etichetta energetica."
       },
       "group": "eprel"
     },
@@ -497,33 +502,33 @@
       },
       "validation_regex": null,
       "help_text_i18n": {
-        "de": "Link oder Datei zum offiziellen Energielabel-Bild.",
-        "en": "Link or file for the official energy label image.",
-        "tr": "Resmi enerji etiketi görseli için bağlantı veya dosya.",
-        "fr": "Lien ou fichier de l'image officielle de l'étiquette énergie.",
-        "es": "Enlace o archivo de la imagen oficial de la etiqueta energética.",
-        "it": "Link o file dell'immagine ufficiale dell'etichetta energetica."
+        "de": "Das offizielle Energielabel als Bild (PNG/JPG) oder Link – am einfachsten aus EPREL herunterladen. Wird im Shop beim Klick auf den Effizienzklassen-Pfeil angezeigt.",
+        "en": "The official energy label as an image (PNG/JPG) or link – easiest to download from EPREL. Shown in the shop when the efficiency-class arrow is clicked.",
+        "tr": "Resmi enerji etiketi görsel (PNG/JPG) veya bağlantı olarak – en kolayı EPREL'den indirmek. Mağazada verimlilik sınıfı okuna tıklanınca gösterilir.",
+        "fr": "L'étiquette énergie officielle en image (PNG/JPG) ou lien – le plus simple : la télécharger depuis EPREL. Affichée dans la boutique au clic sur la flèche de classe.",
+        "es": "La etiqueta energética oficial como imagen (PNG/JPG) o enlace; lo más fácil es descargarla de EPREL. Se muestra en la tienda al hacer clic en la flecha de clase.",
+        "it": "L'etichetta energetica ufficiale come immagine (PNG/JPG) o link – più semplice scaricarla da EPREL. Mostrata nel negozio cliccando sulla freccia della classe."
       },
       "group": "eprel"
     },
     "energy_label_qr": {
       "type": "text",
       "label_i18n": {
-        "de": "Energielabel QR / Link",
-        "en": "Energy label QR / link",
-        "tr": "Enerji etiketi QR / bağlantı",
-        "fr": "QR / lien étiquette énergie",
-        "es": "QR / enlace etiqueta energética",
-        "it": "QR / link etichetta energetica"
+        "de": "Produktdatenblatt / EPREL-Link",
+        "en": "Product information sheet / EPREL link",
+        "tr": "Ürün bilgi föyü / EPREL bağlantısı",
+        "fr": "Fiche d'information produit / lien EPREL",
+        "es": "Ficha de información del producto / enlace EPREL",
+        "it": "Scheda informativa prodotto / link EPREL"
       },
       "validation_regex": null,
       "help_text_i18n": {
-        "de": "QR-Code-Inhalt oder Produktlink aus EPREL.",
-        "en": "QR code content or product link from EPREL.",
-        "tr": "EPREL'den QR kod içeriği veya ürün bağlantısı.",
-        "fr": "Contenu du QR ou lien produit depuis EPREL.",
-        "es": "Contenido del QR o enlace del producto desde EPREL.",
-        "it": "Contenuto del QR o link prodotto da EPREL."
+        "de": "Link zum Produktdatenblatt (z. B. der EPREL-Link aus dem QR-Code auf dem Label: https://eprel.ec.europa.eu/qr/123456). Wird im Shop als „Produktdatenblatt\" verlinkt.",
+        "en": "Link to the product information sheet (e.g. the EPREL link from the label QR code: https://eprel.ec.europa.eu/qr/123456). Linked in the shop as \"Product information sheet\".",
+        "tr": "Ürün bilgi föyü bağlantısı (örn. etiketteki QR koddan EPREL bağlantısı: https://eprel.ec.europa.eu/qr/123456). Mağazada \"Ürün bilgi föyü\" olarak bağlanır.",
+        "fr": "Lien vers la fiche d'information produit (ex. le lien EPREL du QR code de l'étiquette : https://eprel.ec.europa.eu/qr/123456). Lié dans la boutique comme « Fiche produit ».",
+        "es": "Enlace a la ficha de información del producto (p. ej. el enlace EPREL del QR de la etiqueta: https://eprel.ec.europa.eu/qr/123456). Se enlaza en la tienda como «Ficha del producto».",
+        "it": "Link alla scheda informativa del prodotto (es. il link EPREL dal QR dell'etichetta: https://eprel.ec.europa.eu/qr/123456). Collegato nel negozio come «Scheda prodotto»."
       },
       "group": "eprel"
     },
@@ -1504,6 +1509,108 @@
         "it": "Facoltativo: valore Nutri-Score (A–E), se usato."
       },
       "group": "food"
+    },
+    "energy_class_scale": {
+      "type": "select",
+      "options": [
+        "A-G",
+        "A+++-D",
+        "A++-E",
+        "A+-F"
+      ],
+      "label_i18n": {
+        "de": "Effizienzklassen-Skala",
+        "en": "Energy class scale",
+        "tr": "Enerji sınıfı skalası",
+        "fr": "Échelle des classes d'efficacité",
+        "es": "Escala de clases energéticas",
+        "it": "Scala delle classi energetiche"
+      },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Spannweite der Skala auf dem Energielabel. Seit 2021 gilt für die meisten Produktgruppen (Kühlgeräte, Waschmaschinen, Geschirrspüler, Fernseher/Displays, Lampen) die neue Skala A–G. Ältere Skalen (z. B. A+++–D) nur, wenn das Etikett Ihres Produkts sie noch zeigt.",
+        "en": "Range of the scale printed on the energy label. Since 2021 most product groups (fridges, washing machines, dishwashers, TVs/displays, lamps) use the rescaled A–G label. Older scales (e.g. A+++–D) only if your product's label still shows them.",
+        "tr": "Enerji etiketindeki skalanın aralığı. 2021'den beri çoğu ürün grubu (buzdolabı, çamaşır/bulaşık makinesi, TV/ekran, lamba) yeni A–G skalasını kullanır. Eski skalalar (örn. A+++–D) yalnızca ürününüzün etiketinde hâlâ yer alıyorsa.",
+        "fr": "Étendue de l'échelle imprimée sur l'étiquette énergie. Depuis 2021, la plupart des groupes (réfrigérateurs, lave-linge, lave-vaisselle, téléviseurs/écrans, lampes) utilisent l'échelle A–G. Les anciennes échelles (ex. A+++–D) seulement si l'étiquette du produit les affiche encore.",
+        "es": "Rango de la escala de la etiqueta energética. Desde 2021 la mayoría de grupos (frigoríficos, lavadoras, lavavajillas, televisores/pantallas, lámparas) usan la escala A–G. Escalas antiguas (p. ej. A+++–D) solo si la etiqueta del producto aún las muestra.",
+        "it": "Intervallo della scala riportata sull'etichetta energetica. Dal 2021 la maggior parte dei gruppi (frigoriferi, lavatrici, lavastoviglie, TV/display, lampade) usa la scala A–G. Scale precedenti (es. A+++–D) solo se l'etichetta del prodotto le mostra ancora."
+      },
+      "group": "eprel"
+    },
+    "energy_class_grade": {
+      "type": "select",
+      "options": [
+        "A+++",
+        "A++",
+        "A+",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "label_i18n": {
+        "de": "Energieeffizienzklasse",
+        "en": "Energy efficiency class",
+        "tr": "Enerji verimlilik sınıfı",
+        "fr": "Classe d'efficacité énergétique",
+        "es": "Clase de eficiencia energética",
+        "it": "Classe di efficienza energetica"
+      },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Die Klasse (Buchstabe) genau wie auf dem Energielabel bzw. in der EPREL-Datenbank. Der Shop zeigt sie als farbigen Pfeil neben der Variantenauswahl; ein Klick öffnet das Label (Pflicht im Online-Handel nach EU 2017/1369).",
+        "en": "The class (letter) exactly as on the energy label / in the EPREL database. The shop shows it as a coloured arrow above the variant selector; clicking opens the label (required for online sales under EU 2017/1369).",
+        "tr": "Sınıf (harf), enerji etiketinde / EPREL veritabanında yazdığı gibi. Mağaza bunu varyant seçicinin üstünde renkli ok olarak gösterir; tıklanınca etiket açılır (AB 2017/1369 uyarınca online satışta zorunlu).",
+        "fr": "La classe (lettre) exactement comme sur l'étiquette / dans EPREL. La boutique l'affiche en flèche colorée au-dessus du choix de variante ; un clic ouvre l'étiquette (obligatoire en vente en ligne, UE 2017/1369).",
+        "es": "La clase (letra) exactamente como en la etiqueta / en EPREL. La tienda la muestra como flecha de color sobre el selector de variante; al hacer clic se abre la etiqueta (obligatorio en venta online, UE 2017/1369).",
+        "it": "La classe (lettera) esattamente come sull'etichetta / in EPREL. Il negozio la mostra come freccia colorata sopra la scelta della variante; un clic apre l'etichetta (obbligatorio nella vendita online, UE 2017/1369)."
+      },
+      "group": "eprel"
+    },
+    "safety_information_text": {
+      "type": "text",
+      "label_i18n": {
+        "de": "Sicherheitsinformationen (Text)",
+        "en": "Safety information (text)",
+        "tr": "Güvenlik bilgileri (metin)",
+        "fr": "Informations de sécurité (texte)",
+        "es": "Información de seguridad (texto)",
+        "it": "Informazioni di sicurezza (testo)"
+      },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Warn- und Sicherheitshinweise in der Sprache des Käufers (GPSR Art. 19). Erscheint im Shop unter „Sicherheit und Produktressourcen“ direkt unter der Beschreibung.",
+        "en": "Warnings and safety information in the buyer's language (GPSR Art. 19). Shown in the shop under “Safety and product resources” right below the description.",
+        "tr": "Alıcının dilinde uyarılar ve güvenlik bilgileri (GPSR Md. 19). Mağazada açıklamanın hemen altında “Güvenlik ve ürün kaynakları” bölümünde gösterilir.",
+        "fr": "Avertissements et consignes de sécurité dans la langue de l'acheteur (GPSR art. 19). Affichés sous la description, rubrique « Sécurité et ressources produit ».",
+        "es": "Advertencias e información de seguridad en el idioma del comprador (GPSR art. 19). Se muestran bajo la descripción en «Seguridad y recursos del producto».",
+        "it": "Avvertenze e informazioni di sicurezza nella lingua dell'acquirente (GPSR art. 19). Mostrate sotto la descrizione in «Sicurezza e risorse del prodotto»."
+      },
+      "group": "general"
+    },
+    "safety_information_pdf": {
+      "type": "file",
+      "label_i18n": {
+        "de": "Sicherheitsinformationen (PDF)",
+        "en": "Safety information (PDF)",
+        "tr": "Güvenlik bilgileri (PDF)",
+        "fr": "Informations de sécurité (PDF)",
+        "es": "Información de seguridad (PDF)",
+        "it": "Informazioni di sicurezza (PDF)"
+      },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Link zu einem PDF mit Sicherheitsinformationen bzw. der Gebrauchsanleitung mit Sicherheitshinweisen.",
+        "en": "Link to a PDF with safety information or the instructions containing safety notes.",
+        "tr": "Güvenlik bilgilerini veya güvenlik notları içeren kullanım kılavuzunu içeren PDF bağlantısı.",
+        "fr": "Lien vers un PDF d'informations de sécurité ou la notice contenant les consignes.",
+        "es": "Enlace a un PDF con información de seguridad o las instrucciones con avisos de seguridad.",
+        "it": "Link a un PDF con informazioni di sicurezza o le istruzioni con avvertenze."
+      },
+      "group": "general"
     }
   }
 }

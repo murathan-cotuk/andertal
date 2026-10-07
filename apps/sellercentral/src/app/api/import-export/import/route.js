@@ -239,6 +239,8 @@ function buildMetafieldLookup(definitions) {
     }
     valueByKeyAndAlias.set(key, vmap);
   }
+  // Exact keys win over other definitions' labels/translations (handoff Faz 1).
+  for (const key of valueByKeyAndAlias.keys()) keyByAlias.set(key.toLowerCase(), key);
   return { keyByAlias, valueByKeyAndAlias };
 }
 

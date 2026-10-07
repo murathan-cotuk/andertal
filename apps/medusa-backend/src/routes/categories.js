@@ -979,6 +979,8 @@ function sanitizeCustomField(raw, existingKeys) {
   const help_text = String(raw?.help_text || '').trim()
   const out = { key: uniqueKey, label, type }
   if (isOverride) out.override = true
+  // Required | Optional per manual field (handoff Faz 0c); missing flag = required (old rows).
+  out.required = raw?.required !== false
   if (help_text) out.help_text = help_text
   if (type === 'select') {
     const options = Array.isArray(raw?.options) ? raw.options.map((o) => String(o || '').trim()).filter(Boolean) : []
@@ -1045,11 +1047,15 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
       : []
     const disabledSet = new Set(disabledFields)
 
-    const mergedRequired = [...resolved.required_fields, ...customKeys.filter((k) => !resolved.required_fields.includes(k))]
+    // A manual field (or an override of a profile field) marked Optional leaves the required and
+    // publish-blocking lists; missing flag = required, as before (handoff Faz 0c).
+    const customOptionalSet = new Set(ownCustomFields.filter((f) => f && f.required === false).map((f) => f.key))
+    const customRequiredKeys = customKeys.filter((k) => !customOptionalSet.has(k))
+    const mergedRequired = [...resolved.required_fields.filter((k) => !customOptionalSet.has(k)), ...customRequiredKeys.filter((k) => !resolved.required_fields.includes(k))]
       .filter((k) => !disabledSet.has(k))
-    const mergedOptional = [...resolved.optional_fields, ...customKeys.filter((k) => !resolved.optional_fields.includes(k) && !mergedRequired.includes(k))]
-      .filter((k) => !disabledSet.has(k))
-    const mergedBlocked = [...resolved.blocked_publish_without, ...customKeys.filter((k) => !resolved.blocked_publish_without.includes(k))]
+    const mergedOptional = [...resolved.optional_fields, ...customKeys.filter((k) => !resolved.optional_fields.includes(k))]
+      .filter((k) => !disabledSet.has(k) && !mergedRequired.includes(k))
+    const mergedBlocked = [...resolved.blocked_publish_without.filter((k) => !customOptionalSet.has(k)), ...customRequiredKeys.filter((k) => !resolved.blocked_publish_without.includes(k))]
       .filter((k) => !disabledSet.has(k))
     const mergedDefs = { ...resolved.field_definitions, ...customFieldsToDefs(ownCustomFields, resolved.field_definitions) }
 

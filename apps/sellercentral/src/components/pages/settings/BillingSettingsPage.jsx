@@ -6,6 +6,7 @@ import {
   Select, Banner, Spinner, Divider, Checkbox, Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import JtlPartnerTab from "@/components/pages/settings/JtlPartnerTab";
 import { getOrderPdfDownloadUrl, downloadAuthenticatedPdf, downloadAuthenticatedPdfsAsZip } from "@/lib/order-pdf-url";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
@@ -1659,7 +1660,10 @@ export default function BillingSettingsPage() {
     { id: "order-docs", content: ui.orderDocuments },
     { id: "commission", content: ui.commissionInvoices },
     ...(isSuperuser
-      ? [{ id: "finanzamt", content: lt(locale, "Platform / Tax office", "Platform / Vergi Dairesi", "Plateforme / Fisc", "Plataforma / Hacienda", "Piattaforma / Fisco", "Plattform / Finanzamt") }]
+      ? [
+          { id: "finanzamt", content: lt(locale, "Platform / Tax office", "Platform / Vergi Dairesi", "Plateforme / Fisc", "Plataforma / Hacienda", "Piattaforma / Fisco", "Plattform / Finanzamt") },
+          { id: "jtl", content: "JTL" },
+        ]
       : []),
   ];
 
@@ -1671,8 +1675,10 @@ export default function BillingSettingsPage() {
             <OrderDocumentsTab isSuperuser={isSuperuser} mySellerId={mySellerId} />
           ) : selectedTab === 1 ? (
             <CommissionInvoicesTab isSuperuser={isSuperuser} mySellerId={mySellerId} />
-          ) : isSuperuser ? (
+          ) : isSuperuser && selectedTab === 2 ? (
             <FinanzamtTab />
+          ) : isSuperuser && selectedTab === 3 ? (
+            <JtlPartnerTab />
           ) : null}
         </Box>
       </Tabs>

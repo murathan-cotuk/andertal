@@ -5,13 +5,16 @@ import { Text, TextField, Select, Banner, BlockStack, InlineStack } from "@shopi
 import { ProductSectionHeading, ProductSectionRule } from "@/components/products/ProductSection";
 import InfoIconTooltip from "@/components/InfoIconTooltip";
 
-/** Already rendered by static sections in ProductEditPage (base GPSR + WEEE/EPREL) — never duplicate here. */
+/**
+ * Already rendered by static sections in ProductEditPage (base GPSR + WEEE) — never duplicate here.
+ * EPREL fields (number, class, scale, label, data sheet) all live in this section's "eprel" group
+ * so they stay together and separate from WEEE (handoff Faz 0c/0e).
+ */
 const ALREADY_RENDERED_KEYS = new Set([
   "hersteller",
   "hersteller_information",
   "verantwortliche_person_information",
   "weee_number",
-  "eprel_number",
 ]);
 
 function pickI18n(dict, locale) {
@@ -117,6 +120,14 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
     es: "opcional",
     it: "facoltativo",
   }, locale);
+  const requiredWord = pickI18n({
+    de: "Pflichtfeld",
+    en: "Required",
+    tr: "Zorunlu alan",
+    fr: "Champ obligatoire",
+    es: "Campo obligatorio",
+    it: "Campo obbligatorio",
+  }, locale);
   const LABEL_LANGUAGE_NAMES = {
     de: pickI18n({ de: "Deutsch", en: "German", tr: "Almanca", fr: "allemand", es: "alemán", it: "tedesco" }, locale),
     fr: pickI18n({ de: "Französisch", en: "French", tr: "Fransızca", fr: "français", es: "francés", it: "francese" }, locale),
@@ -208,6 +219,8 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
               const isRequired = requiredKeys.includes(key);
               const label = isRequired ? baseLabel : `${baseLabel} (${optionalWord})`;
               const value = getMeta(product, key) || "";
+              // Required + empty → red frame (handoff Faz 0c); never blocks saving.
+              const missingError = isRequired && !String(value).trim() ? requiredWord : undefined;
 
               const labelNode = (
                 <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -225,6 +238,7 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
                     options={[{ label: "—", value: "" }, ...def.options.map((o) => ({ label: o, value: o }))]}
                     value={value}
                     onChange={(v) => updateMeta(key, v || null)}
+                    error={missingError}
                   />
                 );
               }
@@ -237,6 +251,7 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
                   value={value}
                   onChange={(v) => updateMeta(key, v || null)}
                   type={def.type === "number" ? "number" : "text"}
+                  error={missingError}
                   placeholder={def.type === "file" ? "https://…" : undefined}
                   autoComplete="off"
                   multiline={
@@ -245,6 +260,7 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
                       key === "ingredients" ||
                       key === "nutrition_values" ||
                       key === "safety_warnings" ||
+                      key === "safety_information_text" ||
                       key === "recall_procedure")
                       ? 3
                       : undefined

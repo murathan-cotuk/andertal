@@ -60,3 +60,34 @@ export function metafieldValue(key, value, locale, defs) {
   const t = def?.values_i18n?.[loc]?.[v];
   return t != null && String(t).trim() ? String(t).trim() : v;
 }
+
+/** Packaging units describe how the seller ships, not a product property (handoff Faz 0). */
+export const HIDDEN_METAFIELD_KEYS = new Set(["packaging_unit", "packaging_unit_plural"]);
+
+/**
+ * Eigenschaften rows for the PDP: one row per metafield key, several values joined with ", ".
+ * The variant is the real product — a key the variant carries replaces the parent's values;
+ * parent-only keys are kept. Order: parent order first, then variant-only keys.
+ * @returns {Array<{ key: string, values: string[] }>}
+ */
+export function mergeMetafieldRows(parentMetafields, variantMetafields) {
+  const collect = (list) => {
+    const map = new Map();
+    for (const f of Array.isArray(list) ? list : []) {
+      const key = String(f?.key || "").trim();
+      const value = f?.value == null ? "" : String(f.value).trim();
+      if (!key || !value || HIDDEN_METAFIELD_KEYS.has(key.toLowerCase())) continue;
+      const k = key.toLowerCase();
+      if (!map.has(k)) map.set(k, { key, values: [] });
+      const row = map.get(k);
+      if (!row.values.includes(value)) row.values.push(value);
+    }
+    return map;
+  };
+  const parent = collect(parentMetafields);
+  const variant = collect(variantMetafields);
+  const out = [];
+  for (const [k, row] of parent) out.push(variant.get(k) || row);
+  for (const [k, row] of variant) if (!parent.has(k)) out.push(row);
+  return out;
+}

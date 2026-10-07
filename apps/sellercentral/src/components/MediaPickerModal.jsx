@@ -54,7 +54,7 @@ async function inspectProductImageFile(file) {
   const img = await readImageBitmap(file);
   const width = Number(img.naturalWidth || img.width || 0);
   const height = Number(img.naturalHeight || img.height || 0);
-  const minSizeOk = width >= 1000 && height >= 1000;
+  const minSizeOk = Math.max(width, height) >= 1000;
   const squareOk = width === height;
 
   let whiteCornersOk = false;
@@ -154,8 +154,7 @@ export default function MediaPickerModal({
             const analysis = await inspectProductImageFile(file).catch(() => null);
             if (analysis) {
               const warns = [];
-              if (!analysis.squareOk) warns.push(lt("not square", "kare değil", "pas carré", "no cuadrado", "non quadrato", "nicht quadratisch"));
-              if (!analysis.minSizeOk) warns.push(lt("below 1000×1000", "1000×1000 altında", "moins de 1000×1000", "menos de 1000×1000", "sotto 1000×1000", "unter 1000×1000"));
+              if (!analysis.minSizeOk) warns.push(lt("longest side below 1000 px", "uzun kenar 1000 px altında", "côté le plus long sous 1000 px", "lado más largo menor de 1000 px", "lato più lungo sotto 1000 px", "längere Seite unter 1000 px"));
               if (!analysis.whiteCornersOk) warns.push(lt("background may not be pure white (#ffffff)", "arka plan saf beyaz olmayabilir (#ffffff)", "fond peut ne pas être blanc pur (#ffffff)", "fondo puede no ser blanco puro (#ffffff)", "sfondo potrebbe non essere bianco puro (#ffffff)", "Hintergrund evtl. nicht reinweiß (#ffffff)"));
               if (warns.length) {
                 setUploadWarnings((prev) => [
@@ -260,12 +259,12 @@ export default function MediaPickerModal({
           <Box paddingBlockEnd="200">
             <Text as="p" variant="bodySm" tone="subdued">
               {lt(
-                "Product images: JPEG or PNG, at least 1000×1000 px; upload is saved as square WebP (1000×1000).",
-                "Ürün görselleri: JPEG veya PNG, en az 1000×1000 px; yükleme kare WebP (1000×1000) olarak kaydedilir.",
-                "Images produit : JPEG ou PNG, min. 1000×1000 px ; enregistrées en WebP carré (1000×1000).",
-                "Imágenes de producto: JPEG o PNG, mín. 1000×1000 px; se guardan como WebP cuadrado (1000×1000).",
-                "Immagini prodotto: JPEG o PNG, min. 1000×1000 px; salvate come WebP quadrato (1000×1000).",
-                "Produktbilder: JPEG oder PNG, mindestens 1000×1000 px; Upload wird als quadratisches WebP (1000×1000) gespeichert.",
+                "Product images: JPEG, PNG, WebP or AVIF, longest side at least 1000 px. Saved as square WebP (up to 2000×2000); non-square images are padded with white, never cropped.",
+                "Ürün görselleri: JPEG, PNG, WebP veya AVIF, uzun kenar en az 1000 px. Kare WebP olarak kaydedilir (en fazla 2000×2000); kare olmayan görseller kırpılmaz, beyazla tamamlanır.",
+                "Images produit : JPEG, PNG, WebP ou AVIF, côté le plus long min. 1000 px. Enregistrées en WebP carré (jusqu'à 2000×2000) ; les images non carrées sont complétées de blanc, jamais recadrées.",
+                "Imágenes de producto: JPEG, PNG, WebP o AVIF, lado más largo mín. 1000 px. Se guardan como WebP cuadrado (hasta 2000×2000); las no cuadradas se completan con blanco, nunca se recortan.",
+                "Immagini prodotto: JPEG, PNG, WebP o AVIF, lato più lungo min. 1000 px. Salvate come WebP quadrato (fino a 2000×2000); le immagini non quadrate vengono completate di bianco, mai ritagliate.",
+                "Produktbilder: JPEG, PNG, WebP oder AVIF, längere Seite mindestens 1000 px. Gespeichert als quadratisches WebP (bis 2000×2000); nicht quadratische Bilder werden weiß ergänzt, nie beschnitten.",
               )}
             </Text>
           </Box>

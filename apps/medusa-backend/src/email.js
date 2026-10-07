@@ -5,7 +5,8 @@
 
 const logger = require("./logger");
 
-async function sendEmail({ to, from, subject, html, text }) {
+/** attachments (optional): [{ filename, content: Buffer|string, contentType? }] */
+async function sendEmail({ to, from, subject, html, text, cc, attachments }) {
   const resendKey = process.env.RESEND_API_KEY;
 
   if (resendKey) {
@@ -18,6 +19,10 @@ async function sendEmail({ to, from, subject, html, text }) {
         subject,
         html,
         text,
+        ...(cc ? { cc: Array.isArray(cc) ? cc : [cc] } : {}),
+        ...(attachments && attachments.length
+          ? { attachments: attachments.map((a) => ({ filename: a.filename, content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(String(a.content || "")) })) }
+          : {}),
       });
       if (error) throw new Error(error.message);
       logger.info({ emailId: data?.id, to, subject }, "Email sent via Resend");
@@ -46,6 +51,8 @@ async function sendEmail({ to, from, subject, html, text }) {
       subject,
       html,
       text,
+      ...(cc ? { cc: Array.isArray(cc) ? cc.join(", ") : cc } : {}),
+      ...(attachments && attachments.length ? { attachments } : {}),
     });
     logger.info({ messageId: info.messageId, to, subject }, "Email sent via SMTP");
     return info;

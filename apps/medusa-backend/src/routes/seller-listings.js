@@ -1,4 +1,5 @@
 'use strict'
+const { normalizeListingStatus } = require('../listing-status')
 const { Router } = require('express')
 
 module.exports = function createSellerListingsRouter() {
@@ -44,8 +45,8 @@ module.exports = function createSellerListingsRouter() {
       try {
         await c.connect()
         const r = await c.query(
-          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), updated_at = now() WHERE id = $4::uuid AND seller_id = $5 RETURNING *`,
-          [price_cents != null ? Number(price_cents) : null, inventory != null ? Number(inventory) : null, status || null, id, sellerId]
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = CASE WHEN COALESCE($3, status) = 'active' AND COALESCE($1, price_cents, 0) <= 0 THEN 'draft' ELSE COALESCE($3, status) END, updated_at = now() WHERE id = $4::uuid AND seller_id = $5 RETURNING *`,
+          [price_cents != null ? Number(price_cents) : null, inventory != null ? Number(inventory) : null, normalizeListingStatus(status), id, sellerId]
         )
         await c.end()
         if (!r.rows[0]) return res.status(404).json({ message: 'Listing not found' })

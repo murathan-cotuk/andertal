@@ -415,6 +415,7 @@ async function allocateExternalRefund(client, refundId, { lines = null, sellerId
 }
 
 module.exports = {
+  loadPayablesNetOfOpenRefunds,
   allocateExternalRefund,
   createRefundRecord,
   executeRefund,

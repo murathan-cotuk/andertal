@@ -6,6 +6,7 @@ module.exports = {
   ...require('./ledger'),
   ...require('./payables'),
   ...require('./refunds'),
+  ...require('./return-refund'),
   ...require('./disputes'),
   ...require('./payouts'),
   ...require('./connect-account'),

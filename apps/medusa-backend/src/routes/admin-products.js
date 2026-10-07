@@ -17,6 +17,8 @@ const { assignAnId, normalizeAnId, ensureVariantAnIds, findProductByAnId } = req
 const { collectVariantEans, collectProductRowEans, validateProductEansDb } = require('../product-ean')
 const { collectProductRowSkus, validateSellerSkusDb } = require('../product-sku')
 const { applyListingReadinessGate } = require('../product-readiness')
+const { validateVariantMatrix } = require('../product-variants')
+const { normalizeListingStatus, gateListingStatus } = require('../listing-status')
 const { explainStoreVisibility } = require('../shop-visibility')
 const { getApprovedSellerIdsSet } = require('./seller-settings')
 const { resolveProductCommissionOverride, productCommissionOverridePct } = require('../commission-rate')
@@ -840,6 +842,8 @@ const createAdminHubProductDb = async (body) => {
       variants: variantsArr,
     })
     if (!skuValidation.ok) { await client.end(); return { __error: skuValidation.message } }
+    const matrixValidation = validateVariantMatrix(metaObj || {}, variantsArr)
+    if (!matrixValidation.ok) { await client.end(); return { __error: matrixValidation.message } }
     const brandGate = await validateBrandForPublish(client, metaObj || {}, status, (body.seller || body.seller_id || '').trim() || null)
     if (!brandGate.ok) {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
@@ -1044,6 +1048,10 @@ const updateAdminHubProductDb = async (id, body) => {
       grandfathered: collectProductRowSkus(existing),
     })
     if (!skuValidation.ok) { await client.end(); return { __error: skuValidation.message } }
+    if (body.variants !== undefined) {
+      const matrixValidation = validateVariantMatrix(metadataObj || {}, nextVariantsArr, existing)
+      if (!matrixValidation.ok) { await client.end(); return { __error: matrixValidation.message } }
+    }
     if (!skipComplianceGates) {
       const brandGate = await validateBrandForPublish(client, metadataObj || {}, status, existing.seller_id || null)
       if (!brandGate.ok) {
@@ -1443,7 +1451,7 @@ const adminHubProductsPOST = async (req, res) => {
               const metaFbObj = buildListingSellerMeta(eanFb)
               const listedEanFb = metaFbObj ? metaFbObj.ean : null
               const existL = await lc2.query(
-                `SELECT id FROM admin_hub_seller_listings
+                `SELECT id, price_cents FROM admin_hub_seller_listings
                  WHERE product_id = $1 AND seller_id = $2
                    AND (
                      ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
@@ -1607,7 +1615,7 @@ const adminHubProductByIdGET = async (req, res) => {
           price: myListing.price_cents != null ? myListing.price_cents / 100 : 0,
           price_cents: myListing.price_cents ?? 0,
           inventory: myListing.inventory ?? 0,
-          status: myListing.status || 'draft',
+          status: myListing.status === 'active' ? 'published' : (myListing.status || 'draft'),
           metadata: {
             ...(product.metadata && typeof product.metadata === 'object' ? product.metadata : {}),
             brand_id: myListing.brand_id || null,
@@ -1693,8 +1701,12 @@ const adminHubProductByIdPUT = async (req, res) => {
       body = sanitized.body; queuedMetaSuggestionCount = sanitized.queued
     }
 
-    if (existing) {
-      const normalizeEan = (v) => { if (v == null) return ''; return String(v).trim() }
+    // The "EAN cannot be changed" guard protects the OWNER's catalog row. A second seller adding
+    // an offer sends the EAN they list (often a child EAN) — it is stored on the listing
+    // (seller_metadata), never on the master, so it must not be compared (handoff Faz 0b).
+    const callerOwnsProduct = !!existing && (isSuperuserCaller || !callerSellerId || !existing.seller_id || String(existing.seller_id).trim() === callerSellerId)
+    if (existing && callerOwnsProduct) {
+      const normalizeEan = (v) => { if (v == null) return ''; return normalizeStoreEan(v) || String(v).trim() }
       const existingMeta = existing && existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
       const existingVariants = Array.isArray(existing?.variants) ? existing.variants : []
       const incomingMeta = body?.metadata && typeof body.metadata === 'object' ? body.metadata : {}
@@ -1788,7 +1800,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       await lc.connect()
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
-      let status = body.status !== undefined ? String(body.status || 'active') : null
+      let status = body.status !== undefined ? normalizeListingStatus(body.status || 'active') : null
       const skuVal = body.sku !== undefined ? (body.sku || null) : null
       const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
@@ -1801,7 +1813,7 @@ const adminHubProductByIdPUT = async (req, res) => {
         if (!listingBrandGate.ok) status = 'draft'
       }
       const existingListing = await lc.query(
-        `SELECT id FROM admin_hub_seller_listings
+        `SELECT id, price_cents FROM admin_hub_seller_listings
          WHERE product_id = $1 AND seller_id = $2
            AND (
              ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
@@ -1817,13 +1829,13 @@ const adminHubProductByIdPUT = async (req, res) => {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
           `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, listed_ean = COALESCE($10, listed_ean), updated_at = now() WHERE id = $9 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
+          [priceCents, inventory, status == null ? null : gateListingStatus(status, priceCents != null ? priceCents : existingListing.rows[0].price_cents), skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
           `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, gateListingStatus(status || 'draft', priceCents || 0), skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1853,7 +1865,7 @@ const adminHubProductByIdPUT = async (req, res) => {
         product: {
           ...existing,
           price: (listing?.price_cents || 0) / 100, price_cents: listing?.price_cents || 0,
-          inventory: listing?.inventory || 0, status: listing?.status || existing.status, sku: listing?.sku || null,
+          inventory: listing?.inventory || 0, status: listing?.status ? (listing.status === 'active' ? 'published' : listing.status) : existing.status, sku: listing?.sku || null,
           metadata: { ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}), ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}), ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}), ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}) },
         },
         listing, listing_saved: true, shared_change_blocked: true,
@@ -1899,7 +1911,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       await lc.connect()
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
-      let status = body.status !== undefined ? String(body.status || 'active') : null
+      let status = body.status !== undefined ? normalizeListingStatus(body.status || 'active') : null
       const skuVal = body.sku !== undefined ? (body.sku || null) : null
       const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
@@ -1912,7 +1924,7 @@ const adminHubProductByIdPUT = async (req, res) => {
         if (!listingBrandGate.ok) status = 'draft'
       }
       const existingListing = await lc.query(
-        `SELECT id FROM admin_hub_seller_listings
+        `SELECT id, price_cents FROM admin_hub_seller_listings
          WHERE product_id = $1 AND seller_id = $2
            AND (
              ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
@@ -1928,13 +1940,13 @@ const adminHubProductByIdPUT = async (req, res) => {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
           `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, listed_ean = COALESCE($10, listed_ean), updated_at = now() WHERE id = $9 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
+          [priceCents, inventory, status == null ? null : gateListingStatus(status, priceCents != null ? priceCents : existingListing.rows[0].price_cents), skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
           `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, gateListingStatus(status || 'draft', priceCents || 0), skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1963,7 +1975,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       const productWithListingData = {
         ...existing,
         price: (listing?.price_cents || 0) / 100, price_cents: listing?.price_cents || 0,
-        inventory: listing?.inventory || 0, status: listing?.status || existing.status, sku: listing?.sku || null,
+        inventory: listing?.inventory || 0, status: listing?.status ? (listing.status === 'active' ? 'published' : listing.status) : existing.status, sku: listing?.sku || null,
         metadata: { ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}), ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}), ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}), ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}) },
       }
       res.json({

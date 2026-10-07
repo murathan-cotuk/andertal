@@ -328,7 +328,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
         await lc.connect()
         const lr = await lc.query(
           `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata, brand_id, listed_ean
-           FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
+           FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status IN ('active', 'published')`,
           [productIdsForListings]
         )
         await lc.end()
@@ -510,6 +510,10 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
           ean: v.ean || null,
           price_cents: vPriceCents,
           compare_at_price_cents: vCompareCents,
+          // Variant's OWN root prices (variant page / matrix) — the shop must apply the same order as
+          // checkout (src/line-unit-price.js): variant per-market → these → parent.
+          own_price_cents: v.price_cents != null ? Number(v.price_cents) : null,
+          sale_price_cents: v.sale_price_cents != null ? Number(v.sale_price_cents) : null,
           inventory_quantity: parseInt(v.inventory, 10) || 0,
           option_values: optionValues,
           option_labels: optionLabels,

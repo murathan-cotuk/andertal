@@ -94,7 +94,19 @@ const uploadStorage = useS3
         cb(null, storageFilenameWithPrefix(file.originalname || 'file'))
       },
     })
-const upload = multer({ storage: uploadStorage })
+// Uploads are buffered in memory on S3 setups — cap them so one huge file cannot exhaust the
+// server (largest real upload so far: a 38 MB product video).
+const MEDIA_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+const upload = multer({ storage: uploadStorage, limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES } })
+const uploadSingleFile = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next()
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ code: 'FILE_TOO_LARGE', message: `Datei zu groß (max. ${MEDIA_UPLOAD_MAX_BYTES / 1024 / 1024} MB).` })
+    }
+    return next(err)
+  })
+}
 
 const mediaRowVisibleToUser = (row, u) => {
   if (!u) return false
@@ -108,12 +120,19 @@ const mapMediaRowForApi = (row) => {
   return { ...row, filename: decodeMultipartFilename(row.filename) }
 }
 
-/** Product gallery / variant images: min 1000px edge, center square crop, store as WebP (JPEG/PNG in). */
+/**
+ * Product gallery / variant images (marketplace standard, cf. Amazon/Otto image rules):
+ * - longest edge at least 1000 px (zoom), JPEG / PNG / WebP / AVIF in
+ * - the WHOLE product stays visible: non-square images are padded with white to a square
+ *   (never cropped — a centre crop used to cut off the top/bottom of tall products)
+ * - transparent backgrounds become white; output is a square WebP of 1000–2000 px
+ */
 const PRODUCT_IMAGE_MIN_EDGE = 1000
-const PRODUCT_IMAGE_OUT_SIZE = 1000
+const PRODUCT_IMAGE_MAX_OUT = 2000
+const PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'])
 const processProductImageToSquareWebp = async (inputBuffer, mimetype) => {
   const mt = String(mimetype || '').toLowerCase()
-  if (mt !== 'image/jpeg' && mt !== 'image/png' && mt !== 'image/jpg') {
+  if (!PRODUCT_IMAGE_TYPES.has(mt)) {
     const err = new Error('PRODUCT_IMAGE_TYPE')
     err.code = 'PRODUCT_IMAGE_TYPE'
     throw err
@@ -126,20 +145,20 @@ const processProductImageToSquareWebp = async (inputBuffer, mimetype) => {
     err.code = 'SHARP_UNAVAILABLE'
     throw err
   }
-  const meta = await sharp(inputBuffer).metadata()
+  // .rotate() applies the EXIF orientation first (phone photos), so width/height are the real ones.
+  const oriented = await sharp(inputBuffer).rotate().toBuffer()
+  const meta = await sharp(oriented).metadata()
   const w = meta.width || 0
   const h = meta.height || 0
-  if (w < PRODUCT_IMAGE_MIN_EDGE || h < PRODUCT_IMAGE_MIN_EDGE) {
+  if (Math.max(w, h) < PRODUCT_IMAGE_MIN_EDGE) {
     const err = new Error('PRODUCT_IMAGE_MIN_SIZE')
     err.code = 'PRODUCT_IMAGE_MIN_SIZE'
     throw err
   }
-  const side = Math.min(w, h)
-  const left = Math.floor((w - side) / 2)
-  const top = Math.floor((h - side) / 2)
-  return sharp(inputBuffer)
-    .extract({ left, top, width: side, height: side })
-    .resize(PRODUCT_IMAGE_OUT_SIZE, PRODUCT_IMAGE_OUT_SIZE, { fit: 'fill' })
+  const side = Math.min(Math.max(w, h), PRODUCT_IMAGE_MAX_OUT)
+  return sharp(oriented)
+    .flatten({ background: '#ffffff' })
+    .resize(side, side, { fit: 'contain', background: '#ffffff' })
     .webp({ quality: 85 })
     .toBuffer()
 }
@@ -234,12 +253,12 @@ const mediaUploadPOST = async (req, res) => {
       }
       if (pe.code === 'PRODUCT_IMAGE_MIN_SIZE') {
         return res.status(400).json({
-          message: `Produktbild: mindestens ${PRODUCT_IMAGE_MIN_EDGE}×${PRODUCT_IMAGE_MIN_EDGE} Pixel (JPEG oder PNG).`,
+          message: `Produktbild: die längere Seite muss mindestens ${PRODUCT_IMAGE_MIN_EDGE} Pixel haben.`,
         })
       }
       if (pe.code === 'PRODUCT_IMAGE_TYPE') {
         return res.status(400).json({
-          message: 'Produktbild: nur JPEG- oder PNG-Dateien.',
+          message: 'Produktbild: nur JPEG, PNG, WebP oder AVIF.',
         })
       }
       if (pe.code === 'SHARP_UNAVAILABLE') {
@@ -781,7 +800,7 @@ module.exports = function createMediaRouter() {
   const router = Router()
 
   router.get('/admin-hub/v1/media', mediaListWithFolderGET)
-  router.post('/admin-hub/v1/media', prepareSellerMediaUploadPath, upload.single('file'), mediaUploadPOST)
+  router.post('/admin-hub/v1/media', prepareSellerMediaUploadPath, uploadSingleFile, mediaUploadPOST)
   router.get('/admin-hub/v1/media/folders', mediaFoldersGET)
   router.post('/admin-hub/v1/media/folders', mediaFoldersPOST)
   router.delete('/admin-hub/v1/media/folders/:id', mediaFolderDELETE)

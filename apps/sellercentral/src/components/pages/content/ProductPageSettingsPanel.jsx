@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BlockStack, InlineStack, Text, Box, Button, Banner, Badge, Divider } from "@shopify/polaris";
+import { BlockStack, InlineStack, Text, Box, Button, Banner, Badge, Divider, TextField } from "@shopify/polaris";
+import { lt } from "@/lib/locale-text";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { pdpElementsByColumn, pdpElementLabel, pdpReorderGroups, pdpOrderedKeys } from "@andertal/shop-theme";
@@ -77,6 +78,8 @@ export default function ProductPageSettingsPanel() {
   // { <reorderGroup>: [key, ...] } — absence = natural order
   const [order, setOrder] = useState({});
   const [containers, setContainers] = useState([]);
+  // "Learn more" link of the statutory-warranty box under every product description (handoff Faz 0f).
+  const [warrantyUrl, setWarrantyUrl] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +92,7 @@ export default function ProductPageSettingsPanel() {
         const s = data && typeof data.settings === "object" && data.settings ? data.settings : {};
         setElements(s.elements && typeof s.elements === "object" ? s.elements : {});
         setOrder(s.order && typeof s.order === "object" ? s.order : {});
+        setWarrantyUrl(typeof s.warranty_info_url === "string" ? s.warranty_info_url : "");
         setContainers(Array.isArray(data?.containers) ? data.containers : []);
       })
       .catch((e) => {
@@ -139,7 +143,10 @@ export default function ProductPageSettingsPanel() {
     try {
       await client.request(`/admin-hub/landing-page/${PRODUCT_PAGE_ID}`, {
         method: "PUT",
-        body: JSON.stringify({ containers, settings: { elements, order } }),
+        body: JSON.stringify({
+          containers,
+          settings: { elements, order, ...(warrantyUrl.trim() ? { warranty_info_url: warrantyUrl.trim() } : {}) },
+        }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -278,6 +285,17 @@ export default function ProductPageSettingsPanel() {
             ? "Die Pfeile ↑ ↓ ordnen nur benachbarte Elemente (Galerie-Buttons; im Buybox die Zeilen Verkäufer/Versand/Rückgabe). Alle anderen Elemente bleiben an ihrer festen Position im Shop."
             : "The ↑ ↓ arrows only reorder adjacent items (gallery action buttons; the seller / shipping / return rows in the buybox). Every other element stays in its fixed shop position."}
       </Text>
+
+      <Box maxWidth="520px">
+        <TextField
+          label={lt(locale, "Statutory warranty — „Learn more“ link", "Yasal garanti — „Daha fazla bilgi“ bağlantısı", "Garantie légale — lien « En savoir plus »", "Garantía legal — enlace «Más información»", "Garanzia legale — link «Scopri di più»", "Gesetzliche Gewährleistung — Link „Mehr erfahren“")}
+          value={warrantyUrl}
+          onChange={(v) => { setSaved(false); setWarrantyUrl(v); }}
+          placeholder="/pages/gewaehrleistung"
+          helpText={lt(locale, "Shown under every product description in “Safety and product resources”. Empty = /pages/gewaehrleistung (create that CMS page with your real text).", "Her ürün açıklamasının altındaki “Güvenlik ve ürün kaynakları” bölümünde gösterilir. Boş = /pages/gewaehrleistung (bu CMS sayfasını gerçek metninizle oluşturun).", "Affiché sous chaque description dans « Sécurité et ressources produit ». Vide = /pages/gewaehrleistung (créez cette page CMS avec votre texte).", "Se muestra bajo cada descripción en «Seguridad y recursos del producto». Vacío = /pages/gewaehrleistung (cree esa página CMS con su texto).", "Mostrato sotto ogni descrizione in «Sicurezza e risorse del prodotto». Vuoto = /pages/gewaehrleistung (crea quella pagina CMS con il tuo testo).", "Wird unter jeder Produktbeschreibung in „Sicherheit und Produktressourcen“ angezeigt. Leer = /pages/gewaehrleistung (diese CMS-Seite mit Ihrem echten Text anlegen).")}
+          autoComplete="off"
+        />
+      </Box>
 
       <InlineStack>
         <Button variant="primary" onClick={handleSave} loading={saving} disabled={saving}>

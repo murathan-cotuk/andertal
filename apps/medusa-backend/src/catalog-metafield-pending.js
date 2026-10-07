@@ -48,6 +48,9 @@ const buildCatalogMaps = (definitionRows) => {
     }
     allowedByKey.set(key, vals)
   }
+  // A real key always wins over another definition's label / translation that happens to spell
+  // the same word (handoff Faz 1: "farbe" must never resolve to a different definition).
+  for (const key of allowedByKey.keys()) keyByAlias.set(key.toLowerCase(), key)
   return { allowedByKey, keyByAlias, labelByKey }
 }
 

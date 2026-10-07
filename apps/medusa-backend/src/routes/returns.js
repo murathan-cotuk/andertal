@@ -120,8 +120,22 @@ const adminHubReturnsGET = async (req, res) => {
       )`
     }
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
+    // Backend-computed refund due for returns not refunded yet (goods + outbound shipping when
+    // the return completes the seller's part of the order, §357 Abs. 2 BGB).
+    const { suggestReturnRefund } = require('../settlement')
+    const rows = []
+    for (const row of r.rows || []) {
+      let suggestion = null
+      if (row.refund_status !== 'erstattet') suggestion = await suggestReturnRefund(client, row).catch(() => null)
+      rows.push({
+        ...row,
+        return_number: row.return_number ? Number(row.return_number) : null,
+        order_number: row.order_number ? Number(row.order_number) : null,
+        ...(suggestion ? { refund_suggestion: suggestion } : {}),
+      })
+    }
     await client.end()
-    res.json({ returns: (r.rows || []).map(row => ({ ...row, return_number: row.return_number ? Number(row.return_number) : null, order_number: row.order_number ? Number(row.order_number) : null })) })
+    res.json({ returns: rows })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.json({ returns: [] })
@@ -176,6 +190,8 @@ async function executeReturnRefund(client, returnId, { isSuperuser, jwtSellerId,
       const { refund } = await settlement.createRefundRecord(client, {
         orderId: ret.order_id, returnId, amountCents: amount,
         lines: lines.length ? lines : null,
+        // §357 Abs. 2 BGB: outbound shipping is refunded once all of the seller's items come back.
+        shippingSellerIds: lines.length ? ((await settlement.suggestReturnRefund(client, ret))?.shipping_seller_ids || []) : [],
         sellerScope: lines.length ? null : (ret.seller_id || null),
         actorSellerId: isSuperuser ? null : jwtSellerId,
         reason: 'return', actor, idempotencyKey: `return:${returnId}:${attempt}`,

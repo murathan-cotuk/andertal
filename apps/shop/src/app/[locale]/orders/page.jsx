@@ -466,7 +466,11 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
   // Auto-generated at return-request time now (Sendcloud) — no longer waits on manual approval.
   const returnWithLabel = returns.find(r => r.label_url) || null;
   const blockedForReturn = ["storniert", "refunded", "cancelled", "retoure", "retoure_anfrage"];
-  const canRequestReturn = !activeReturn && !blockedForReturn.includes(status);
+  // Backend return_window (src/withdrawal.js) decides: deadline, remaining returnable quantities.
+  const rw = order.return_window || null;
+  const canRequestReturn = rw
+    ? rw.open && rw.remaining_total > 0 && !["storniert", "refunded", "cancelled"].includes(status)
+    : !activeReturn && !blockedForReturn.includes(status);
 
   const [showRetoure, setShowRetoure] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
@@ -767,7 +771,14 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                       const res = await getMedusaClient().request(`/store/orders/${order.id}/return-request`, {
                         method: "POST",
                         headers: { Authorization: `Bearer ${token()}` },
-                        body: JSON.stringify({ reason: retoureReason, notes: retoureNotes }),
+                        // Quick return from the list: every item still returnable, full quantity.
+                        body: JSON.stringify({
+                          reason: retoureReason,
+                          notes: retoureNotes,
+                          items: (order.items || [])
+                            .map((it) => ({ order_item_id: it.id, quantity: rw ? Number(rw.remaining?.[String(it.id)] || 0) : Number(it.quantity || 1) }))
+                            .filter((x) => x.quantity > 0),
+                        }),
                       });
                       if (res?.__error) throw new Error(res.message || t("error"));
                       setActionOk(t("returnSubmitted"));

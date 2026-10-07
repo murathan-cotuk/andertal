@@ -197,11 +197,14 @@ function ActionBtn({ children, onClick, color = "#3a352f", bg = "#faf7f2", disab
 /* ── Return request modal ── */
 function ReturnModal({ order, onClose, onDone }) {
   const t = useTranslations("order");
-  const orderItems = Array.isArray(order?.items) ? order.items : [];
+  // Only items (and quantities) still returnable — the backend reports them in return_window.
+  const remaining = order?.return_window?.remaining || null;
+  const maxQtyOf = (it) => (remaining ? Number(remaining[String(it.id)] || 0) : Number(it.quantity || 1));
+  const orderItems = (Array.isArray(order?.items) ? order.items : []).filter((it) => maxQtyOf(it) > 0);
   const [selected, setSelected] = useState(() => {
     const init = {};
     for (const it of orderItems) {
-      if (orderItems.length === 1) init[String(it.id)] = Number(it.quantity || 1);
+      if (orderItems.length === 1) init[String(it.id)] = maxQtyOf(it);
     }
     return init;
   });
@@ -220,7 +223,6 @@ function ReturnModal({ order, onClose, onDone }) {
   };
 
   const submit = async () => {
-    if (!reason) { setErr(t("reasonRequired")); return; }
     const items = Object.entries(selected).map(([order_item_id, quantity]) => ({ order_item_id, quantity: Number(quantity) || 1 }));
     if (!items.length) { setErr(t("selectReturnItems")); return; }
     setBusy(true); setErr("");
@@ -249,7 +251,7 @@ function ReturnModal({ order, onClose, onDone }) {
           <div style={{ marginBottom: 14, border: "1px solid #e6dfd4", borderRadius: 10, overflow: "hidden" }}>
             {orderItems.map((it) => {
               const id = String(it.id);
-              const maxQty = Number(it.quantity || 1);
+              const maxQty = maxQtyOf(it);
               const checked = selected[id] != null;
               return (
                 <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid #f3eee6" }}>
@@ -277,7 +279,7 @@ function ReturnModal({ order, onClose, onDone }) {
           </div>
           <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#3a352f" }}>{t("returnReasonLabel")}</label>
           <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
-            <option value="">{t("choosePlaceholder")}</option>
+            <option value="">{t("reasonNotGiven")}</option>
             <option value="defekt">{t("reasonDefect")}</option>
             <option value="falsch">{t("reasonWrongItem")}</option>
             <option value="nicht_gefallen">{t("reasonDislike")}</option>
@@ -789,7 +791,12 @@ export default function OrderDetailPage() {
   const returnWindowExpired = order.delivery_date
     ? (Date.now() - new Date(order.delivery_date).getTime()) / (1000 * 60 * 60 * 24) > 14
     : false;
-  const canReturn = !activeReturn && !blockedStatuses.includes(status) && !returnWindowExpired;
+  // Backend return_window (src/withdrawal.js): Widerruf deadline at the end of the last day,
+  // longest promised period, several returns per order for the remaining items.
+  const rw = order.return_window || null;
+  const canReturn = rw
+    ? rw.open && rw.remaining_total > 0 && !["storniert", "cancelled", "refunded"].includes(status)
+    : !activeReturn && !blockedStatuses.includes(status) && !returnWindowExpired;
   const canCancel = !!order.cancellation_allowed && !cancelBusy;
 
   const handleCancel = async () => {

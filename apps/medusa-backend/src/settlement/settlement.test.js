@@ -596,3 +596,38 @@ withDb('reverse charge only with a VIES-verified VAT ID that matches the current
   await s.createPayablesForOrder(c, o3.order.id)
   assert.equal((await payablesOf(c, o3.order.id))[0].commission_vat_scheme, 'domestic_no_vat_id')
 })
+
+withDb('Widerruf: return of all of a seller\'s items refunds the outbound shipping too (§357 Abs. 2 BGB)', async (c) => {
+  await h.addSeller(c, 'seller_a', { rate: 0.1 })
+  const { order, items } = await h.addPaidOrder(c, {
+    items: [{ seller: 'seller_a', price: 2000, qty: 2 }, { seller: 'seller_a', price: 1500 }],
+    shippingBySeller: { seller_a: 490 },
+  })
+  await s.createPayablesForOrder(c, order.id)
+  const before = await h.balanceOf(c, 'seller_a')
+  const stripe = h.fakeStripe()
+
+  // Partial return first: goods only.
+  const part = { order_id: order.id, items: [{ order_item_id: items[0].id, quantity: 1 }] }
+  const p1 = await s.suggestReturnRefund(c, part)
+  assert.equal(p1.goods_cents, 2000)
+  assert.equal(p1.shipping_cents, 0)
+  await refundAndApply(c, stripe, { orderId: order.id, amountCents: p1.amount_cents, lines: part.items, shippingSellerIds: p1.shipping_seller_ids, idempotencyKey: 'ret:1' })
+
+  // The rest comes back → shipping included, booked against the seller who charged it.
+  const rest = { order_id: order.id, items: [{ order_item_id: items[0].id, quantity: 1 }, { order_item_id: items[1].id, quantity: 1 }] }
+  const p2 = await s.suggestReturnRefund(c, rest)
+  assert.equal(p2.goods_cents, 3500)
+  assert.equal(p2.shipping_cents, 490)
+  assert.deepEqual(p2.shipping_seller_ids, ['seller_a'])
+  await refundAndApply(c, stripe, { orderId: order.id, amountCents: p2.amount_cents, lines: rest.items, shippingSellerIds: p2.shipping_seller_ids, idempotencyKey: 'ret:2' })
+
+  assert.equal(stripe.calls.refunds.reduce((a, r) => a + r.amount, 0), 2000 + 3500 + 490)
+  const shipLines = (await c.query(`SELECT COALESCE(SUM(shipping_cents), 0)::int AS s FROM order_refund_lines`)).rows[0].s
+  assert.equal(shipLines, 490)
+  // Everything the seller was credited is reversed (goods + shipping, commission given back).
+  assert.ok(before > 0)
+  assert.equal(await h.balanceOf(c, 'seller_a'), 0)
+  // Nothing left to refund.
+  assert.equal(await s.suggestReturnRefund(c, rest), null)
+})

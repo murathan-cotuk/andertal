@@ -54,6 +54,10 @@ export function resolveProductSaleCents(product, variant, countryCode, marketCou
     marketCountry,
   );
   if (fromVariantMap != null && fromVariantMap > 0) return fromVariantMap;
+  // Variant's own root sale price (variant page / matrix) beats the parent's — same order as checkout.
+  const ownSale = Number(variant?.sale_price_cents);
+  const ownPrice = Number(variant?.own_price_cents);
+  if (Number.isFinite(ownSale) && ownSale > 0 && (!(ownPrice > 0) || ownSale < ownPrice)) return ownSale;
   const fromProductMap = getSaleCentsFromPricesMap(
     pm.prices && typeof pm.prices === "object" ? pm.prices : {},
     countryCode,

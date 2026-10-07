@@ -140,8 +140,12 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
   const ui = getUI(locale);
   const c = getOrdersReturnsCopy(locale);
   const orderTotal = ret.total_cents || 0;
+  // Amount due for THIS return, computed by the backend (items + outbound shipping when the
+  // return completes the seller's part). Falls back to the order total for legacy orders.
+  const due = ret.refund_suggestion || null;
+  const fullCents = due?.amount_cents != null ? due.amount_cents : orderTotal;
   const [mode, setMode] = useState("full"); // "full" | "partial"
-  const [amount, setAmount] = useState((orderTotal / 100).toFixed(2));
+  const [amount, setAmount] = useState((fullCents / 100).toFixed(2));
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -191,7 +195,7 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
               type="button"
               onClick={() => {
                 setMode(m);
-                if (m === "full") setAmount((orderTotal / 100).toFixed(2));
+                if (m === "full") setAmount((fullCents / 100).toFixed(2));
               }}
               style={{
                 padding: "6px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: mode === m ? 700 : 400,
@@ -206,6 +210,13 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {due && (
+            <div style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 8, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#3a352f" }}>
+              <div>{c.refundDueGoods(fmtMoney(due.goods_cents, locale))}</div>
+              {due.shipping_cents > 0 && <div>{c.refundDueShipping(fmtMoney(due.shipping_cents, locale))}</div>}
+              <div style={{ color: "#5e574e", marginTop: 4 }}>{c.refundDueNote}</div>
+            </div>
+          )}
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#3a352f", display: "block", marginBottom: 4 }}>{c.amountLabel}</label>
             <input
