@@ -947,7 +947,7 @@ export default function CategoryTemplate() {
     el.href = `${SITE_URL}${prefix}/${slug}`;
   }, [slug, locale, marketPrefixVal]);
 
-  const rawFacets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
+  const rawFacets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions, products);
   const facets = Object.fromEntries(
     Object.entries(rawFacets).filter(([k]) => k !== "category" && k !== "category_slug")
   );

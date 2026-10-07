@@ -17,6 +17,8 @@ export function getNotificationsCopy(locale) {
     euOriginPending: t("EU origin / badge pending", "AB kökeni / rozet bekliyor", "Origine UE / badge en attente", "Origen UE / badge pendiente", "Origine UE / badge in sospeso", "EU-Herkunft / Badge ausstehend"),
     productChanges: t("Product changes", "Ürün değişiklikleri", "Modifications produit", "Cambios de producto", "Modifiche prodotto", "Produktänderungen"),
     productChangePending: t("Product change pending", "Ürün değişikliği bekliyor", "Modification produit en attente", "Cambio de producto pendiente", "Modifica prodotto in sospeso", "Produktänderung ausstehend"),
+    catalogProposals: t("Catalog proposals", "Katalog önerileri", "Propositions catalogue", "Propuestas de catálogo", "Proposte catalogo", "Katalogvorschläge"),
+    catalogProposalPending: t("Catalog attribute proposal", "Katalog özelliği önerisi", "Proposition d’attribut catalogue", "Propuesta de atributo de catálogo", "Proposta attributo catalogo", "Katalog-Attributvorschlag"),
     productFallback: t("Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt"),
     orders: t("Orders", "Siparişler", "Commandes", "Pedidos", "Ordini", "Bestellungen"),
     newOrder: (n) => t(`New order #${n}`, `Yeni sipariş #${n}`, `Nouvelle commande #${n}`, `Nuevo pedido #${n}`, `Nuovo ordine #${n}`, `Neue Bestellung #${n}`),

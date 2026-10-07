@@ -1,7 +1,12 @@
 'use strict'
 const { Router } = require('express')
 const { applyEuOriginMetadataPolicy, registerEuOriginRoutes } = require('../eu-origin')
-const { buildCatalogMaps, scanProductCatalogPending } = require('../catalog-metafield-pending')
+const {
+  buildCatalogMaps,
+  scanProductCatalogPending,
+  hasStaleCatalogApprovalFlags,
+  stripStaleCatalogApprovalFlags,
+} = require('../catalog-metafield-pending')
 const {
   isPlaceholderHandle,
   parseProductUrlHandle,
@@ -436,21 +441,18 @@ const normalizeProductMetadata = (meta) => {
   return out
 }
 
-const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
+const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId, productId = null) => {
   const result = { body: body && typeof body === 'object' ? { ...body } : {}, queued: 0 }
   const sid = String(sellerId || '').trim()
   if (!sid) return result
+  const pid = productId != null ? String(productId).trim() : ''
   let definitionRows
   try {
     definitionRows = await dbQ('SELECT key, label, values, label_i18n FROM admin_hub_metafield_definitions')
   } catch (_) {
     definitionRows = { rows: [] }
   }
-  // Everything below is a non-blocking side quest (flag unrecognized Eigenschaft/variation
-  // values for superuser review) — it must NEVER be able to fail the actual product save. Any
-  // unexpected data shape here used to throw straight out of this function, past this call's
-  // uncaught call site, into adminHubProductByIdPUT's outer catch → a 500 that discarded the
-  // seller's edits entirely instead of just skipping the review-queue step.
+  // Non-blocking side quest — must NEVER fail the product save.
   let maps, scanned
   try {
     maps = buildCatalogMaps(definitionRows.rows)
@@ -464,8 +466,17 @@ const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
   const toPropose = scanned.proposalsByKey || scanned.pendingByKey
   if (toPropose.size > 0) {
     try {
+      const {
+        insertAdminHubNotificationSafe,
+        reopenSuperuserSourceUnreadSafe,
+      } = require('../admin-hub-notify')
+      // Optional product correlation for deep-links in the superuser bell.
+      try {
+        await dbQ('ALTER TABLE admin_hub_metafield_pending ADD COLUMN IF NOT EXISTS source_product_ids jsonb DEFAULT \'[]\'::jsonb')
+      } catch (_) { /* ignore */ }
+
       const existingPending = await dbQ(
-        `SELECT id, key, label, proposed_values FROM admin_hub_metafield_pending WHERE seller_id = $1 AND status = 'pending'`,
+        `SELECT id, key, label, proposed_values, source_product_ids FROM admin_hub_metafield_pending WHERE seller_id = $1 AND status = 'pending'`,
         [sid]
       )
       const existingByKey = new Map((existingPending.rows || []).map((r) => [r.key, r]))
@@ -473,34 +484,59 @@ const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
         const vals = Array.from(rec.values)
         const label = rec.label || maps.labelByKey.get(key) || key
         const existing = existingByKey.get(key)
-        if (existing) {
-          const merged = [...new Set([...(Array.isArray(existing.proposed_values) ? existing.proposed_values : []), ...vals])]
-          await dbQ(
-            `UPDATE admin_hub_metafield_pending SET proposed_values = $1, label = COALESCE(NULLIF($2, ''), label), created_at = now() WHERE id = $3::uuid`,
-            [JSON.stringify(merged), label, existing.id]
-          )
-        } else {
-          await dbQ(
-            `INSERT INTO admin_hub_metafield_pending (key, label, seller_id, proposed_values) VALUES ($1, $2, $3, $4)`,
-            [key, label, sid, JSON.stringify(vals)]
-          )
-          // TASKS.md #27 (Spezifikationen tab): "Superusera bunun bildirimi kesinlikle gitmeli" —
-          // only for a genuinely NEW key (this else-branch), not every time a seller adds one more
-          // value to an already-pending key, or every save would spam a fresh notification.
-          try {
-            const { insertAdminHubNotificationSafe } = require('../admin-hub-notify')
-            insertAdminHubNotificationSafe({
-              type: 'metafield_proposed',
-              title: `Neue Eigenschaft vorgeschlagen: ${label}`,
-              body: `Ein Verkäufer hat die Eigenschaft "${label}" (${key}) mit Wert(en) "${vals.join(', ')}" vorgeschlagen. Bitte in Metaobjekte prüfen.`,
-              sellerId: sid,
-              referenceId: key,
-            })
-          } catch (_) {}
+        const valuesPreview = vals.slice(0, 8).join(', ') + (vals.length > 8 ? '…' : '')
+        const notifySuperuser = (pendingId, isNew, addedVals) => {
+          const addedPreview = (addedVals || vals).slice(0, 8).join(', ')
+          insertAdminHubNotificationSafe({
+            type: 'metafield_proposed',
+            title: isNew
+              ? `Katalogvorschlag: ${label}`
+              : `Katalogvorschlag aktualisiert: ${label}`,
+            body: isNew
+              ? `Verkäufer schlägt neue Eigenschaft/Werte vor: „${label}“ (${key}) → ${addedPreview || valuesPreview}. Inhalt → Metaobjekte prüfen.`
+              : `Neue Werte für „${label}“ (${key}): ${addedPreview}. Inhalt → Metaobjekte prüfen.`,
+            sellerId: sid,
+            referenceId: pendingId || key,
+          })
+          if (pendingId) reopenSuperuserSourceUnreadSafe('metafield_pending', pendingId)
         }
-        result.queued++
+
+        if (existing) {
+          const prev = Array.isArray(existing.proposed_values) ? existing.proposed_values.map(String) : []
+          const prevLower = new Set(prev.map((v) => v.trim().toLowerCase()).filter(Boolean))
+          const added = vals.filter((v) => !prevLower.has(String(v).trim().toLowerCase()))
+          const merged = [...new Set([...prev, ...vals])]
+          let nextProductIds = Array.isArray(existing.source_product_ids) ? existing.source_product_ids.map(String) : []
+          if (pid && !nextProductIds.includes(pid)) nextProductIds = [...nextProductIds, pid].slice(-20)
+          await dbQ(
+            `UPDATE admin_hub_metafield_pending
+             SET proposed_values = $1::jsonb,
+                 label = COALESCE(NULLIF($2, ''), label),
+                 source_product_ids = COALESCE($4::jsonb, source_product_ids),
+                 created_at = now()
+             WHERE id = $3::uuid`,
+            [JSON.stringify(merged), label, existing.id, JSON.stringify(nextProductIds)]
+          )
+          // Re-alert only when genuinely new values arrive (not every save).
+          if (added.length > 0) {
+            notifySuperuser(existing.id, false, added)
+            result.queued++
+          }
+        } else {
+          const ins = await dbQ(
+            `INSERT INTO admin_hub_metafield_pending (key, label, seller_id, proposed_values, source_product_ids)
+             VALUES ($1, $2, $3, $4::jsonb, $5::jsonb)
+             RETURNING id`,
+            [key, label, sid, JSON.stringify(vals), JSON.stringify(pid ? [pid] : [])]
+          )
+          const newId = ins.rows?.[0]?.id
+          notifySuperuser(newId, true, vals)
+          result.queued++
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('queueMetafieldSuggestionsAndSanitizePayload queue:', e && e.message)
+    }
   }
   return result
 }
@@ -1536,6 +1572,19 @@ const adminHubProductByIdGET = async (req, res) => {
       console.warn('adminHubProductByIdGET listings:', e && e.message)
     }
 
+    // Heal legacy `_catalog_approval_pending` flags (proposals never hide products anymore).
+    if (hasStaleCatalogApprovalFlags(product)) {
+      const cleaned = stripStaleCatalogApprovalFlags(product.metadata)
+      product = { ...product, metadata: cleaned }
+      dbQ(
+        `UPDATE admin_hub_products
+         SET metadata = COALESCE(metadata, '{}'::jsonb) - '_catalog_approval_pending' - '_pending_catalog_metafields',
+             updated_at = now()
+         WHERE id = $1`,
+        [product.id],
+      ).catch((e) => console.warn('heal stale catalog flags:', e && e.message))
+    }
+
     // Shop visibility uses the catalog master row (what store-products filters on), not the
     // commercial listing overlay below (which may rewrite status for second-seller editors).
     await attachShopVisibility(product)
@@ -1637,12 +1686,12 @@ const adminHubProductByIdPUT = async (req, res) => {
     let body = req.body || {}
     const isSuperuserCaller = req.sellerUser?.is_superuser || false
     const callerSellerId = (!isSuperuserCaller && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
+    const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
     let queuedMetaSuggestionCount = 0
     if (callerSellerId && !isSuperuserCaller) {
-      const sanitized = await queueMetafieldSuggestionsAndSanitizePayload(body, callerSellerId)
+      const sanitized = await queueMetafieldSuggestionsAndSanitizePayload(body, callerSellerId, existing?.id || null)
       body = sanitized.body; queuedMetaSuggestionCount = sanitized.queued
     }
-    const existing = await getAdminHubProductByIdOrHandleDb(req.params.id)
 
     if (existing) {
       const normalizeEan = (v) => { if (v == null) return ''; return String(v).trim() }

@@ -1018,7 +1018,7 @@ function CollectionPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const facets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
+  const facets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions, products);
 
   const hasFacets = Object.keys(facets).length > 0;
   // Collections show only product filters (metadata); sub-category navigation is category-page only.

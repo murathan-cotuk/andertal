@@ -1040,6 +1040,7 @@ export default function PolarisLayout({ children }) {
                     !notifData?.recent_returns?.length &&
                     !notifData?.recent_verifications?.length &&
                     !notifData?.recent_product_change_requests?.length &&
+                    !notifData?.recent_catalog_proposals?.length &&
                     !notifData?.recent_campaigns_submitted?.length &&
                     !notifData?.recent_seller_errors?.length &&
                     !notifData?.recent_support_cases?.length &&
@@ -1166,16 +1167,62 @@ export default function PolarisLayout({ children }) {
                           </div>
                         </Link>
                       ))}
+                      {((notifData?.recent_catalog_proposals || []).length > 0) && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {notifCopy.catalogProposals}
+                        </div>
+                      )}
+                      {(notifData?.recent_catalog_proposals || []).map((mp) => {
+                        const href = `/content/metaobjects?pending=${encodeURIComponent(mp.key || mp.href_key || "")}`;
+                        const values = Array.isArray(mp.proposed_values)
+                          ? mp.proposed_values.map(String).filter(Boolean).slice(0, 6).join(", ")
+                          : "";
+                        return (
+                          <Link
+                            key={`mf-${mp.id}`}
+                            href={href}
+                            onClick={() => setNotifOpen(false)}
+                            style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
+                          >
+                            <span
+                              style={{
+                                flexShrink: 0,
+                                marginTop: 1,
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                background: "#fcebd5",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#7f3f00",
+                                fontSize: 14,
+                                fontWeight: 700,
+                              }}
+                              aria-hidden
+                            >
+                              ⌗
+                            </span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--p-color-text)" }}>
+                                {mp.title || notifCopy.catalogProposalPending}
+                              </div>
+                              <div style={{ fontSize: 12, color: "var(--p-color-text-secondary)", lineHeight: 1.35, marginTop: 2 }}>
+                                {mp.body || [mp.label || mp.key, values].filter(Boolean).join(" · ")}
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
                       {(notifData?.recent_product_change_requests || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.productChanges}
                         </div>
                       )}
                       {(notifData?.recent_product_change_requests || []).map((cr) => {
+                        if (cr.kind === "metafield_pending") return null;
                         const isSellerInfo = !cr.product_id && (cr.title || cr.reference_id);
-                        const href = cr.kind === "metafield_pending"
-                          ? `/content/metaobjects?pending=${encodeURIComponent(cr.key || "")}`
-                          : cr.product_id
+                        const href = cr.product_id
                           ? `/products/${cr.product_id}`
                           : (cr.reference_id || cr.seller_id ? `/sellers/${cr.reference_id || cr.seller_id}` : "/products/inventory");
                         return (

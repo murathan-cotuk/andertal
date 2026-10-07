@@ -19,13 +19,13 @@ test('draft is not visible', () => {
   assert.equal(r.reasons[0].code, 'status_not_live')
 })
 
-test('pending catalog metafields hide active products', () => {
+test('stale catalog approval flags do not hide active products', () => {
   const r = explainStoreVisibility(
     { status: 'active', seller_id: 's1', metadata: { _catalog_approval_pending: true } },
     { approvedSellerIds: new Set(['s1']) },
   )
-  assert.equal(r.visible, false)
-  assert.ok(r.reasons.some((x) => x.code === 'pending_catalog_metafields'))
+  assert.equal(r.visible, true)
+  assert.equal(r.reasons.length, 0)
 })
 
 test('rejected seller hides product', () => {

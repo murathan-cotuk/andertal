@@ -25,6 +25,10 @@ const FACET_GROUP_TITLE_OVERRIDES = {
   size: "Größe",
   groesse: "Größe",
   style: "Style",
+  design: "Design",
+  dimensions: "Abmessungen",
+  opt_dimensions: "Abmessungen",
+  masse: "Maße",
   gender: "Gender",
   age_group: "Altersgruppe",
   season: "Saison",
@@ -210,9 +214,37 @@ export function normalizeFacetKey(key) {
   return raw;
 }
 
+/**
+ * Facet key for a variation axis. Packaging/system keys (e.g. dimensions, weight) that are
+ * used as sellable option groups get an `opt_` prefix so they are not confused with product
+ * shipping metadata and are not dropped by FACET_SKIP.
+ */
 export function variationGroupFacetKey(group, fallbackIndex) {
   const raw = group?.metafield_key || group?.key || group?.name || group?.title || `option_${fallbackIndex + 1}`;
-  return normalizeFacetKey(raw);
+  let nk = normalizeFacetKey(raw);
+  if (!nk) nk = `option_${(fallbackIndex || 0) + 1}`;
+  if (isProductSystemMetaKey(nk) && nk !== "type" && nk !== "typ") {
+    nk = `opt_${nk}`;
+  }
+  return nk;
+}
+
+/** All variation-axis facet keys present on a product list (always allowed as shop filters). */
+export function collectVariationFacetKeys(products) {
+  const keys = new Set();
+  for (const p of products || []) {
+    const meta = p?.metadata && typeof p.metadata === "object" ? p.metadata : {};
+    const groups = Array.isArray(p?.variation_groups)
+      ? p.variation_groups
+      : Array.isArray(meta.variation_groups)
+        ? meta.variation_groups
+        : [];
+    groups.forEach((g, i) => {
+      const k = variationGroupFacetKey(g, i);
+      if (k) keys.add(k);
+    });
+  }
+  return keys;
 }
 
 export function inferFacetKeyFromValue(value, fallbackKey = "") {
@@ -343,10 +375,21 @@ function isCleanValue(s) {
   return true;
 }
 
-function addFacetValue(f, key, rawVal) {
-  const normalizedKey = normalizeFacetKey(key);
-  if (!normalizedKey || normalizedKey.startsWith("_")) return;
-  if (normalizedKey !== "type" && normalizedKey !== "typ" && isProductSystemMetaKey(normalizedKey)) return;
+function addFacetValue(f, key, rawVal, { fromVariation = false } = {}) {
+  let normalizedKey = normalizeFacetKey(key);
+  if (!normalizedKey || (normalizedKey.startsWith("_") && !normalizedKey.startsWith("opt_"))) return;
+  // Variation axes may legally use names that collide with packaging system keys (opt_*).
+  if (
+    !fromVariation &&
+    normalizedKey !== "type" &&
+    normalizedKey !== "typ" &&
+    isProductSystemMetaKey(normalizedKey)
+  ) {
+    return;
+  }
+  if (fromVariation && isProductSystemMetaKey(normalizedKey) && !normalizedKey.startsWith("opt_")) {
+    normalizedKey = `opt_${normalizedKey}`;
+  }
   const vals = Array.isArray(rawVal) ? rawVal : [rawVal];
   vals.forEach((x) => {
     if (x == null || typeof x === "object") return;
@@ -369,17 +412,40 @@ export function catalogFacetKeySet(definitions) {
   return s;
 }
 
-/** Catalog Eigenschaften plus Type. Never dump product operational fields. */
-export function filterFacetsToCatalog(facets, definitions) {
+/**
+ * Catalog Eigenschaften + Type + variation axes from the product list.
+ * Third arg may be the products array (preferred) or `{ products, variationKeys }`.
+ * Never dumps operational product fields.
+ */
+export function filterFacetsToCatalog(facets, definitions, productsOrOpts) {
   const allowed = catalogFacetKeySet(definitions);
   allowed.add("type");
   allowed.add("typ");
+  const opts = Array.isArray(productsOrOpts)
+    ? { products: productsOrOpts }
+    : productsOrOpts && typeof productsOrOpts === "object"
+      ? productsOrOpts
+      : {};
+  const variationKeys =
+    opts.variationKeys instanceof Set
+      ? opts.variationKeys
+      : Array.isArray(opts.variationKeys)
+        ? new Set(opts.variationKeys)
+        : collectVariationFacetKeys(opts.products || []);
+  for (const k of variationKeys) {
+    const nk = normalizeFacetKey(k);
+    if (nk) allowed.add(nk);
+    allowed.add(String(k || "").trim().toLowerCase());
+  }
   return Object.fromEntries(
     Object.entries(facets || {}).filter(([k]) => {
       const nk = normalizeFacetKey(k);
       if (nk === "type" || nk === "typ") return true;
+      // Remapped variation axes (opt_dimensions, …) are always filterable.
+      if (nk.startsWith("opt_")) return true;
+      if (variationKeys.has(nk) || variationKeys.has(String(k || "").trim().toLowerCase())) return true;
       if (isProductSystemMetaKey(nk)) return false;
-      if (allowed.size <= 2) return !isProductSystemMetaKey(nk);
+      if (allowed.size <= 2 + variationKeys.size) return !isProductSystemMetaKey(nk);
       return allowed.has(nk) || allowed.has(String(k || "").trim().toLowerCase());
     }),
   );
@@ -399,6 +465,23 @@ export function buildFacetsFromProducts(products) {
       });
     }
 
+    const groups = Array.isArray(p.variation_groups)
+      ? p.variation_groups
+      : Array.isArray(meta.variation_groups)
+        ? meta.variation_groups
+        : [];
+
+    // Harvest declared option lists even when some variants lack option_values.
+    groups.forEach((g, idx) => {
+      const groupKey = variationGroupFacetKey(g, idx);
+      const opts = Array.isArray(g?.options) ? g.options : [];
+      opts.forEach((o) => {
+        const val = typeof o === "string" ? o : o?.value ?? o?.label ?? "";
+        if (val == null || String(val).trim() === "") return;
+        addFacetValue(f, groupKey, val, { fromVariation: true });
+      });
+    });
+
     if (Array.isArray(p.variants)) {
       p.variants.forEach((variant) => {
         const variantMeta = typeof variant?.metadata === "object" && variant.metadata ? variant.metadata : {};
@@ -409,10 +492,14 @@ export function buildFacetsFromProducts(products) {
           });
         }
         if (Array.isArray(variant?.option_values)) {
-          const groups = Array.isArray(p.variation_groups) ? p.variation_groups : (Array.isArray(meta.variation_groups) ? meta.variation_groups : []);
           variant.option_values.forEach((value, idx) => {
-            const groupKey = inferFacetKeyFromValue(value, variationGroupFacetKey(groups[idx], idx));
-            addFacetValue(f, groupKey, value);
+            const declared = variationGroupFacetKey(groups[idx], idx);
+            // Prefer the variation axis name; only infer size/color when the group is unnamed.
+            const groupKey =
+              declared && !/^option_\d+$/.test(declared)
+                ? declared
+                : inferFacetKeyFromValue(value, declared);
+            addFacetValue(f, groupKey, value, { fromVariation: true });
           });
         }
       });
@@ -422,8 +509,31 @@ export function buildFacetsFromProducts(products) {
   return Object.fromEntries(
     Object.entries(f)
       .map(([k, s]) => [k, [...s].sort()])
-      .filter(([, v]) => v.length > 0 && v.length <= 50),
+      // Variation axes may have many values; allow up to 80. Eigenschaften stay at 50.
+      .filter(([k, v]) => {
+        if (!v.length) return false;
+        const nk = normalizeFacetKey(k);
+        const isVar = nk.startsWith("opt_") || nk === "design" || nk === "groesse" || nk === "farbe" || nk === "material";
+        return v.length <= (isVar ? 80 : 50);
+      }),
   );
+}
+
+function productVariationGroups(product) {
+  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  if (Array.isArray(product?.variation_groups)) return product.variation_groups;
+  if (Array.isArray(meta.variation_groups)) return meta.variation_groups;
+  return [];
+}
+
+function optionValueMatchesFacet(value, group, groupIndex, normalizedKey, vals) {
+  if (!vals.includes(String(value ?? "").trim())) return false;
+  const declared = variationGroupFacetKey(group, groupIndex);
+  const groupKey =
+    declared && !/^option_\d+$/.test(declared)
+      ? declared
+      : inferFacetKeyFromValue(value, declared);
+  return normalizeFacetKey(groupKey) === normalizedKey || groupKey === normalizedKey;
 }
 
 export function filterProductsByFacets(products, filters) {
@@ -440,6 +550,7 @@ export function filterProductsByFacets(products, filters) {
       if (directNormalized != null && (Array.isArray(directNormalized) ? directNormalized : [directNormalized]).some((x) => vals.includes(String(x).trim()))) return true;
       if (Array.isArray(meta.metafields) && meta.metafields.some((mf) => mf?.key === k && vals.includes(String(mf.value ?? "").trim()))) return true;
       if (Array.isArray(meta.metafields) && meta.metafields.some((mf) => normalizeFacetKey(mf?.key) === normalizedKey && vals.includes(String(mf.value ?? "").trim()))) return true;
+      const groups = productVariationGroups(p);
       if (Array.isArray(p.variants) && p.variants.some((v) => {
         const variantMeta = typeof v?.metadata === "object" && v.metadata ? v.metadata : {};
         const directVariant = variantMeta[k];
@@ -448,8 +559,7 @@ export function filterProductsByFacets(products, filters) {
         if (directVariantNormalized != null && (Array.isArray(directVariantNormalized) ? directVariantNormalized : [directVariantNormalized]).some((x) => vals.includes(String(x).trim()))) return true;
         if (Array.isArray(variantMeta.metafields) && variantMeta.metafields.some((mf) => normalizeFacetKey(mf?.key) === normalizedKey && vals.includes(String(mf.value ?? "").trim()))) return true;
         const ov = Array.isArray(v.option_values) ? v.option_values : [];
-        const groups = Array.isArray(p.variation_groups) ? p.variation_groups : [];
-        return ov.some((x, idx) => inferFacetKeyFromValue(x, variationGroupFacetKey(groups[idx], idx)) === normalizedKey && vals.includes(String(x).trim()));
+        return ov.some((x, idx) => optionValueMatchesFacet(x, groups[idx], idx, normalizedKey, vals));
       })) return true;
       return false;
     });

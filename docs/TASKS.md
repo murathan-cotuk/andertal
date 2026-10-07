@@ -67,7 +67,7 @@ A alanı ilerleme (2026-10-07):
 - [ ] Canlıdaki test ürünlerinin EAN'ları gerçek GTIN değil (153 kodun 144'ü); kod değiştirilmedikçe kaydetme engellenmez. "arts | | | title_de" başlıklı ürünler hatalı Excel importundan kalmış.
 
 Açık küçük işler (A alanında kapatılır):
-- [ ] "Ecom Lastest" ve "1 Tütün tabakasi…" ürünleri eski `_catalog_approval_pending` işareti yüzünden shop'ta gizli; işaret temizlenecek.
+- [x] Eski `_catalog_approval_pending` bayrağı ürünü artık shop'tan gizlemez; ürün GET'te otomatik temizlenir. Katalog önerileri superuser ziline (`catalog_proposals` / Metaobjekte) düşer.
 - [ ] Second-nav arka plan düzeltmesi (`ShopHeader.jsx`, chrome cover yalnızca kaydırınca) push bekliyor.
 
 Stripe Dashboard işleri (bölüm 6) bilinçli olarak programın sonuna bırakıldı.

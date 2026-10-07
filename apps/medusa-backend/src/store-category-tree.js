@@ -97,11 +97,6 @@ const PUBLISHED_PRODUCTS_SQL = `
   SELECT seller_id, metadata
   FROM admin_hub_products
   WHERE LOWER(TRIM(COALESCE(status, ''))) IN ('published', 'active')
-    AND LOWER(TRIM(COALESCE(metadata->>'_catalog_approval_pending', ''))) NOT IN ('true', 't')
-    AND NOT (
-      jsonb_typeof(metadata->'_pending_catalog_metafields') = 'array'
-      AND jsonb_array_length(COALESCE(metadata->'_pending_catalog_metafields', '[]'::jsonb)) > 0
-    )
 `
 
 const VISIBLE_SELLER_SQL = `

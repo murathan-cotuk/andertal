@@ -2,11 +2,10 @@
 
 /**
  * Why a product does / does not appear in the shop catalog — mirrors the hard filters in
- * store-products listStoreProducts / PDP GET (status, pending catalog metafields, seller
- * approval, family shell). Used by Sellercentral to explain "Active but not in shop".
+ * store-products listStoreProducts / PDP GET (status, seller approval, family shell).
+ * Catalog metafield proposals no longer hide products (2026-10-07).
  */
 
-const { productHasPendingCatalogMetafields } = require('./catalog-metafield-pending')
 const { isFamilyShell } = require('./product-identity')
 
 const STORE_LIVE_STATUSES = new Set(['published', 'active'])
@@ -14,8 +13,6 @@ const STORE_LIVE_STATUSES = new Set(['published', 'active'])
 const REASON_MESSAGES = {
   status_not_live:
     'Status is not Active/Published — draft, archived, merged, or inactive products are hidden from the shop.',
-  pending_catalog_metafields:
-    'Catalog attribute values are waiting for platform approval; the product stays hidden until they are approved.',
   seller_not_approved:
     'Seller account is rejected or suspended, so their products are hidden from the shop.',
   family_shell:
@@ -32,12 +29,6 @@ const explainStoreVisibility = (product, opts = {}) => {
   const status = String(product?.status || '').trim().toLowerCase()
   if (!STORE_LIVE_STATUSES.has(status)) {
     reasons.push({ code: 'status_not_live', message: REASON_MESSAGES.status_not_live })
-  }
-  if (productHasPendingCatalogMetafields(product)) {
-    reasons.push({
-      code: 'pending_catalog_metafields',
-      message: REASON_MESSAGES.pending_catalog_metafields,
-    })
   }
   const sid = String(product?.seller_id || '').trim()
   if (sid && sid !== 'default') {

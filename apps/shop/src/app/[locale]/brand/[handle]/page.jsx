@@ -535,7 +535,7 @@ export default function BrandPage() {
 
   // Product metadata facets; category facets stay off (sub-category navigation is category-page only).
   const facets = useMemo(() => {
-    const raw = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
+    const raw = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions, products);
     return Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "category" && k !== "category_slug"));
   }, [products, metafieldDefinitions]);
 

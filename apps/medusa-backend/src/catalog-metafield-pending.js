@@ -181,12 +181,36 @@ const scanProductCatalogPending = (metadata, variants, maps) => {
   return { metadata: meta, variants: nextVariants, pendingByKey, proposalsByKey }
 }
 
-const productHasPendingCatalogMetafields = (product) => {
-  const meta = product?.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+/**
+ * Legacy flag check. As of 2026-10-07 unknown catalog values are proposal-only and must
+ * NEVER hide a product from the shop. Always returns false; kept so callers keep compiling.
+ * Stale `_catalog_approval_pending` / `_pending_catalog_metafields` are stripped by
+ * `stripStaleCatalogApprovalFlags` / product GET heal.
+ */
+const productHasPendingCatalogMetafields = (_product) => false
+
+/** True if metadata still carries the deprecated hide flags (for heal / cleanup). */
+const hasStaleCatalogApprovalFlags = (productOrMeta) => {
+  const meta =
+    productOrMeta?.metadata && typeof productOrMeta.metadata === 'object'
+      ? productOrMeta.metadata
+      : productOrMeta && typeof productOrMeta === 'object' && !productOrMeta.id
+        ? productOrMeta
+        : {}
   if (meta._catalog_approval_pending === true) return true
   if (String(meta._catalog_approval_pending || '').toLowerCase() === 'true') return true
   if (Array.isArray(meta._pending_catalog_metafields) && meta._pending_catalog_metafields.length > 0) return true
   return false
+}
+
+/** Mutates a copy-friendly metadata object: drops deprecated approval flags. */
+const stripStaleCatalogApprovalFlags = (metadata) => {
+  if (!metadata || typeof metadata !== 'object') return metadata
+  if (!hasStaleCatalogApprovalFlags(metadata)) return metadata
+  const out = { ...metadata }
+  delete out._catalog_approval_pending
+  delete out._pending_catalog_metafields
+  return out
 }
 
 const filterMetafieldsRejecting = (arr, rejectKey, rejectLower) => (
@@ -256,6 +280,8 @@ module.exports = {
   resolveCatalogKey,
   scanProductCatalogPending,
   productHasPendingCatalogMetafields,
+  hasStaleCatalogApprovalFlags,
+  stripStaleCatalogApprovalFlags,
   stripRejectedCatalogValues,
   persistCatalogPendingScan,
 }

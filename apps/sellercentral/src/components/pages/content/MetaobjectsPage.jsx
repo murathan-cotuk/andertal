@@ -350,11 +350,15 @@ export default function MetaobjectsPage() {
     }
   };
 
+  const refreshNotifBell = () => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("andertal-notifications-refresh"));
+  };
   const approvePending = async (id) => {
     setPendingActionId(id);
     try {
       await client.approveMetafieldProposal(id);
       await load();
+      refreshNotifBell();
     } catch (e) {
       setError(e?.message || c.approvalFailed);
     } finally {
@@ -371,6 +375,7 @@ export default function MetaobjectsPage() {
     try {
       await client.approveMetafieldProposal(p.id, { values, label: (p.label || p.key || "").trim() });
       await load();
+      refreshNotifBell();
     } catch (e) {
       setError(e?.message || c.editApprovalFailed);
     } finally {
@@ -382,6 +387,7 @@ export default function MetaobjectsPage() {
     try {
       await client.rejectMetafieldProposal(id);
       await load();
+      refreshNotifBell();
     } catch (e) {
       setError(e?.message || c.rejectionFailed);
     } finally {

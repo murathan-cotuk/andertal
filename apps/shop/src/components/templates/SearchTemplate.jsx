@@ -728,7 +728,7 @@ export default function SearchTemplate() {
   }, [q, textHits, catNodeForFilter]);
 
   const facets = useMemo(() => {
-    const raw = filterFacetsToCatalog(buildFacetsFromProducts(baseAfterCat), metafieldDefinitions);
+    const raw = filterFacetsToCatalog(buildFacetsFromProducts(baseAfterCat), metafieldDefinitions, baseAfterCat);
     return Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "category" && k !== "category_slug"));
   }, [baseAfterCat, metafieldDefinitions]);
   const hasFacets = Object.keys(facets).length > 0;
