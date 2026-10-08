@@ -47,6 +47,8 @@ import InfoIconTooltip from "@/components/InfoIconTooltip";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { buildBrandOptions } from "@/lib/brand-options";
 import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
+import EditLanguagePills from "@/components/products/EditLanguagePills";
+import MarketPriceTable, { EUR_MARKETS } from "@/components/products/MarketPriceTable";
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
 import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
@@ -1371,6 +1373,28 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       return { ...prev, ...extra, metadata: m };
     });
   }, [editingCountry]);
+
+  /** Konsept s34 market table: metadata.prices[CC] for the other EUR markets (empty = DE price). */
+  const updateMarketPrice = useCallback((code, field, cents) => {
+    const market = EUR_MARKETS.find((m) => m.code === code);
+    if (!market) return;
+    setProduct((prev) => {
+      if (!prev) return prev;
+      const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+      const prices = { ...(m.prices || {}) };
+      const cp = { ...(prices[code] || {}) };
+      if (cents == null) delete cp[field];
+      else cp[field] = cents;
+      if (field === "brutto_cents") {
+        if (cents == null) delete cp.netto_cents;
+        else cp.netto_cents = Math.round(cents / (1 + market.vatRate / 100));
+      }
+      if (cp.brutto_cents == null && cp.sale_cents == null) delete prices[code];
+      else prices[code] = cp;
+      m.prices = prices;
+      return { ...prev, metadata: m };
+    });
+  }, []);
 
   /** Pass `rawFromDom` from blur `e.currentTarget.value` so the last keystroke is never lost (draft ref can lag one render). */
   const commitCountryPriceDraft = useCallback((draftKey, metadataField, linkedClearKey, rawFromDom) => {
@@ -3330,6 +3354,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           <Card>
             <div className="product-edit-sections">
             <BlockStack gap="300">
+              <EditLanguagePills product={product} locked={isNew || isDirty} />
               <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
                 {pe.title}
               </ProductSectionHeading>
@@ -3585,6 +3610,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   );
                 })}
               </div>
+              <MarketPriceTable
+                prices={meta.prices || {}}
+                deBruttoCents={cpBruttoCents}
+                deSaleCents={cpSaleCents}
+                onCommit={updateMarketPrice}
+              />
               <ProductSectionRule />
               <ProductSectionHeading>{pe.inventory}</ProductSectionHeading>
               <InlineStack gap="200" wrap>

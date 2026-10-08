@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — SC ürün düzenleme s34: dil hapları + pazar fiyat tablosu (bitti, karar 2)
+
+- `components/products/EditLanguagePills.jsx`: Titel kartının üstünde DE/EN/TR/FR/ES/IT hapları; nokta yeşil = başlık + açıklama var ve otomatik değil, turuncu = eksik veya `_auto` (tooltip açıklar). Düzenleme dili mevcut desende arayüz dili (`metadata.translations[locale]`), hap aynı sayfayı o dilde açar. Kaydedilmemiş değişiklik varken / yeni üründe kilitli (navigasyon değişiklikleri silerdi) — "Erst speichern".
+- `components/products/MarketPriceTable.jsx`: Preise kartında DE alanlarının altında AT/FR/IT/ES tablosu (MwSt %, brutto, Angebotspreis, hesaplanan netto). `metadata.prices[CC]`'ye yazar; boş = DE fiyatı (placeholder gösterir); iki alan da boşsa ülke anahtarı silinir. **Yalnız EUR pazarları**: checkout `prices[country]`'yi EUR sent olarak okuyor (`line-unit-price.js`), CHF/TRY girişi euro diye tahsil edilirdi. Shop kartı/PDP de aynı haritayı ülkeye göre okuyor → gösterim = tahsilat.
+- CSS `globals.css` sonu (`.sc-lang-pill*`, `.sc-market-prices*`), kompakt tablo.
+- Kontrol: esbuild OK. Yapılmayan (s34'te kalan): sekmesiz tek sayfa düzeni, sağ kolon yeniden dağılımı.
+
 ## 2026-10-08 — PDP "Lieferung bis …" (bitti, karar 3)
 
 - Kargo grubuna `handling_days` (hazırlık) + `transit_days` (taşıma) — iş günü, 0–30, boş = tarih yok (`server.js` ensure; `store-checkout.js` POST/PATCH; public `/store/shipping-groups` döner).

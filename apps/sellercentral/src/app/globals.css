@@ -758,3 +758,31 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
 @media (max-width: 47.99em) {
   .sc-unsaved-bar { left: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); padding: 8px 12px; }
 }
+
+/* Product edit (Konsept s34): editing-language pills + per-market price table */
+.sc-lang-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc-lang-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px;
+  border: 1px solid #d4d4d4; border-radius: 999px; background: #fff; color: #303030;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.sc-lang-pill:hover:not(:disabled) { border-color: #8a8a8a; }
+.sc-lang-pill.is-active { background: #1a1a1a; border-color: #1a1a1a; color: #fff; cursor: default; }
+.sc-lang-pill:disabled { opacity: 0.5; cursor: not-allowed; }
+.sc-lang-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.sc-lang-dot.is-ok { background: #1e9e5a; }
+.sc-lang-dot.is-warn { background: #e8a33a; }
+.sc-market-prices { display: grid; gap: 4px; margin-top: 4px; }
+.sc-market-prices-scroll { overflow-x: auto; }
+.sc-market-prices-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+.sc-market-prices-table th {
+  text-align: left; font-size: 11px; font-weight: 600; color: #616161; text-transform: uppercase;
+  letter-spacing: 0.02em; padding: 6px 8px; border-bottom: 1px solid #e3e3e3; white-space: nowrap;
+}
+.sc-market-prices-table td { padding: 4px 8px; border-bottom: 1px solid #f1f1f1; white-space: nowrap; }
+.sc-market-prices-table .is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.sc-market-price-input {
+  width: 96px; height: 28px; padding: 0 8px; border: 1px solid #d4d4d4; border-radius: 6px;
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.sc-market-price-input:focus { outline: 2px solid #005bd3; outline-offset: -1px; border-color: #005bd3; }
