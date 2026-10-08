@@ -150,22 +150,295 @@ MATERIALS = sorted(
     reverse=True,
 )
 
-# Explicit product-type phrases → category slug (only when phrase appears in title)
-# Not fuzzy scoring — hard aliases for clear German product nouns.
+# Explicit product-type phrases → REAL admin_hub leaf slugs (longest phrase wins).
+# Critical: longer phrases first at match time (e.g. magnettelefonhalter > automagnet).
 ALIAS_BY_SLUG: dict[str, list[str]] = {
+    # phones / car mounts — B-5562 style
+    "cell-phone-automobile-cradles": [
+        "magnettelefonhalter",
+        "auto magnettelefonhalter",
+        "autotelefonhalter",
+        "kfz telefonhalter",
+        "handy autohalterung",
+        "handyautohalterung",
+        "lueftungsschlitzhalter",
+        "luftungsschlitzhalter",
+        "luftungsschlitz",
+        "telefonhalter fuer luftung",
+        "handyhalterung auto",
+        "handyhalter auto",
+        "auto handyhalter",
+    ],
+    "cell-phone-bedstand-desk-mounts": [
+        "telefonhalter",
+        "handyhalterung",
+        "handyhalter",
+        "smartphonehalter",
+        "handy halterung",
+        "schreibtisch handyhalter",
+        "bett handyhalter",
+    ],
+    "cell-phone-handlebar-mounts": ["lenkerhalterung", "fahrrad handyhalter"],
+    "cell-phone-basic-cases": [
+        "handyhuelle",
+        "handyhulle",
+        "smartphone huelle",
+        "smartphone hulle",
+        "handytasche",
+        "panzerhuelle",
+        "panzerhulle",
+        "handycover",
+        "schutzhuelle",
+        "schutzhulle",
+        "silikonhuelle",
+        "silikonhulle",
+        "iphone huelle",
+        "iphone hulle",
+        "samsung huelle",
+        "samsung hulle",
+        "handy schutz",
+        "handy case",
+        "phone case",
+        "wallet handyhuelle",
+        "wallet handyhulle",
+        "wallet fuer samsung",
+        "wallet fuer iphone",
+        "wallet fuer google",
+        "wallet fuer galaxy",
+        "smart touch fuer samsung",
+        "smart touch fuer galaxy",
+        "huelle kompatibel mit iphone",
+        "huelle kompatibel mit samsung",
+        "huelle kompatibel mit galaxy",
+        "huelle kompatibel mit xiaomi",
+        "huelle kompatibel mit redmi",
+        "huelle kompatibel mit google",
+        "huelle fuer iphone",
+        "huelle fuer samsung",
+        "huelle fuer galaxy",
+        "huelle fuer xiaomi",
+        "case kompatibel mit iphone",
+        "case kompatibel mit samsung",
+        "universalhuelle",
+        "universalhuelle smartphone",
+        "magpeak",
+        "magmat huelle",
+    ],
+    "tablet-cases": [
+        "ipad huelle",
+        "tablethuelle",
+        "tablet huelle",
+        "galaxy tab huelle",
+        "huelle fuer ipad",
+        "huelle fuer galaxy tab",
+        "smartcase huelle fuer ipad",
+        "smartcase huelle fuer samsung galaxy tab",
+        "lenovo tab huelle",
+    ],
+    "nintendo-switch-cases-storage": [
+        "nintendo switch huelle",
+        "switch huelle",
+        "switch hardpouch",
+        "carbonox huelle fuer nintendo",
+    ],
+    "flip-cell-phone-cases": ["flip huelle", "flip hulle", "klaphuelle", "klaphulle", "bookcase handy", "view case", "huelle mit klappe"],
+    "cell-phone-screen-protectors": [
+        "displayschutzfolie",
+        "panzerfolie",
+        "schutzfolie",
+        "glasfolie",
+        "schutzglas",
+        "displayglas",
+    ],
+    "cell-phone-portable-power-banks": ["powerbank", "power bank", "externer akku"],
+    "cell-phone-automobile-chargers": ["kfz ladegeraet", "autoladegeraet", "12v ladegeraet", "kfz ladekabel"],
+    "cell-phone-wireless-chargers": ["kabelloses ladegeraet", "wireless charger", "induktionsladegeraet"],
+    "cell-phone-wall-chargers": ["netzteil handy", "wandladegeraet", "steckdosenladegeraet", "schnellladegeraet"],
+    "cell-phone-tripods": ["handy stativ", "smartphonestativ", "handytripod"],
+    # kitchen
     "tea-kettles": ["wasserkessel", "flotenkessel", "floetenkessel", "teekessel", "pfeifkessel"],
     "electric-kettles": ["wasserkocher"],
     "stockpots": ["kochtopf", "suppentopf", "kochtopfe"],
-    "luggage-scales": ["kofferwaage", "gepackwaage", "gepaeckwaage"],
-    "bike-saddles": ["fahrradsattel", "fahrradsitz"],
+    "chefs-pans": ["bratpfanne", "grillpfanne", "omelettpfanne"],  # NOT bare "pfanne" (für Pfannen trap)
+    "saucepans": ["stielkasserolle", "kasserolle"],
     "knife-blocks": ["messerblock", "messerblocke", "messerbloecke"],
+    "kitchen-knives-accessories": ["kuechenmesser", "kochenmesser", "kochmesser"],
+    "cutting-boards": ["schneidebrett", "hackbrett"],
+    "baking-dishes": ["auflaufform", "backform", "borcam"],
+    "dinner-plates": ["speiseteller", "dessertteller"],
+    "serving-bowls": ["servierschuessel", "glasschuessel", "servierschale"],
+    "mixing-bowls": ["ruehrschuessel", "ruehrschale"],
+    "colanders": ["passiersieb", "seiher", "kuechensieb"],
+    "demitasse-cups": ["espressotasse", "mokkatasse", "demitasse"],
+    "novelty-coffee-mugs": ["kaffeetasse", "kaffeebecher"],
+    "lunch-boxes": ["lunch box", "lunchbox", "brotbox", "brotdose"],
+    "bento-boxes": ["bento box", "bentobox"],
+    "portable-closets": ["kleiderschrank faltbar", "faltbarer kleiderschrank", "stoffschrank"],
+    "dome-surveillance-cameras": ["innenkamera", "ueberwachungskamera", "wlan kamera", "sicherheitskamera"],
+    "webcams": ["webcam", "pc kamera"],
+    "boys-pajama-sets": ["pyjama jungen", "schlafanzug jungen", "jungen pyjama", "jungen schlafanzug"],
+    "girls-pajama-sets": ["pyjama maedchen", "schlafanzug maedchen", "maedchen pyjama", "madchen schlafanzug"],
+    "boys-boxer-shorts": ["boxershorts jungen", "boxershorts kinder", "jungen boxershorts"],
+    "mens-boxer-shorts": ["boxershorts herren", "herren boxershorts"],
+    "kickballs-playground-balls": ["sprungball", "huepfball", "spielball kinder"],
+    # coasters / Untersetzer — NEVER furniture tables
+    "tabletop-saucers": [
+        "korkuntersetzer",
+        "glasuntersetzer",
+        "bambus untersetzer",
+        "tischuntersetzer",
+        "untersetzer fuer glaeser",
+        "untersetzer fuer tassen",
+        "untersetzer fuer becher",
+        "untersetzer set",
+        "untersetzer",
+        "tischschutz fuer glaeser",
+    ],
+    "trivets": [
+        "topfuntersetzer",
+        "pfannenuntersetzer",
+        "untersetzer fuer toepfe",
+        "untersetzer fuer pfannen",
+        "hitzeschutz untersetzer",
+    ],
+    "bar-coasters": ["bar untersetzer", "getraenkeuntersetzer"],
+    "mechanical-vibration-damping-pads": [
+        "waschmaschinen untersetzer",
+        "vibrationsdaempfer",
+        "vibrationsdaempfer untersetzer",
+        "antivibrationsuntersetzer",
+        "waschmaschine untersetzer",
+    ],
+    # home / soft
     "hand-bath-towels": ["handtuch", "badetuch", "mikrofaserhandtuch"],
-    "cell-phone-cases-covers": ["handyhuelle", "handyhulle", "handytasche", "panzerhuelle", "panzerhulle"],
-    "girls-fashion-hoodies-sweatshirts": ["sweatjacke", "kapuzenpullover", "kapuzenjacke", "hoodie"],
-    "boys-fashion-hoodies-sweatshirts": ["sweatjacke", "kapuzenpullover", "kapuzenjacke", "hoodie"],
-    "girls-sweatshirts": ["sweatshirt", "mädchen sweatshirt"],
-    "boys-sweatshirts": ["sweatshirt", "jungen sweatshirt"],
+    "kids-throw-blankets": ["kuscheldecke", "fleecedecke", "kinderdecke"],
+    "wearable-blankets": ["kuscheldecke mit kapuze", "decke mit kapuze"],
+    "bedding-duvet-covers": ["bettbezug", "bettdeckenbezug", "bettwaesche"],
+    "throw-pillows": ["dekokissen", "zierkissen", "formkissen"],
+    "kids-throw-pillows": ["kinder kissen", "kinderkissen"],
+    "kids-plush-toy-pillows": ["plueschkissen", "kuschelkissen"],
+    "luggage-scales": ["kofferwaage", "gepackwaage", "gepaeckwaage"],
+    "casual-daypack-backpacks": ["schulrucksack", "trekkingrucksack", "daypack", "rucksack kinder"],
+    "messenger-bags": ["umhaengetasche", "schultertasche", "crossover tasche"],
+    "fashion-waist-packs": ["bauchtasche", "huefttasche", "gurteltasche"],
+    "womens-tote-handbags": ["shopper tasche", "canvas tasche"],
+    "laptop-sleeves": [
+        "notebooktasche",
+        "laptoptasche",
+        "laptop sleeve",
+        "laptophuelle",
+        "macbook huelle",
+        "laptop huelle",
+        "neoprenhuelle",
+        "smartshell huelle",
+    ],
+    "folding-umbrellas": ["regenschirm", "taschenschirm", "knirps"],
+    "boys-wallets": ["portemonnaie kinder", "kinder portemonnaie", "geldboerse kinder"],
+    "womens-wallets": ["portemonnaie", "geldboerse", "geldborse"],
+    "keychains": ["schluesselanhaenger", "taschenanhaenger", "schluesselanhanger"],
+    # pets
+    "standard-cat-litter-boxes": ["katzenklo", "katzentoilette", "schalentoilette"],
+    "cat-litter-scoops": ["katzenschaufel", "streuschaufel"],
+    "small-animal-carriers": ["transportbox", "transportboxe", "katzen transportbox", "tiertransport"],
+    # bike / auto misc
+    "bike-saddles": ["fahrradsattel", "fahrradsitz"],
+    "bike-cable-locks": ["fahrradschloss", "kabelschloss", "zahlencode schloss", "elektroller schloss"],
+    "automotive-magnets": ["wagenmagnet", "autoaufkleber magnet"],
+    # apparel (require audience markers in phrase where gendered)
+    "girls-fashion-hoodies-sweatshirts": ["maedchen hoodie", "maedchen kapuzen", "madchen hoodie"],
+    "boys-fashion-hoodies-sweatshirts": ["jungen hoodie", "jungen kapuzen", "kinder hoodie"],
+    "mens-fashion-hoodies-sweatshirts": ["herren hoodie", "herren kapuzenpullover", "herren sweatjacke"],
+    "womens-fashion-hoodies-sweatshirts": ["damen hoodie", "damen kapuzenpullover", "damen sweatjacke"],
+    "mens-slippers": ["hausschuhe herren", "pantoffeln herren", "herrenhausschuhe"],
+    "womens-slippers": ["hausschuhe damen", "damenhausschuhe", "pantoffeln damen"],
+    "boys-slippers": ["hausschuhe jungen", "jungenhausschuhe", "kinderhausschuhe jungen"],
+    "girls-slippers": ["hausschuhe maedchen", "hausschuhe madchen", "kinderhausschuhe madchen"],
+    "mens-fashion-sneakers": ["herren sneaker", "sneaker herren"],
+    "womens-fashion-sneakers": ["damen sneaker", "sneaker damen"],
+    "boys-sneakers": ["jungen sneaker", "kinder sneaker"],
+    "girls-sneakers": ["maedchen sneaker", "madchen sneaker"],
+    "boys-boots": ["jungen stiefel", "kinder stiefel"],
+    "girls-boots": ["maedchen stiefel", "madchen stiefel"],
+    "boys-sports-recreation-socks": ["kindersocken", "sport socken kinder", "socken kinder"],
+    "mens-sports-recreation-socks": ["herren socken", "sportsocken herren"],
+    "womens-sports-recreation-socks": ["damen socken", "sportsocken damen"],
+    "mens-cold-weather-scarves": ["herren schal", "winterschal herren"],
+    "womens-cold-weather-scarves-wraps": ["damen schal", "winterschal damen"],
+    "girls-fashion-scarves": ["maedchen schal", "madchen schal", "kinder schal"],
+    "mens-skullies-beanies": ["herren muetze", "herren beanie"],
+    "womens-skullies-beanies": ["damen muetze", "damen beanie"],
+    "boys-novelty-beanies-knit-hats": ["jungen muetze", "kinder muetze"],
+    "mens-t-shirts": ["herren t shirt", "herren tshirt"],
+    "boys-t-shirts": ["jungen t shirt", "kinder t shirt"],
+    "girls-tees": ["maedchen t shirt", "madchen t shirt"],
+    "mens-dress-shirts": ["herren hemd", "businesshemd"],
+    "boys-pants": ["jungen hose", "kinderhose jungen"],
+    "girls-pants-capris": ["maedchen hose", "madchen hose"],
+    "mens-jeans": ["herren jeans"],
+    "womens-jeans": ["damen jeans"],
+    "girls-skirts": ["maedchen rock", "madchen rock", "kinderrock"],
+    "boys-cold-weather-gloves": ["jungen handschuhe", "kinder handschuhe"],
+    "mens-cold-weather-gloves": ["herren handschuhe"],
+    "womens-cold-weather-gloves": ["damen handschuhe"],
+    # electronics accessories
+    "computer-mice": [
+        "computermaus",
+        "usb maus",
+        "funkmaus",
+        "gaming maus",
+        "kabellose maus",
+        "drahtlose maus",
+        "wireless maus",
+        "pc maus",
+    ],
+    "computer-keyboards": [
+        "tastatur",
+        "keyboard",
+        "gaming tastatur",
+        "wireless tastatur",
+        "wireless keyboard",
+        "mechanical keyboard",
+    ],
+    "computer-keyboard-mouse-combos": ["desktop wireless", "tastatur maus set", "keyboard mouse"],
+    "hdmi-cables": ["hdmi kabel"],
+    "usb-cables": ["usb kabel", "usb c kabel", "ladekabel", "datenkabel", "type c kabel", "usb a auf usb c"],
+    "cat-6-ethernet-cables": ["netzwerkkabel", "lan kabel", "ethernet kabel"],
+    "led-strip-lights": ["led streifen", "led strip", "led band", "ledlichtband"],
+    "led-bulbs": ["led birne", "gluehbirne", "leuchtmittel", "e27 led", "gu10 led"],
+    "desk-lamps": ["schreibtischlampe", "leselampe"],
+    "handheld-flashlights": ["taschenlampe", "led taschenlampe"],
+    "external-hard-drives": ["externe festplatte", "external ssd"],
+    "usb-flash-drives": ["usb stick", "usb speicherstick"],
+    "micro-sd-memory-cards": ["microsd", "micro sd", "sd karte", "speicherkarte"],
+    "earbud-in-ear-headphones": ["in ear", "ohrhoerer", "earbuds", "kopfhoerer in ear"],
+    "over-ear-headphones": ["over ear", "kopfhoerer", "headset"],
+    "portable-bluetooth-speakers": ["bluetooth lautsprecher", "bt lautsprecher", "bluetooth speaker"],
+    "smartwatches": ["smartwatch", "fitness armband", "fitnesstracker"],
+    "streaming-media-players": ["tv stick", "fire tv", "chromecast", "streaming stick", "mi tv stick"],
+    "item-finders": ["airtag", "air tag", "tracker anhaenger", "schluesselfinder"],
+    "baby-hearing-protection-earmuffs": ["gehoerschutz", "laermschutz kopfhoerer", "baby gehoerschutz"],
+    "safety-earmuffs": ["gehoerschutzkapseln", "laermschutz"],
+    "karaoke-players": ["karaoke"],
+    "toy-building-sets": ["klemmbaustein", "klemmbausteine", "baustein set", "steine set"],
+    "toy-interlocking-building-accessories": ["lego kompatibel", "bausteine"],
 }
+
+# If match is immediately followed by these, it is only a PREFIX of a longer product type → reject
+CONTINUATION_SUFFIXES = (
+    "halter",
+    "halterung",
+    "telefonhalter",
+    "handyhalter",
+    "huelle",
+    "hulle",
+    "cover",
+    "tasche",
+    "kabel",
+    "stativ",
+    "station",
+    "ladegeraet",
+    "set",
+)
 
 # Never assign category from these alone (features/parts inside a product title)
 WEAK_EVIDENCE = {
@@ -186,6 +459,27 @@ WEAK_EVIDENCE = {
     "design",
     "farbe",
     "groesse",
+    "magnet",  # alone too weak — magnettelefonhalter handled by longer alias
+    "auto",
+    "tisch",  # Tischschutz ≠ Couchtisch
+    "tische",
+    "glas",
+    "glaeser",
+    "tasse",
+    "tassen",
+    "becher",
+    "pfanne",
+    "pfannen",
+    "topf",
+    "toepfe",
+    "rucksack",  # often only in "für Tasche Rucksack" purpose clause
+    "schule",
+    "freizeit",
+    "reisen",
+    "zuhause",
+    "astronomie",  # SEO fluff in descriptions
+    "couchtisch",
+    "couchtische",
 }
 
 # Audience markers in category labels / product text (for exact disambiguation only)
@@ -232,6 +526,9 @@ def log(msg: str) -> None:
 
 def norm(s: str) -> str:
     s = (s or "").lower().replace("ß", "ss")
+    # German umlauts → digraphs BEFORE NFKD (otherwise ü→u and aliases like gehoerschutz miss)
+    for src, dst in (("ä", "ae"), ("ö", "oe"), ("ü", "ue")):
+        s = s.replace(src, dst)
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = re.sub(r"[^a-z0-9]+", " ", s)
@@ -524,14 +821,113 @@ def load_andertal_leaves_from_db() -> tuple[list[dict], dict[str, list[int]]]:
                     if len(w) >= 5:
                         word_inv[w].append(idx)
 
-    log(f"   DB leaf categories: {len(leaves):,} | compact keys {len(compact_inv):,}")
-    return leaves, {"word": word_inv, "compact": compact_inv}
+    by_slug = {leaf["slug"]: i for i, leaf in enumerate(leaves) if leaf.get("slug")}
+    # Longest-first alias phrases for primary matching
+    alias_phrases: list[tuple[str, str, int]] = []  # compact_or_norm, slug, len
+    for slug, phrases in ALIAS_BY_SLUG.items():
+        if slug not in by_slug:
+            continue
+        for ph in phrases:
+            ac = compact_norm(ph)
+            an = norm(ph)
+            if len(ac) >= 5:
+                alias_phrases.append((ac, slug, len(ac)))
+            if " " in an and len(an) >= 5:
+                alias_phrases.append((an, slug, len(an)))
+    alias_phrases.sort(key=lambda x: -x[2])
+
+    log(f"   DB leaf categories: {len(leaves):,} | compact keys {len(compact_inv):,} | aliases {len(alias_phrases):,}")
+    return leaves, {
+        "word": word_inv,
+        "compact": compact_inv,
+        "by_slug": by_slug,
+        "alias_phrases": alias_phrases,
+    }
+
+
+def _continuation_blocks(haystack_c: str, start: int, matched_len: int) -> bool:
+    """True if match is only a prefix of a longer product-type compound (Automagnet⊂Magnettelefonhalter)."""
+    rest = haystack_c[start + matched_len :]
+    if not rest:
+        return False
+    return any(rest.startswith(suf) for suf in CONTINUATION_SUFFIXES)
+
+
+def _find_match_pos(hay_c: str, hay_n: str, variant: str) -> int:
+    if " " in variant:
+        return hay_n.find(variant)
+    return hay_c.find(variant)
+
+
+def _only_as_fuer_object(title_n: str, phrase: str) -> bool:
+    """True if phrase appears only after für/fuer/for (purpose object), not as product type.
+
+    Example: 'Untersetzer für Pfannen' must not classify as Bratpfanne.
+    """
+    ph = phrase if " " in phrase else norm(phrase)
+    if not ph:
+        return False
+    # compact phrases → check spaced tokens that start with phrase
+    positions: list[int] = []
+    if " " in ph or " " in title_n:
+        start = 0
+        while True:
+            pos = title_n.find(ph, start)
+            if pos < 0:
+                break
+            positions.append(pos)
+            start = pos + 1
+        if not positions:
+            # try token prefix (pfanne → pfannen)
+            for tok in title_n.split():
+                if tok == ph or (tok.startswith(ph) and len(tok) <= len(ph) + 2):
+                    positions.append(title_n.find(tok))
+    if not positions:
+        return False
+    for pos in positions:
+        before = title_n[:pos]
+        # product-type if phrase is near the start (first ~40 chars of norm title)
+        if pos <= 40 and not re.search(r"\b(fuer|fur|for)\s+$", before):
+            # still product if no fuer immediately before
+            if not re.search(r"\b(fuer|fur|for)\s+\S*$", before[-30:] if len(before) > 30 else before):
+                return False
+        if re.search(r"\b(fuer|fur|for)\s+([a-z0-9]+\s+){0,6}$", before):
+            continue  # this hit is fuer-object
+        return False  # at least one hit is not fuer-object → keep
+    return True  # all hits are fuer-objects
+
+
+def _title_alias_hit(title_n: str, title_c: str, phrase: str) -> int:
+    """Return start pos in title_n/title_c, or -1. Short aliases need token boundaries."""
+    if " " in phrase:
+        pos = title_n.find(phrase)
+        return pos
+    # compact phrase
+    if len(phrase) < 8:
+        # require token match in spaced title (avoid pfanne⊂pfannen via bare compact,
+        # and avoid matching only as für-object — checked separately)
+        for tok in title_n.split():
+            if tok == phrase or (len(phrase) >= 5 and tok.startswith(phrase) and len(tok) <= len(phrase) + 2):
+                return title_n.find(tok)
+        # compound head: title_c starts with phrase or phrase after digit/separator boundary
+        pos = title_c.find(phrase)
+        if pos == 0:
+            return pos
+        return -1
+    pos = title_c.find(phrase)
+    if pos < 0:
+        return -1
+    if _continuation_blocks(title_c, pos, len(phrase)):
+        return -1
+    return pos
 
 
 def match_category(product: dict, leaves: list[dict], inv: dict) -> dict:
-    """Assign leaf only when category name evidence appears in product name/description.
+    """Assign leaf from ARTICLE TITLE only (never description — SEO fluff caused Couchtisch etc.).
 
-    No fuzzy token scoring. Empty if not certain.
+    1) Longest alias phrase in title
+    2) DB category label evidence in title only
+    Empty is better than wrong.
     """
     empty = {
         "Andertal_Kategorie_Name": "",
@@ -539,86 +935,161 @@ def match_category(product: dict, leaves: list[dict], inv: dict) -> dict:
         "Andertal_Kategorie_ID": "",
         "Andertal_Kategorie_Pfad": "",
         "Andertal_Match_Methode": "",
+        "Andertal_Kategorie_Sicherheit": "",
     }
     name = product.get("Artikelname") or ""
-    desc = strip_html(product.get("Beschreibung") or "")
-    # Prefer title evidence; description only as secondary text
     title_n = norm(name)
     title_c = compact_norm(name)
-    desc_n = norm(desc[:2500])
-    desc_c = compact_norm(desc[:2500])
-    text_n = f"{title_n} {desc_n}".strip()
-    text_c = f"{title_c}{desc_c}"
-    if len(text_n) < 4:
+    if len(title_n) < 3:
         return empty
 
     prod_aud = audience_of_text(title_n)
+    by_slug: dict[str, int] = inv["by_slug"]
+    alias_phrases: list[tuple[str, str, int]] = inv["alias_phrases"]
 
+    def pack(leaf: dict, method: str, mlen: int, sicher: str) -> dict:
+        return {
+            "Andertal_Kategorie_Name": leaf["name"],
+            "Andertal_Kategorie_Slug": leaf["slug"],
+            "Andertal_Kategorie_ID": leaf["id"],
+            "Andertal_Kategorie_Pfad": leaf["path"],
+            "Andertal_Match_Methode": f"{method}:{mlen}",
+            "Andertal_Kategorie_Sicherheit": sicher,
+        }
+
+    # --- Pass 1: longest alias in TITLE (high confidence) ---
+    best_alias = None  # (len, -pos, slug, method)
+    for phrase, slug, plen in alias_phrases:
+        pos = _title_alias_hit(title_n, title_c, phrase)
+        if pos < 0:
+            continue
+        if _only_as_fuer_object(title_n, phrase):
+            continue
+        use_slug = slug
+        # Glass/cup coasters must not catch appliance/furniture pads
+        if slug in ("tabletop-saucers", "bar-coasters") and any(
+            x in title_c
+            for x in (
+                "waschmaschine",
+                "vibration",
+                "moebelunter",
+                "waschmaschinen",
+                "trockner",
+                "kuehlschrank",
+            )
+        ):
+            continue
+        # Prefer trivets when Topf/Pfannen-Untersetzer
+        if slug == "tabletop-saucers" and any(
+            x in title_c
+            for x in ("topfuntersetzer", "pfannenuntersetzer", "fuertoepfe", "fuerpfannen", "hitzeschutz", "toepfe")
+        ):
+            if by_slug.get("trivets") is not None:
+                use_slug = "trivets"
+        # Car cradle aliases without auto/vent context → desk/bed phone mounts
+        if slug == "cell-phone-automobile-cradles" and not any(
+            x in title_c
+            for x in ("auto", "kfz", "lueftung", "luftung", "magnettelefon", "autotelefon", "lueftungsschlitz")
+        ):
+            if by_slug.get("cell-phone-bedstand-desk-mounts") is not None:
+                use_slug = "cell-phone-bedstand-desk-mounts"
+        if slug == "cell-phone-bedstand-desk-mounts" and any(
+            x in title_c for x in ("auto", "kfz", "lueftung", "luftung", "magnettelefon", "autotelefon")
+        ):
+            if by_slug.get("cell-phone-automobile-cradles") is not None:
+                use_slug = "cell-phone-automobile-cradles"
+        key = (plen, -pos, use_slug)
+        if best_alias is None or key[:2] > best_alias[:2]:
+            best_alias = (plen, -pos, use_slug, "alias_title")
+
+    if best_alias:
+        plen, _, slug, method = best_alias
+        idx = by_slug.get(slug)
+        if idx is not None:
+            sicher = "hoch" if plen >= 10 else "mittel"
+            return pack(leaves[idx], method, plen, sicher)
+
+    # --- Pass 2: DB label evidence in TITLE only (no description) ---
     word_inv = inv["word"]
     compact_inv = inv["compact"]
-
-    # Candidate leaves: title words + all compact substrings of title (exact keys only)
     cand: set[int] = set()
     for w in title_n.split():
-        if len(w) >= 5:
+        if len(w) >= 5 and w not in WEAK_EVIDENCE:
             cand.update(word_inv.get(w, ()))
-    # sliding windows over compact title → dict lookup (fast, exact)
     n = len(title_c)
     for i in range(n):
-        for L in range(6, min(48, n - i + 1)):
-            sub = title_c[i : i + L]
-            hit = compact_inv.get(sub)
+        for L in range(8, min(48, n - i + 1)):  # min 8 — avoid tisch⊂tischschutz noise
+            hit = compact_inv.get(title_c[i : i + L])
             if hit:
                 cand.update(hit)
 
-    if not cand:
-        return empty
-
     best = None
-    best_key = (-1, -1, -1)  # matched_len, depth, audience_bonus
-
+    best_key = None
     for idx in cand:
         leaf = leaves[idx]
         matched_via = None
         matched_len = 0
-        for v in leaf["variants"]:
+        matched_var = ""
+        for v in sorted(leaf["variants"], key=len, reverse=True):
+            if len(v) < 8 and " " not in v:
+                continue  # too short stem (tisch, glas, …)
+            if v in WEAK_EVIDENCE or norm(v) in WEAK_EVIDENCE or compact_norm(v) in WEAK_EVIDENCE:
+                continue
             if " " in v:
                 if v in title_n:
-                    matched_via = "title_phrase"
-                    matched_len = len(v)
-                    break
-                if v in desc_n and len(v) >= 10:
-                    matched_via = "desc_phrase"
-                    matched_len = len(v)
+                    if _only_as_fuer_object(title_n, v):
+                        continue
+                    matched_via, matched_len, matched_var = "title_phrase", len(v), v
                     break
             else:
-                # compact / single token — must appear in title compound preferably
-                if len(v) >= 6 and v in title_c:
-                    matched_via = "title_compound"
-                    matched_len = len(v)
-                    break
-                if len(v) >= 8 and v in text_c:
-                    matched_via = "desc_compound"
-                    matched_len = len(v)
+                if v in title_c:
+                    pos = title_c.find(v)
+                    if pos >= 0 and _continuation_blocks(title_c, pos, len(v)):
+                        continue
+                    if _only_as_fuer_object(title_n, v):
+                        continue
+                    matched_via, matched_len, matched_var = "title_compound", len(v), v
                     break
         if not matched_via:
             continue
 
-        # If category is "X für Y", Y must also appear in product text (else false positives)
+        # Accessory/product-pad titles must not become the host appliance/furniture
+        if any(
+            m in title_c
+            for m in (
+                "untersetzer",
+                "vibrationsdaempfer",
+                "antivibration",
+                "tischschutz",
+            )
+        ):
+            allowed = {
+                "tabletop-saucers",
+                "trivets",
+                "bar-coasters",
+                "tea-bag-coasters",
+                "sports-fan-coasters",
+                "plant-saucers",
+                "furniture-cups",
+                "mechanical-vibration-damping-pads",
+                "holiday-tree-trays-mats",
+            }
+            if leaf["slug"] not in allowed:
+                continue
+
+        # Category "X für Y" requires Y evidence in TITLE
         fuer = re.search(r"(?i)\s+für\s+(.+)$", leaf["name"])
         if fuer:
             obj_n = norm(fuer.group(1))
             obj_c = compact_norm(fuer.group(1))
-            if obj_n not in text_n and (len(obj_c) < 5 or obj_c not in text_c):
+            if obj_n not in title_n and (len(obj_c) < 5 or obj_c not in title_c):
                 continue
 
-        # Audience must not contradict (Herrenhausschuhe vs Damenhausschuhe)
         leaf_aud = leaf["audience"]
         gender_leaf = leaf_aud & {"baby_boy", "baby_girl", "boy", "girl", "men", "women"}
         gender_prod = prod_aud & {"baby_boy", "baby_girl", "boy", "girl", "men", "women", "kids", "baby"}
         aud_bonus = 0
         if gender_leaf:
-            # Exact audience only — "Kinder" alone is NOT enough to pick Jungen vs Mädchen
             specific_prod = gender_prod & {"baby_boy", "baby_girl", "boy", "girl", "men", "women"}
             if not specific_prod:
                 continue
@@ -630,51 +1101,214 @@ def match_category(product: dict, leaves: list[dict], inv: dict) -> dict:
             else:
                 aud_bonus = 2
 
-        # Compound substring matches need stronger evidence (avoid Flöten⊂Flötenkessel)
-        if matched_via.endswith("compound") and matched_len < 8:
-            continue
-        if matched_via.endswith("phrase") and matched_len < 6:
+        if matched_len < 8:
             continue
 
-        # Drop weak feature words (Reißverschluss on a hoodie, etc.)
-        weak = False
-        for v in leaf["variants"]:
-            vc = compact_norm(v) if " " not in v else ""
-            vn = norm(v)
-            if vn in WEAK_EVIDENCE or vc in WEAK_EVIDENCE:
-                if matched_len <= max(len(vn), len(vc)):
-                    weak = True
-                    break
-        if weak:
-            continue
-
-        # Prefer longer evidence, then earlier position in title, then deeper leaf
-        pos = title_c.find(compact_norm(leaf["name"][:20])) if leaf["name"] else -1
+        pos = _find_match_pos(title_c, title_n, matched_var) if matched_var else 9999
         if pos < 0:
             pos = 9999
-            for v in leaf["variants"]:
-                if " " in v:
-                    p = title_n.find(v)
-                else:
-                    p = title_c.find(v)
-                if p >= 0:
-                    pos = min(pos, p)
+        # Prefer earlier title match (product head noun)
         key = (matched_len, -pos if pos != 9999 else -9999, leaf["depth"], aud_bonus)
-        if key > best_key:
+        if best_key is None or key > best_key:
             best_key = key
-            best = (leaf, matched_via, matched_len)
+            sicher = "hoch" if matched_len >= 12 and pos <= 20 else "mittel"
+            best = (leaf, matched_via, matched_len, sicher)
 
-    if not best:
-        return empty
+    if best:
+        leaf, method, mlen, sicher = best
+        return pack(leaf, method, mlen, sicher)
 
-    leaf, method, mlen = best
-    return {
-        "Andertal_Kategorie_Name": leaf["name"],
-        "Andertal_Kategorie_Slug": leaf["slug"],
-        "Andertal_Kategorie_ID": leaf["id"],
-        "Andertal_Kategorie_Pfad": leaf["path"],
-        "Andertal_Match_Methode": f"{method}:{mlen}",
+    # --- Pass 3: soft fill from strong title nouns (niedrig) — only when still empty ---
+    # Longest phrases first. Gendered categories require audience evidence.
+    SOFT = [
+        ("handyhuelle", "cell-phone-basic-cases", False),
+        ("handyhulle", "cell-phone-basic-cases", False),
+        ("smartphonehuelle", "cell-phone-basic-cases", False),
+        ("smartphonehulle", "cell-phone-basic-cases", False),
+        ("huellekompatibelmitiphone", "cell-phone-basic-cases", False),
+        ("huellekompatibelmitsamsung", "cell-phone-basic-cases", False),
+        ("huellekompatibelmitgalaxy", "cell-phone-basic-cases", False),
+        ("huellekompatibelmitxiaomi", "cell-phone-basic-cases", False),
+        ("ipadhuelle", "tablet-cases", False),
+        ("tablethuelle", "tablet-cases", False),
+        ("galaxytabhuelle", "tablet-cases", False),
+        ("macbookhuelle", "laptop-sleeves", False),
+        ("laptophuelle", "laptop-sleeves", False),
+        ("nintendoswitchhuelle", "nintendo-switch-cases-storage", False),
+        ("schutzfolie", "cell-phone-screen-protectors", False),
+        ("panzerfolie", "cell-phone-screen-protectors", False),
+        ("powerbank", "cell-phone-portable-power-banks", False),
+        ("ladekabel", "usb-cables", False),
+        ("usbc kabel", "usb-cables", False),
+        ("usbkabel", "usb-cables", False),
+        ("hdmi kabel", "hdmi-cables", False),
+        ("hdmikabel", "hdmi-cables", False),
+        ("ledstreifen", "led-strip-lights", False),
+        ("ledband", "led-strip-lights", False),
+        ("computermaus", "computer-mice", False),
+        ("funkmaus", "computer-mice", False),
+        ("gamingmaus", "computer-mice", False),
+        ("tastatur", "computer-keyboards", False),
+        ("keyboard", "computer-keyboards", False),
+        ("kuscheldecke", "kids-throw-blankets", False),
+        ("fleecedecke", "kids-throw-blankets", False),
+        ("wohndecke", "kids-throw-blankets", False),
+        ("sofadecke", "kids-throw-blankets", False),
+        ("dekokissen", "throw-pillows", False),
+        ("zierkissen", "throw-pillows", False),
+        ("formkissen", "throw-pillows", False),
+        ("schulrucksack", "casual-daypack-backpacks", False),
+        ("korkuntersetzer", "tabletop-saucers", False),
+        ("topfuntersetzer", "trivets", False),
+        ("tischuntersetzer", "tabletop-saucers", False),
+        ("umhaengetasche", "messenger-bags", False),
+        ("schultertasche", "messenger-bags", False),
+        ("bauchtasche", "fashion-waist-packs", False),
+        ("notebooktasche", "laptop-sleeves", False),
+        ("laptoptasche", "laptop-sleeves", False),
+        ("regenschirm", "folding-umbrellas", False),
+        ("bluetoothlautsprecher", "portable-bluetooth-speakers", False),
+        ("smartwatch", "smartwatches", False),
+        ("tvstick", "streaming-media-players", False),
+        ("klemmbaustein", "toy-building-sets", False),
+        ("auflaufform", "baking-dishes", False),
+        ("backform", "baking-dishes", False),
+        ("katzenklo", "standard-cat-litter-boxes", False),
+        ("katzentoilette", "standard-cat-litter-boxes", False),
+        ("katzenschaufel", "cat-litter-scoops", False),
+        ("transportbox", "small-animal-carriers", False),
+        ("gehoerschutz", "safety-earmuffs", False),
+        ("laermschutz", "safety-earmuffs", False),
+        ("airtag", "item-finders", False),
+        ("portemonnaie", "womens-wallets", False),
+        ("geldboerse", "womens-wallets", False),
+        ("lunchbox", "lunch-boxes", False),
+        ("brotdose", "lunch-boxes", False),
+        ("wasserkocher", "electric-kettles", False),
+        ("bratpfanne", "chefs-pans", False),
+        ("schneidebrett", "cutting-boards", False),
+        ("taschenlampe", "handheld-flashlights", False),
+        ("schreibtischlampe", "desk-lamps", False),
+        ("speicherkarte", "micro-sd-memory-cards", False),
+        ("usbstick", "usb-flash-drives", False),
+        ("kopfhoerer", "over-ear-headphones", False),
+        ("gehoerschutz", "safety-earmuffs", False),
+        ("laermschutz", "safety-earmuffs", False),
+        ("passiersieb", "colanders", False),
+        ("glasschuessel", "serving-bowls", False),
+        ("espressotasse", "demitasse-cups", False),
+        ("mokkatasse", "demitasse-cups", False),
+        ("innenkamera", "dome-surveillance-cameras", False),
+        ("ueberwachungskamera", "dome-surveillance-cameras", False),
+        ("sprungball", "kickballs-playground-balls", False),
+        ("kleiderschrank", "portable-closets", False),
+        ("pyjama", "boys-pajama-sets", True),
+        ("schlafanzug", "boys-pajama-sets", True),
+        ("boxershorts", "boys-boxer-shorts", True),
+        # gendered — only if audience known
+        ("hausschuhe", "boys-slippers", True),
+        ("pantoffeln", "boys-slippers", True),
+        ("sneaker", "boys-sneakers", True),
+        ("hoodie", "boys-fashion-hoodies-sweatshirts", True),
+        ("kapuzenpullover", "boys-fashion-hoodies-sweatshirts", True),
+        ("socken", "boys-sports-recreation-socks", True),
+        ("jeans", "mens-jeans", True),
+    ]
+    SOFT.sort(key=lambda x: -len(x[0]))
+    GENDER_SLUG = {
+        "boy": {
+            "slippers": "boys-slippers",
+            "sneakers": "boys-sneakers",
+            "hoodies": "boys-fashion-hoodies-sweatshirts",
+            "socks": "boys-sports-recreation-socks",
+            "jeans": "boys-jeans",
+            "pajamas": "boys-pajama-sets",
+            "boxers": "boys-boxer-shorts",
+        },
+        "girl": {
+            "slippers": "girls-slippers",
+            "sneakers": "girls-sneakers",
+            "hoodies": "girls-fashion-hoodies-sweatshirts",
+            "socks": "girls-sports-recreation-socks",
+            "jeans": "girls-jeans",
+            "pajamas": "girls-pajama-sets",
+            "boxers": "boys-boxer-shorts",  # no girls boxers leaf commonly
+        },
+        "men": {
+            "slippers": "mens-slippers",
+            "sneakers": "mens-fashion-sneakers",
+            "hoodies": "mens-fashion-hoodies-sweatshirts",
+            "socks": "mens-sports-recreation-socks",
+            "jeans": "mens-jeans",
+            "pajamas": "mens-pajama-sets" if "mens-pajama-sets" in by_slug else "boys-pajama-sets",
+            "boxers": "mens-boxer-shorts",
+        },
+        "women": {
+            "slippers": "womens-slippers",
+            "sneakers": "womens-fashion-sneakers",
+            "hoodies": "womens-fashion-hoodies-sweatshirts",
+            "socks": "womens-sports-recreation-socks",
+            "jeans": "womens-jeans",
+            "pajamas": "womens-pajama-sets" if "womens-pajama-sets" in by_slug else "girls-pajama-sets",
+            "boxers": "mens-boxer-shorts",
+        },
     }
+    # kinder without explicit boy/girl still often pajama/boxers → niedrig boys*
+    if "kinder" in title_n or "kind" in title_c:
+        prod_aud = prod_aud | {"kids"}
+    for phrase, slug, need_gender in SOFT:
+        pos = title_c.find(phrase)
+        if pos < 0:
+            continue
+        if _continuation_blocks(title_c, pos, len(phrase)):
+            continue
+        use_slug = slug
+        if need_gender:
+            specific = prod_aud & {"boy", "girl", "men", "women", "baby_boy", "baby_girl"}
+            if not specific and (prod_aud & {"kids", "baby"}) and phrase in (
+                "pyjama",
+                "schlafanzug",
+                "boxershorts",
+                "hausschuhe",
+                "pantoffeln",
+                "socken",
+                "sneaker",
+                "hoodie",
+                "kapuzenpullover",
+            ):
+                # kids without gender → boys-* with niedrig (marked uncertain)
+                specific = {"boy"}
+            if not specific:
+                continue  # no wrong-gender guess
+            aud = next(iter(specific))
+            if aud.startswith("baby_"):
+                aud = aud[5:]  # baby_boy → boy
+            kind = (
+                "slippers"
+                if "slipper" in slug or "hausschuh" in phrase or "pantoffel" in phrase
+                else "sneakers"
+                if "sneaker" in slug or phrase == "sneaker"
+                else "hoodies"
+                if "hoodie" in slug or "kapuze" in phrase or phrase == "hoodie"
+                else "socks"
+                if "sock" in slug or phrase == "socken"
+                else "jeans"
+                if "jean" in slug or phrase == "jeans"
+                else "pajamas"
+                if phrase in ("pyjama", "schlafanzug") or "pajama" in slug
+                else "boxers"
+                if phrase == "boxershorts" or "boxer" in slug
+                else None
+            )
+            if kind and aud in GENDER_SLUG and kind in GENDER_SLUG[aud]:
+                use_slug = GENDER_SLUG[aud][kind]
+            else:
+                continue
+        idx = by_slug.get(use_slug)
+        if idx is not None:
+            return pack(leaves[idx], "soft_title", len(phrase), "niedrig")
+
+    return empty
 
 
 def find_color(text: str) -> str:
@@ -897,6 +1531,7 @@ LEAD_COLUMNS = [
     "Andertal_Kategorie_ID",
     "Andertal_Kategorie_Pfad",
     "Andertal_Match_Methode",
+    "Andertal_Kategorie_Sicherheit",
     "Farbe",
     "Farbe_Quelle",
     "Größe",
@@ -1002,6 +1637,7 @@ def main() -> int:
             "Andertal_Kategorie_ID": cat["Andertal_Kategorie_ID"],
             "Andertal_Kategorie_Pfad": cat["Andertal_Kategorie_Pfad"],
             "Andertal_Match_Methode": cat.get("Andertal_Match_Methode", ""),
+            "Andertal_Kategorie_Sicherheit": cat.get("Andertal_Kategorie_Sicherheit", ""),
             "Farbe": inferred["Farbe"],
             "Farbe_Quelle": inferred["Farbe_Quelle"],
             "Größe": inferred["Größe"],
