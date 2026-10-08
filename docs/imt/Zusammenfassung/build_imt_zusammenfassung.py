@@ -2,7 +2,7 @@
 """IM-Trading Zusammenfassung:
 - Keep products ordered since 2025-01-01
 - Order count per Artikelnummer
-- Match deepest Andertal (AmazonCategories) leaf: name, slug, id
+- Match Andertal leaf categories from DB (admin_hub_categories) by exact name/description evidence
 - Attributes + infer Farbe/Groesse/Material/Mass from name/description when missing
 """
 from __future__ import annotations
@@ -19,8 +19,9 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 BASE = Path(__file__).resolve().parent.parent
 DOCS = BASE.parent  # docs/
+ROOT = DOCS.parent
 OUT = Path(__file__).resolve().parent / "IMT Zusammenfassung.xlsx"
-AMAZON_CATS = DOCS / "AmazonCategories.csv"
+ENV_PATH = ROOT / "apps" / "medusa-backend" / ".env"
 
 ENC = "cp1252"
 ENC_ERRORS = "replace"
@@ -149,45 +150,65 @@ MATERIALS = sorted(
     reverse=True,
 )
 
-# JTL / DE shop category hints → English Amazon path tokens (boost)
-CAT_HINTS = {
-    "schuhe": ["shoes", "footwear", "slippers", "boots", "sneakers", "sandals", "loafers"],
-    "hausschuhe": ["slippers", "house slippers", "slipper"],
-    "bekleidung": ["clothing", "apparel", "shirts", "dresses", "pants", "hoodies"],
-    "hüllen": ["cases", "covers", "sleeves", "phone cases"],
-    "huellen": ["cases", "covers", "sleeves", "phone cases"],
-    "handyzubehör": ["cell phone accessories", "phone cases", "chargers"],
-    "handyzubehoer": ["cell phone accessories", "phone cases", "chargers"],
-    "tablet": ["tablets", "tablet accessories"],
-    "pc": ["computers", "laptops", "pc accessories"],
-    "laptop": ["laptops", "laptop accessories"],
-    "led": ["lighting", "led lights", "light bulbs"],
-    "leuchtmittel": ["light bulbs", "led bulbs"],
-    "decken": ["blankets", "throws", "bedding"],
-    "spielzeug": ["toys", "games", "kids toys"],
-    "gläser": ["drinkware", "glassware", "tumblers"],
-    "glaeser": ["drinkware", "glassware", "tumblers"],
-    "taschen": ["bags", "handbags", "backpacks", "shoulder bags"],
-    "rucksack": ["backpacks"],
-    "umhängetasche": ["shoulder bags", "handbags", "crossbody"],
-    "umhaengetasche": ["shoulder bags", "handbags", "crossbody"],
-    "auto": ["automotive", "car accessories", "exterior accessories"],
-    "frontscheibe": ["windshield", "car covers", "automotive"],
-    "garten": ["garden", "patio", "outdoor"],
-    "küche": ["kitchen", "dining", "cookware"],
-    "kueche": ["kitchen", "dining", "cookware"],
-    "wohnen": ["home", "home decor", "furniture"],
-    "elektronische": ["electronics", "computers", "cell phones"],
-    "fashion": ["clothing", "shoes", "jewelry", "handbags"],
-    "panzerhülle": ["phone cases", "screen protectors", "cases"],
-    "panzerhuelle": ["phone cases", "screen protectors", "cases"],
-    "disney": ["character toys", "toys"],
-    "nähen": ["sewing", "sewing kits", "crafts"],
-    "naehen": ["sewing", "sewing kits", "crafts"],
-    "heiz": ["heaters", "heating pads", "foot warmers"],
-    "fußwärmer": ["foot warmers", "heating pads"],
-    "fusswaermer": ["foot warmers", "heating pads"],
-    "kinder": ["kids", "boys", "girls", "baby"],
+# Explicit product-type phrases → category slug (only when phrase appears in title)
+# Not fuzzy scoring — hard aliases for clear German product nouns.
+ALIAS_BY_SLUG: dict[str, list[str]] = {
+    "tea-kettles": ["wasserkessel", "flotenkessel", "floetenkessel", "teekessel", "pfeifkessel"],
+    "electric-kettles": ["wasserkocher"],
+    "stockpots": ["kochtopf", "suppentopf", "kochtopfe"],
+    "luggage-scales": ["kofferwaage", "gepackwaage", "gepaeckwaage"],
+    "bike-saddles": ["fahrradsattel", "fahrradsitz"],
+    "knife-blocks": ["messerblock", "messerblocke", "messerbloecke"],
+    "hand-bath-towels": ["handtuch", "badetuch", "mikrofaserhandtuch"],
+    "cell-phone-cases-covers": ["handyhuelle", "handyhulle", "handytasche", "panzerhuelle", "panzerhulle"],
+    "girls-fashion-hoodies-sweatshirts": ["sweatjacke", "kapuzenpullover", "kapuzenjacke", "hoodie"],
+    "boys-fashion-hoodies-sweatshirts": ["sweatjacke", "kapuzenpullover", "kapuzenjacke", "hoodie"],
+    "girls-sweatshirts": ["sweatshirt", "mädchen sweatshirt"],
+    "boys-sweatshirts": ["sweatshirt", "jungen sweatshirt"],
+}
+
+# Never assign category from these alone (features/parts inside a product title)
+WEAK_EVIDENCE = {
+    "reissverschluss",
+    "reissverschlusse",
+    "knopf",
+    "knopfe",
+    "kapuze",
+    "tasche",
+    "taschen",
+    "deckel",
+    "griff",
+    "kabel",
+    "batterie",
+    "batterien",
+    "adapter",
+    "set",
+    "design",
+    "farbe",
+    "groesse",
+}
+
+# Audience markers in category labels / product text (for exact disambiguation only)
+AUDIENCE_LEAF = {
+    "babyjungen": "baby_boy",
+    "babymadchen": "baby_girl",
+    "babymädchen": "baby_girl",
+    "baby boys": "baby_boy",
+    "baby girls": "baby_girl",
+    "jungen": "boy",
+    "madchen": "girl",
+    "mädchen": "girl",
+    "boys": "boy",
+    "girls": "girl",
+    "herren": "men",
+    "damen": "women",
+    "mens": "men",
+    "womens": "women",
+    "women": "women",
+    "men": "men",
+    "kinder": "kids",
+    "kids": "kids",
+    "baby": "baby",
 }
 
 
@@ -348,145 +369,311 @@ def load_attributes(path: Path, keep_skus: set[str]) -> tuple[dict[str, dict[str
     return by_sku, long_rows
 
 
-def load_andertal_leaves(path: Path) -> tuple[list[dict], dict[str, list[int]]]:
-    """Deepest non-empty subcategory per row = leaf candidate + inverted token index."""
-    leaves = []
-    inv: dict[str, list[int]] = defaultdict(list)
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f, delimiter=";")
-        name_cols = ["Main Category"] + [f"Subcategory {i}" for i in range(1, 9)]
-        id_cols = ["Main ID"] + [f"SUB{i} ID" for i in range(1, 9)]
-        slug_cols = ["Main Slug", "SUB1 Slug", "SUB2 Slug", "SUB3 Slug", "SUB4-Slug", "SUB5 Slug", "SUB6 Slug", "SUB7 Slug", "SUB8 Slug"]
-        for row in reader:
-            depth = 0
-            for i, col in enumerate(name_cols):
-                if (row.get(col) or "").strip():
-                    depth = i
-            name = (row.get(name_cols[depth]) or "").strip()
-            cid = (row.get(id_cols[depth]) or "").strip()
-            slug = (row.get(slug_cols[depth]) or "").strip()
-            if not name or not cid:
-                continue
-            path_names = [(row.get(c) or "").strip() for c in name_cols[: depth + 1] if (row.get(c) or "").strip()]
-            path_slugs = [(row.get(c) or "").strip() for c in slug_cols[: depth + 1] if (row.get(c) or "").strip()]
-            path_str = " > ".join(path_names)
-            tok = tokens(path_str + " " + " ".join(path_slugs))
-            idx = len(leaves)
-            leaves.append(
-                {
-                    "name": name,
-                    "id": cid,
-                    "slug": slug,
-                    "path": path_str,
-                    "depth": depth,
-                    "tokens": tok,
-                    "name_tokens": tokens(name),
-                }
-            )
-            for t in tok:
-                inv[t].append(idx)
-    log(f"   Andertal leaf categories: {len(leaves):,}")
-    return leaves, inv
+def load_db_url() -> str:
+    if not ENV_PATH.exists():
+        raise FileNotFoundError(f"Missing {ENV_PATH}")
+    for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("DATABASE_URL="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise RuntimeError("DATABASE_URL not found in .env")
 
 
-def match_category(product: dict, leaves: list[dict], inv: dict[str, list[int]]) -> dict:
-    """Best deep leaf by token overlap of name + JTL cats + hints (inverted index)."""
+def compact_norm(s: str) -> str:
+    """Lowercase alphanumeric only (no spaces) — for compound DE words like Huettenhausschuhe."""
+    return re.sub(r"[^a-z0-9]", "", norm(s))
+
+
+def stem_variants(label: str) -> list[str]:
+    """Normalized phrase variants for exact evidence matching (no guessing)."""
+    raw = (label or "").strip()
+    if not raw:
+        return []
+    out: list[str] = []
+    # drop audience suffix " für …"
+    core = re.split(r"(?i)\s+für\s+", raw, maxsplit=1)[0].strip()
+    core = re.split(r"(?i)\s+for\s+", core, maxsplit=1)[0].strip()
+    candidates = [raw, core]
+    # simple DE plural → singular-ish
+    for c in list(candidates):
+        n = norm(c)
+        if n.endswith("en") and len(n) > 6:
+            candidates.append(n[:-2])
+        if n.endswith("e") and len(n) > 5:
+            candidates.append(n[:-1])
+        if n.endswith("er") and len(n) > 6:
+            candidates.append(n[:-2])
+    seen = set()
+    for c in candidates:
+        n = norm(c)
+        if len(n) < 5 or n in seen:
+            continue
+        seen.add(n)
+        out.append(n)
+        # compact form for compounds
+        cp = compact_norm(c)
+        if len(cp) >= 6 and cp not in seen:
+            seen.add(cp)
+            out.append(cp)
+    return out
+
+
+def audience_of_text(text_norm: str) -> set[str]:
+    found = set()
+    blob = f" {text_norm} "
+    # longer keys first
+    for key in sorted(AUDIENCE_LEAF.keys(), key=len, reverse=True):
+        kn = norm(key)
+        if f" {kn} " in blob or kn in compact_norm(text_norm):
+            found.add(AUDIENCE_LEAF[key])
+    # Kinder / kids without gender
+    if "kinder" in text_norm or "kinders" in text_norm:
+        found.add("kids")
+    return found
+
+
+def audience_of_leaf(label: str, slug: str) -> set[str]:
+    return audience_of_text(norm(f"{label} {slug.replace('-', ' ')}"))
+
+
+def load_andertal_leaves_from_db() -> tuple[list[dict], dict[str, list[int]]]:
+    """Load leaf categories from admin_hub_categories (name_de + path). Exact-match index only."""
+    try:
+        import psycopg2
+    except ImportError:
+        import subprocess
+
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"])
+        import psycopg2
+
+    url = load_db_url()
+    conn = psycopg2.connect(url)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        WITH RECURSIVE tree AS (
+          SELECT id, parent_id, name, slug,
+                 COALESCE(NULLIF(TRIM(metadata #>> '{translations,de,name}'), ''), name) AS label_de,
+                 ARRAY[COALESCE(NULLIF(TRIM(metadata #>> '{translations,de,name}'), ''), name)]::text[] AS path_labels,
+                 0 AS depth
+          FROM admin_hub_categories
+          WHERE parent_id IS NULL AND COALESCE(active, true) = true
+          UNION ALL
+          SELECT c.id, c.parent_id, c.name, c.slug,
+                 COALESCE(NULLIF(TRIM(c.metadata #>> '{translations,de,name}'), ''), c.name),
+                 t.path_labels || COALESCE(NULLIF(TRIM(c.metadata #>> '{translations,de,name}'), ''), c.name),
+                 t.depth + 1
+          FROM admin_hub_categories c
+          JOIN tree t ON c.parent_id = t.id
+          WHERE COALESCE(c.active, true) = true
+        )
+        SELECT t.id::text, t.slug, t.label_de, t.path_labels, t.depth
+        FROM tree t
+        WHERE NOT EXISTS (
+          SELECT 1 FROM admin_hub_categories ch
+          WHERE ch.parent_id = t.id AND COALESCE(ch.active, true) = true
+        )
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    leaves: list[dict] = []
+    word_inv: dict[str, list[int]] = defaultdict(list)
+    compact_inv: dict[str, list[int]] = defaultdict(list)
+    for cid, slug, label_de, path_labels, depth in rows:
+        label = (label_de or "").strip()
+        if not label or not cid:
+            continue
+        path_str = " > ".join([p for p in (path_labels or []) if p])
+        variants = stem_variants(label)
+        if not variants:
+            continue
+        idx = len(leaves)
+        leaves.append(
+            {
+                "name": label,
+                "id": cid,
+                "slug": slug or "",
+                "path": path_str,
+                "depth": int(depth or 0),
+                "variants": variants,
+                "audience": audience_of_leaf(label, slug or ""),
+                "best_len": max(len(v) for v in variants),
+            }
+        )
+        # slug-based hard aliases (clear product nouns)
+        for alias in ALIAS_BY_SLUG.get(slug or "", []):
+            an = norm(alias)
+            ac = compact_norm(alias)
+            if an and an not in variants:
+                variants.append(an)
+            if ac and len(ac) >= 6 and ac not in variants:
+                variants.append(ac)
+        leaves[idx]["variants"] = variants
+        leaves[idx]["best_len"] = max(len(v) for v in variants)
+
+        for v in variants:
+            if " " in v:
+                for w in v.split():
+                    if len(w) >= 5:
+                        word_inv[w].append(idx)
+            else:
+                if len(v) >= 6:
+                    compact_inv[v].append(idx)
+                for w in v.split():
+                    if len(w) >= 5:
+                        word_inv[w].append(idx)
+
+    log(f"   DB leaf categories: {len(leaves):,} | compact keys {len(compact_inv):,}")
+    return leaves, {"word": word_inv, "compact": compact_inv}
+
+
+def match_category(product: dict, leaves: list[dict], inv: dict) -> dict:
+    """Assign leaf only when category name evidence appears in product name/description.
+
+    No fuzzy token scoring. Empty if not certain.
+    """
     empty = {
         "Andertal_Kategorie_Name": "",
         "Andertal_Kategorie_Slug": "",
         "Andertal_Kategorie_ID": "",
         "Andertal_Kategorie_Pfad": "",
-        "Andertal_Match_Score": 0,
+        "Andertal_Match_Methode": "",
     }
     name = product.get("Artikelname") or ""
-    c1 = product.get("Kategorie Ebene 1") or ""
-    c2 = product.get("Kategorie Ebene 2") or ""
-    wg = product.get("Warengruppe") or ""
-    text = f"{name} {c1} {c2} {wg}"
-    tok = tokens(text)
-    if not tok:
+    desc = strip_html(product.get("Beschreibung") or "")
+    # Prefer title evidence; description only as secondary text
+    title_n = norm(name)
+    title_c = compact_norm(name)
+    desc_n = norm(desc[:2500])
+    desc_c = compact_norm(desc[:2500])
+    text_n = f"{title_n} {desc_n}".strip()
+    text_c = f"{title_c}{desc_c}"
+    if len(text_n) < 4:
         return empty
 
-    boost = set()
-    hint_blob = f"{c1} {c2} {name}"
-    n_hint = norm(hint_blob)
-    for de, ens in CAT_HINTS.items():
-        if de in n_hint:
-            for en in ens:
-                boost |= tokens(en)
+    prod_aud = audience_of_text(title_n)
 
-    # compound DE words in product name → EN shoe/slipper etc.
-    n_name = norm(name)
-    if "hausschuh" in n_name or "pantoffel" in n_name or "slipper" in n_name:
-        boost |= tokens("slippers house slippers kids slippers")
-    if "schuhe" in n_name or "stiefel" in n_name or "sneaker" in n_name:
-        boost |= tokens("shoes sneakers boots footwear")
-    if "hulle" in n_name or "huelle" in n_name or "case" in n_name:
-        boost |= tokens("phone cases covers")
-    if any(x in n_name for x in ("kochtopf", "wasserkessel", "kessel", "pfanne", "topf", "induktion", "suppentopf", "bratpfanne")):
-        boost |= tokens("cookware pots pans tea kettles kitchen dining stockpots")
-    if "led" in n_name or "leucht" in n_name or "lampe" in n_name:
-        boost |= tokens("lighting light bulbs led lights lamps")
+    word_inv = inv["word"]
+    compact_inv = inv["compact"]
 
-    query = tok | boost
-    jtl_tok = tokens(f"{c1} {c2}") | boost
-    cand_counts: Counter = Counter()
-    for t in query:
-        for idx in inv.get(t, ()):
-            cand_counts[idx] += 1
+    # Candidate leaves: title words + all compact substrings of title (exact keys only)
+    cand: set[int] = set()
+    for w in title_n.split():
+        if len(w) >= 5:
+            cand.update(word_inv.get(w, ()))
+    # sliding windows over compact title → dict lookup (fast, exact)
+    n = len(title_c)
+    for i in range(n):
+        for L in range(6, min(48, n - i + 1)):
+            sub = title_c[i : i + L]
+            hit = compact_inv.get(sub)
+            if hit:
+                cand.update(hit)
 
-    if not cand_counts:
+    if not cand:
         return empty
 
-    name_tok = tokens(name)
     best = None
-    best_score = 0.0
-    for idx, _ in cand_counts.most_common(120):
-        leaf = leaves[idx]
-        inter = query & leaf["tokens"]
-        if not inter:
-            continue
-        # Prefer overlap with leaf NAME and JTL-driven boost tokens
-        name_hit = len(leaf["name_tokens"] & name_tok)
-        boost_hit = len(leaf["tokens"] & boost)
-        jtl_hit = len(leaf["tokens"] & jtl_tok)
-        score = (
-            float(len(inter))
-            + name_hit * 3.0
-            + boost_hit * 2.5
-            + jtl_hit * 1.5
-            + leaf["depth"] * 0.2
-        )
-        # kids product should prefer kids/boys/girls path
-        if "kinder" in n_name or "kinder" in norm(c2):
-            if {"kids", "boys", "girls", "baby", "children"} & leaf["tokens"]:
-                score += 2.0
-            if {"womens", "women", "mens", "men"} & leaf["tokens"] and not ({"kids", "boys", "girls", "baby"} & leaf["tokens"]):
-                score -= 2.0
-        if "hausschuh" in n_name or "pantoffel" in n_name:
-            if "slipper" in leaf["tokens"] or "slippers" in leaf["tokens"]:
-                score += 5.0
-            if "boot" in leaf["tokens"] or "boots" in leaf["tokens"]:
-                score -= 4.0
-        if any(x in n_name for x in ("kochtopf", "wasserkessel", "kessel", "pfanne", "topf", "induktion", "suppentopf")):
-            if {"cookware", "pots", "pans", "kettles", "kitchen", "dining", "stockpots"} & leaf["tokens"]:
-                score += 5.0
-            if {"garden", "miniature", "furniture", "outdoor"} & leaf["tokens"] and "kitchen" not in leaf["tokens"]:
-                score -= 5.0
-        if score > best_score:
-            best_score = score
-            best = leaf
+    best_key = (-1, -1, -1)  # matched_len, depth, audience_bonus
 
-    if not best or best_score < 2.0:
-        empty["Andertal_Match_Score"] = round(best_score, 2)
+    for idx in cand:
+        leaf = leaves[idx]
+        matched_via = None
+        matched_len = 0
+        for v in leaf["variants"]:
+            if " " in v:
+                if v in title_n:
+                    matched_via = "title_phrase"
+                    matched_len = len(v)
+                    break
+                if v in desc_n and len(v) >= 10:
+                    matched_via = "desc_phrase"
+                    matched_len = len(v)
+                    break
+            else:
+                # compact / single token — must appear in title compound preferably
+                if len(v) >= 6 and v in title_c:
+                    matched_via = "title_compound"
+                    matched_len = len(v)
+                    break
+                if len(v) >= 8 and v in text_c:
+                    matched_via = "desc_compound"
+                    matched_len = len(v)
+                    break
+        if not matched_via:
+            continue
+
+        # If category is "X für Y", Y must also appear in product text (else false positives)
+        fuer = re.search(r"(?i)\s+für\s+(.+)$", leaf["name"])
+        if fuer:
+            obj_n = norm(fuer.group(1))
+            obj_c = compact_norm(fuer.group(1))
+            if obj_n not in text_n and (len(obj_c) < 5 or obj_c not in text_c):
+                continue
+
+        # Audience must not contradict (Herrenhausschuhe vs Damenhausschuhe)
+        leaf_aud = leaf["audience"]
+        gender_leaf = leaf_aud & {"baby_boy", "baby_girl", "boy", "girl", "men", "women"}
+        gender_prod = prod_aud & {"baby_boy", "baby_girl", "boy", "girl", "men", "women", "kids", "baby"}
+        aud_bonus = 0
+        if gender_leaf:
+            # Exact audience only — "Kinder" alone is NOT enough to pick Jungen vs Mädchen
+            specific_prod = gender_prod & {"baby_boy", "baby_girl", "boy", "girl", "men", "women"}
+            if not specific_prod:
+                continue
+            if not (gender_leaf & specific_prod):
+                if "baby" in gender_prod and gender_leaf & {"baby_boy", "baby_girl"}:
+                    aud_bonus = 1
+                else:
+                    continue
+            else:
+                aud_bonus = 2
+
+        # Compound substring matches need stronger evidence (avoid Flöten⊂Flötenkessel)
+        if matched_via.endswith("compound") and matched_len < 8:
+            continue
+        if matched_via.endswith("phrase") and matched_len < 6:
+            continue
+
+        # Drop weak feature words (Reißverschluss on a hoodie, etc.)
+        weak = False
+        for v in leaf["variants"]:
+            vc = compact_norm(v) if " " not in v else ""
+            vn = norm(v)
+            if vn in WEAK_EVIDENCE or vc in WEAK_EVIDENCE:
+                if matched_len <= max(len(vn), len(vc)):
+                    weak = True
+                    break
+        if weak:
+            continue
+
+        # Prefer longer evidence, then earlier position in title, then deeper leaf
+        pos = title_c.find(compact_norm(leaf["name"][:20])) if leaf["name"] else -1
+        if pos < 0:
+            pos = 9999
+            for v in leaf["variants"]:
+                if " " in v:
+                    p = title_n.find(v)
+                else:
+                    p = title_c.find(v)
+                if p >= 0:
+                    pos = min(pos, p)
+        key = (matched_len, -pos if pos != 9999 else -9999, leaf["depth"], aud_bonus)
+        if key > best_key:
+            best_key = key
+            best = (leaf, matched_via, matched_len)
+
+    if not best:
         return empty
 
+    leaf, method, mlen = best
     return {
-        "Andertal_Kategorie_Name": best["name"],
-        "Andertal_Kategorie_Slug": best["slug"],
-        "Andertal_Kategorie_ID": best["id"],
-        "Andertal_Kategorie_Pfad": best["path"],
-        "Andertal_Match_Score": round(best_score, 2),
+        "Andertal_Kategorie_Name": leaf["name"],
+        "Andertal_Kategorie_Slug": leaf["slug"],
+        "Andertal_Kategorie_ID": leaf["id"],
+        "Andertal_Kategorie_Pfad": leaf["path"],
+        "Andertal_Match_Methode": f"{method}:{mlen}",
     }
 
 
@@ -709,6 +896,7 @@ LEAD_COLUMNS = [
     "Andertal_Kategorie_Slug",
     "Andertal_Kategorie_ID",
     "Andertal_Kategorie_Pfad",
+    "Andertal_Match_Methode",
     "Farbe",
     "Farbe_Quelle",
     "Größe",
@@ -741,7 +929,7 @@ def main() -> int:
     best = BASE / "MC Bestellungen ab 01.01.2025.csv"
     prod = BASE / "MC Alle Produkte Detayli.csv"
     attr = BASE / "MC Alle Attribute.csv"
-    for p in (best, prod, attr, AMAZON_CATS):
+    for p in (best, prod, attr, ENV_PATH):
         if not p.exists():
             log(f"MISSING: {p}")
             return 1
@@ -763,10 +951,10 @@ def main() -> int:
     attr_by_sku, attr_long = load_attributes(attr, product_skus)
     log(f"   attribute rows: {len(attr_long):,} | SKUs with attrs: {len(attr_by_sku):,}")
 
-    log("4/5 Andertal category leaves + match...")
-    leaves, cat_inv = load_andertal_leaves(AMAZON_CATS)
+    log("4/5 Andertal leaf categories FROM DATABASE (exact name evidence only)...")
+    leaves, cat_inv = load_andertal_leaves_from_db()
 
-    log("5/5 Enrich rows + write xlsx (AN + lead columns rebuilt)...")
+    log("5/5 Enrich rows + write xlsx...")
     # Remaining original product columns (after lead block)
     skip_in_tail = {
         "Artikelnummer",
@@ -813,6 +1001,7 @@ def main() -> int:
             "Andertal_Kategorie_Slug": cat["Andertal_Kategorie_Slug"],
             "Andertal_Kategorie_ID": cat["Andertal_Kategorie_ID"],
             "Andertal_Kategorie_Pfad": cat["Andertal_Kategorie_Pfad"],
+            "Andertal_Match_Methode": cat.get("Andertal_Match_Methode", ""),
             "Farbe": inferred["Farbe"],
             "Farbe_Quelle": inferred["Farbe_Quelle"],
             "Größe": inferred["Größe"],
@@ -859,7 +1048,8 @@ def main() -> int:
             {"Kenntnis": "Mit inferred Farbe/Groesse/Material", "Wert": inferred_any},
             {"Kenntnis": "Mit GPSR Hersteller Daten", "Wert": gpsr_filled},
             {"Kenntnis": "Attribute-Zeilen", "Wert": len(attr_long)},
-            {"Kenntnis": "Kategoriequelle", "Wert": str(AMAZON_CATS.name)},
+            {"Kenntnis": "Kategoriequelle", "Wert": "admin_hub_categories (DB leaves, exact name evidence)"},
+            {"Kenntnis": "Kategorie-Regel", "Wert": "Nur wenn Kategorie-Name in Artikelname/Beschreibung vorkommt; sonst leer (kein Fuzzy)"},
             {"Kenntnis": "Hinweis EU Verantwortliche", "Wert": "In IMT-Attributen kaum vorhanden; nur Beschreibung-Parse oder leer"},
             {"Kenntnis": "Encoding", "Wert": ENC},
         ]
@@ -886,6 +1076,7 @@ def main() -> int:
         log(f"   COLS after AN: {list(df_prod.columns[1:12])}")
         log(f"   sample AN={r0['Artikelnummer']} qty={r0['Bestellmenge_seit_01_01_2025']}")
         log(f"   sample cat={r0['Andertal_Kategorie_Name']} | {r0['Andertal_Kategorie_Slug']} | {r0['Andertal_Kategorie_ID']}")
+        log(f"   sample method={r0.get('Andertal_Match_Methode','')}")
         log(f"   sample GPSR={r0['GPSR_Hersteller_Name']} | {r0['GPSR_Hersteller_Land']}")
         log(f"   sample Farbe={r0['Farbe']} Groesse={r0['Größe']} Mat={r0['Material']}")
     return 0
