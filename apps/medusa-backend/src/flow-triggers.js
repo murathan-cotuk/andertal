@@ -14,6 +14,10 @@ const ORDER_TRIGGERS = [
   'return_requested',
   'return_requested_customer_ships',
   'review_request',
+  'order_cancelled',
+  'order_refunded',
+  'return_approved',
+  'return_rejected',
 ]
 
 const MESSAGE_TRIGGERS = [

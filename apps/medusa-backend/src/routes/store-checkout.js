@@ -3632,6 +3632,7 @@ const storeOrdersCancelPOST = async (req, res) => {
     )
 
     await client.end()
+    void dispatchOrderFlowEvent('order_cancelled', orderId)
     res.json({
       success: true,
       refund_processing: refundStillProcessing,

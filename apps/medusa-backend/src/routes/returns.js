@@ -268,7 +268,7 @@ const adminHubReturnPATCH = async (req, res) => {
       if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
     }
     // A refund that is processing or done is money reality — its amount and status are frozen.
-    const cur = (await client.query('SELECT refund_status FROM store_returns WHERE id = $1::uuid', [id])).rows[0]
+    const cur = (await client.query('SELECT refund_status, status, order_id FROM store_returns WHERE id = $1::uuid', [id])).rows[0]
     if (['erstattet', 'in_bearbeitung'].includes(String(cur?.refund_status || '')) && (refund_amount_cents !== undefined || (refund_status !== undefined && !refundRequested))) {
       await client.end()
       return res.status(409).json({ message: 'Erstattung läuft bereits bzw. ist abgeschlossen — Betrag/Status nicht mehr änderbar.' })
@@ -299,6 +299,16 @@ const adminHubReturnPATCH = async (req, res) => {
          WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
         [id],
       ).catch(() => {})
+    }
+    // Customer notifications (flows, content maintained in Sellercentral → Flows).
+    {
+      const { dispatchOrderFlowEvent } = require('../order-flow-dispatch')
+      const oid = cur?.order_id
+      if (oid && status && status !== cur?.status) {
+        if (status === 'genehmigt') void dispatchOrderFlowEvent('return_approved', oid)
+        if (status === 'abgelehnt') void dispatchOrderFlowEvent('return_rejected', oid)
+      }
+      if (oid && refundSucceeded) void dispatchOrderFlowEvent('order_refunded', oid)
     }
     // Refund confirmed by Stripe → order + affiliate + bonus follow-ups (each idempotent per return).
     if (refundSucceeded) {

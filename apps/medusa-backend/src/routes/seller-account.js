@@ -57,6 +57,41 @@ module.exports = function createSellerAccountRouter({
   hashSellerPassword,
   getSmtpTransport,
 }) {
+    /**
+     * Security notice to the account owner when the payout IBAN changes (account takeover →
+     * payouts redirected is the classic marketplace fraud). Best effort, never blocks the save.
+     */
+    const notifyIbanChanged = ({ ownerEmail, actorEmail, newIban }) => {
+      setImmediate(async () => {
+        const dbClient2 = getDbClient()
+        if (!dbClient2 || !ownerEmail) return
+        try {
+          await dbClient2.connect()
+          const transport = await getSmtpTransport(dbClient2)
+          await dbClient2.end()
+          if (!transport) return
+          const masked = newIban ? `…${String(newIban).slice(-4)}` : '—'
+          const when = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
+          const by = actorEmail || ownerEmail
+          const recipients = [...new Set([ownerEmail, actorEmail].filter(Boolean).map((e) => String(e).toLowerCase()))]
+          await transport.sendMail({
+            to: recipients.join(', '),
+            subject: 'Andertal: Bankverbindung geändert / Bank account changed',
+            text: [
+              `Die Auszahlungs-IBAN Ihres Andertal-Verkäuferkontos wurde am ${when} geändert (neu: ${masked}, durch: ${by}).`,
+              'Wenn Sie das nicht waren, ändern Sie sofort Ihr Passwort und kontaktieren Sie den Andertal-Support.',
+              '',
+              `The payout IBAN of your Andertal seller account was changed on ${when} (new: ${masked}, by: ${by}).`,
+              'If this was not you, change your password immediately and contact Andertal support.',
+            ].join('\n'),
+          })
+        } catch (e) {
+          try { await dbClient2.end() } catch (_) {}
+          console.warn('[iban] change notice failed:', e?.message || e)
+        }
+      })
+    }
+
     const adminHubSellerIbanPATCH = async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const sellerEmail = req.sellerUser?.email
@@ -74,10 +109,16 @@ module.exports = function createSellerAccountRouter({
             return res.status(400).json({ message: ichk.message || 'Ungültige IBAN' })
           }
         }
+        const prevOwner = (await client.query(
+          'SELECT iban, email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1', [sellerId],
+        ).catch(() => ({ rows: [] }))).rows[0]
         await client.query(
           `UPDATE seller_users SET iban = $1, payment_account_holder = $2, payment_bic = $3, payment_bank_name = $4, updated_at = now() WHERE seller_id = $5`,
           [cleanIban, payment_account_holder || null, payment_bic || null, payment_bank_name || null, sellerId]
         )
+        if (prevOwner && String(prevOwner.iban || '') !== String(cleanIban || '')) {
+          notifyIbanChanged({ ownerEmail: prevOwner.email, actorEmail: sellerEmail, newIban: cleanIban })
+        }
 
         // Stripe payout bank account. The Custom (recipient) connected account is NOT created here
         // any more: that used to accept Stripe's terms on the seller's behalf (request IP / 127.0.0.1,

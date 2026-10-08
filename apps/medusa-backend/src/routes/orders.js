@@ -528,6 +528,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           )
         }
         await client.end()
+        if (wholeOrder) void dispatchOrderFlowEvent('order_cancelled', id)
         res.json({ success: true, whole_order: wholeOrder, refund_processing: processing })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}

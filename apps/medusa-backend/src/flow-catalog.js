@@ -13,6 +13,11 @@ const FLOW_DEFINITIONS = [
   { trigger_key: 'return_requested', audience: 'seller', category: 'returns', name: 'Retoure angefragt — Seller' },
   { trigger_key: 'return_requested_customer_ships', audience: 'customer', category: 'returns', name: 'Retoure — Kunde versendet selbst' },
   { trigger_key: 'return_requested_customer_ships', audience: 'seller', category: 'returns', name: 'Retoure (Kunde versendet) — Seller' },
+  { trigger_key: 'return_approved', audience: 'customer', category: 'returns', name: 'Retoure genehmigt — Kunde' },
+  { trigger_key: 'return_rejected', audience: 'customer', category: 'returns', name: 'Retoure abgelehnt — Kunde' },
+  { trigger_key: 'order_refunded', audience: 'customer', category: 'returns', name: 'Erstattung ausgeführt — Kunde' },
+  { trigger_key: 'order_cancelled', audience: 'customer', category: 'orders', name: 'Bestellung storniert — Kunde' },
+  { trigger_key: 'order_cancelled', audience: 'seller', category: 'orders', name: 'Bestellung storniert — Seller' },
 
   { trigger_key: 'customer_message_sent', audience: 'customer', category: 'inbox', name: 'Kundennachricht — Kopie an Kunden' },
   { trigger_key: 'seller_new_customer_message', audience: 'seller', category: 'inbox', name: 'Kundennachricht — Hinweis an Seller' },

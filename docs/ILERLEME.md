@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — F. Bildirimler, 1. adım: eksik tetikleyiciler + IBAN güvenlik bildirimi (bitti)
+
+- **Denetim (okuma)**: canlıda 27 aktif flow var (sipariş onayı, işleme, kargo, teslim, iade talebi, mesajlar, destek, satıcı yaşam döngüsü, pazarlama). Kodda hiç tetiklenmeyen müşteri olayları: sipariş iptali, para iadesi, iade onayı/reddi.
+- Yeni sipariş tetikleyicileri (`flow-triggers.js` + `flow-catalog.js` + SC Flows 6 dil + gruplar): `order_cancelled` (müşteri + satıcı; müşteri iptali ve SC tam iptalinde), `order_refunded` (iade parası Stripe'ta başarılı), `return_approved` / `return_rejected` (iade durumu gerçekten değişince). Ortak `src/order-flow-dispatch.js` (kuyruk, yoksa anında).
+- **Metin yok**: CLAUDE.md gereği içerik uydurulmadı — bu tetikleyiciler için e-posta, superuser SC → Marketing → Flows'ta flow oluşturunca gider. Flow yoksa sessiz.
+- **IBAN güvenlik bildirimi** (C'den devreden): ödeme IBAN'ı değişince hesap sahibine (+ değiştiren ekip üyesine) kısa sistem e-postası (DE+EN; maskeli IBAN, kim, ne zaman, "siz değilseniz şifre değiştirin"). DB'deki SMTP ayarıyla (davet e-postasıyla aynı yol); kaydı asla engellemez.
+- `npm test` 228/0, SC esbuild OK.
+- **Kullanıcıya iş**: SC Flows'ta "Bestellung storniert", "Erstattung ausgeführt", "Retoure genehmigt/abgelehnt" flow'larını oluşturmak (metin işletmeye ait).
+
 ## 2026-10-08 — E, 5. adım: PDP teklif/varyant stok tutarlılığı (denetim, değişiklik yok) — E ALANI KAPANDI
 
 - "Andere Verkäufer" satırlarının `in_stock`'u backend'de teklifin kendi (listing) stoğundan; ana buybox ve varyant seçici varyant/ürün stoğundan → `src/inventory.js` checkout kuralıyla aynı. Sahipsiz ürün (seller_id boş) ana kutudan ürün/varyant stoğuyla satılır — o da aynı.
