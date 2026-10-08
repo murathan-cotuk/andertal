@@ -2467,6 +2467,44 @@ module.exports = function createAdminProductsRouter() {
         return res.status(403).json({ message: ownership.message })
       }
 
+      // ── Family mode for the "new roof" flow (Faz 3, default since 2026-10-08): no roof row —
+      // the selected products are linked into a family and stay independently sellable
+      // (own EAN, price, stock); the shop shows them as variants on each member's PDP. ──
+      if (createNewParent && !legacyFold) {
+        const famPlan = buildFamilyLinkPlan({
+          familyTitle: roofTitle || loaded[0]?.title,
+          products: loaded,
+          optionName,
+          optionValues,
+        })
+        if (!famPlan.ok) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({ message: famPlan.message })
+        }
+        const famIns = await client.query(
+          `INSERT INTO admin_hub_product_families (title, handle, metadata) VALUES ($1, $2, $3::jsonb) RETURNING id`,
+          [famPlan.family_title, `${slugifyTitle(famPlan.family_title) || 'family'}-${Date.now().toString(36)}`, JSON.stringify({ variation_groups: famPlan.variation_groups })],
+        )
+        const familyId = famIns.rows[0].id
+        for (const m of famPlan.members) {
+          await client.query(
+            `UPDATE admin_hub_products
+             SET family_id = $1, product_role = $2,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb, updated_at = now()
+             WHERE id = $4`,
+            [familyId, PRODUCT_ROLE_PRODUCT, JSON.stringify({ family_option_value: m.option_value, variation_groups: famPlan.variation_groups }), m.product_id],
+          )
+        }
+        await client.query('COMMIT')
+        return res.json({
+          combined: true,
+          mode: 'family_link',
+          family_id: familyId,
+          product_ids: famPlan.members.map((m) => m.product_id),
+          variation_groups: famPlan.variation_groups,
+        })
+      }
+
       // ── New roof (çatı): create a fresh parent; selected products become its variants ──
       if (createNewParent) {
         const roofPlan = buildNewRoofCombinePlan({

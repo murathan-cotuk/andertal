@@ -10,6 +10,11 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — Faz 3 adım 4 (kod): aile modu varsayılan; yapılamayanlar
+
+- SC "Varyant olarak birleştir" artık varsayılan olarak aile oluşturur (`legacyFold: false`): backend yeni-çatı yoluna aile modu eklendi (çatı ürünü yok; seçilen ürünler satılabilir kalır, PDP'de varyant). Aile handle'ı benzersiz ek alır (benzersiz indeks). Kendi varyantı olan ürün aileye eklenemez (400, açıklamalı). Eski katlama `legacyFold: true` ile hâlâ mümkün.
+- **Yapılamayanlar (kullanıcıda)**: (a) 3 eski siparişin production UPDATE'i ve (b) backfill `--apply` — production yazımı otomatik izin denetimince engelli; kullanıcı ya izin kuralı ekler ya da komutu kendisi çalıştırır. (c) Resend webhook + `RESEND_WEBHOOK_SECRET`, (d) Stripe canlı anahtar/webhook kurulumu — kullanıcının hesap panelleri (gizli anahtar girişi).
+
 ## 2026-10-08 — Bekleyen işler 7: Handoff Faz 3 family_link — adım 1–3 (bitti; 4. adım kullanıcıda)
 
 - Durum: canlıda aile kaydı yok (`family_id` 0, `admin_hub_product_families` 0); SC birleştirme varsayılanı `legacyFold: true` → bugünkü ürünler etkilenmez, yeni kod yalnız aile üyelerinde çalışır.

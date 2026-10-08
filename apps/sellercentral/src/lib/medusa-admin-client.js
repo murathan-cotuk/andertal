@@ -280,7 +280,8 @@ class MedusaAdminClient {
     parentTitle,
     parentSku,
     createNewParent = true,
-    legacyFold = true,
+    // Faz 3: family_link is the default — products stay sellable (own EAN/price/stock).
+    legacyFold = false,
   } = {}) {
     return this.request('/admin-hub/v1/products/combine-as-variants', {
       method: 'POST',

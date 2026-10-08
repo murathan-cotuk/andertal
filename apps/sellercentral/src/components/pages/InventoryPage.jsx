@@ -2359,7 +2359,7 @@ export default function InventoryPage() {
       setSelectedIds([]);
       const data = await medusaClient.getAdminHubProducts();
       setProducts(data.products || []);
-      const parent = res?.parent_id;
+      const parent = res?.parent_id || (Array.isArray(res?.product_ids) ? res.product_ids[0] : null);
       if (parent) router.push(`/products/${parent}`);
     } catch (e) {
       setError(userError(e, locale, "Failed to combine products"));
