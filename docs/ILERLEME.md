@@ -10,6 +10,11 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — E, 5. adım: PDP teklif/varyant stok tutarlılığı (denetim, değişiklik yok) — E ALANI KAPANDI
+
+- "Andere Verkäufer" satırlarının `in_stock`'u backend'de teklifin kendi (listing) stoğundan; ana buybox ve varyant seçici varyant/ürün stoğundan → `src/inventory.js` checkout kuralıyla aynı. Sahipsiz ürün (seller_id boş) ana kutudan ürün/varyant stoğuyla satılır — o da aynı.
+- **E alanı özeti**: Grundpreis listelerde + Merchant feed birim fiyat + feed görsel biçimi; stok kontrolü/düşüm/geri ekleme; kupon müşteri limiti tahsilattan önce + doğru kupon sayacı; minimum adet; ödemede yeniden fiyatlama. Shop görünümüne istenmeden dokunulmadı (yalnız yasal Grundpreis satırı, mesajlar). Açık: kategori sayfasında sunucu tarafı sayfalama (katalog büyüyünce).
+
 ## 2026-10-08 — E, 4. adım: sepet fiyatı ödemede yeniden hesaplanır (bitti) — PARA DÜZELTMESİ
 
 - **Hata**: sepet satırının fiyatı yalnız sepete eklenirken sunucuda hesaplanıp satıra yazılıyordu; ödeme bu anlık görüntüden alınıyordu. Satıcı fiyatı artırınca, kampanya bitince veya müşteri farklı fiyatlı bir pazara (AT/FR/IT/ES, E/s34 pazar fiyatları) teslimat seçince eski fiyat tahsil ediliyordu.
