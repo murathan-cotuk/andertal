@@ -34,7 +34,12 @@ function resolveStockTarget({ line, product, listing }) {
     return { kind: 'listing', productId: product.id, sellerId: lineSeller, idx: null, available: toInt(listing.inventory) }
   }
   const variants = Array.isArray(product.variants) ? product.variants : []
-  const idx = parseVariantIndex(line.variant_id)
+  // Same resolver as the cart (product-identity.js): "-ean-<EAN>" ids (the shop's default for EAN
+  // variants), explicit variant ids, "-variant-<i>" / "-v-<i>". Only parsing the index used to
+  // fall back to the product row (0 for variant products) for EAN ids and block the sale.
+  let idx = null
+  try { idx = require('./product-identity').resolveVariantFromCartId(product, line.variant_id).index } catch (_) { idx = null }
+  if (idx == null) idx = parseVariantIndex(line.variant_id)
   if (variants.length && idx != null && variants[idx]) {
     const v = variants[idx]
     const raw = v.inventory != null ? v.inventory : v.inventory_quantity

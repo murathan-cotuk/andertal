@@ -84,3 +84,10 @@ test('minimum order quantity sums all lines of a product — real Postgres', { s
     await c.end()
   }
 })
+
+test('EAN-style variant ids (shop default) resolve to the variant stock, not the product row', () => {
+  const product = { id: 'p9', seller_id: 's', inventory: 0, variants: [{ ean: '4006381333931', inventory: 7 }, { ean: '4006381333948', inventory: 0 }] }
+  const t = inv.resolveStockTarget({ line: { seller_id: 's', variant_id: 'p9-ean-4006381333931' }, product })
+  assert.deepEqual([t.kind, t.idx, t.available], ['variant', 0, 7])
+  assert.equal(inv.resolveStockTarget({ line: { seller_id: 's', variant_id: 'p9-ean-4006381333948' }, product }).available, 0)
+})

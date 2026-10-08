@@ -10,6 +10,10 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — ACİL düzeltme: stok kontrolü EAN varyant kimliklerini tanımıyordu (bitti)
+
+- Shop, EAN'lı varyantlar için sepet kimliğini `<ürün>-ean-<EAN>` üretiyor (`stableVariantId`). `inventory.js` yalnız `-variant-<i>`/`-v-<i>` okuyordu → EAN kimliğinde ürün satırının stoğuna (varyantlı üründe 0) düşüp ödemeyi `insufficient_stock` ile reddedebilirdi. Artık sepetle aynı çözümleyici (`product-identity.resolveVariantFromCartId`), yedek olarak indeks. Test +1 (EAN kimliği → varyant stoğu). E/2 stok kodu deploy edilmeden önce bu düzeltme gerekli.
+
 ## 2026-10-08 — Bekleyen işler 6: Resend bounce/şikâyet webhook'u (kod bitti; panel kurulumu kullanıcıda)
 
 - `POST /webhooks/resend` (`routes/resend-webhook.js`): Svix imzası (`RESEND_WEBHOOK_SECRET`, 5 dk tolerans, sabit zamanlı karşılaştırma); `email.bounced` (kalıcı) → `email_suppressions` (bounce), `email.complained` → şikâyet kaydı + bülten aboneliğinden çıkış.
