@@ -166,7 +166,9 @@
     "enterOtherBillingAddress": "Saisir une autre adresse de facturation…",
     "couponCode": "Code promo",
     "removeBonusDiscount": "Retirer la réduction bonus",
-    "couponDiscount": "Réduction coupon"
+    "couponDiscount": "Réduction coupon",
+    "insufficientStock": "Certains articles ne sont plus disponibles dans la quantité demandée. Veuillez ajuster votre panier.",
+    "sellerUnavailable": "Certains articles sont actuellement indisponibles. Veuillez les retirer de votre panier."
   },
   "accountPanel": {
     "hello": "Bonjour, {name}",

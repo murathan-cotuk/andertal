@@ -2149,7 +2149,12 @@ export default function CheckoutPage() {
           setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents - bonusDiscountCents - Number(cart?.coupon_discount_cents || 0) + effectiveShippingCents);
         } else {
           setZeroCheckoutMode(false);
-          setPiError(data?.message || t("configError"));
+          // Backend codes → customer language (stock / unavailable seller, src/inventory.js).
+          setPiError(
+            data?.code === "insufficient_stock" ? t("insufficientStock")
+              : data?.code === "seller_unavailable" ? t("sellerUnavailable")
+                : (data?.message || t("configError")),
+          );
           setPayCents(null);
         }
       })

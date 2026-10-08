@@ -43,6 +43,7 @@ export async function POST(request) {
       {
         message,
         backend_status: res.status,
+        ...(data && typeof data === "object" && data.code ? { code: data.code } : {}),
       },
       { status: res.status }
     );

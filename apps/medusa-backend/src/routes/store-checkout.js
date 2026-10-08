@@ -1136,6 +1136,21 @@ const storePaymentIntentPOST = async (req, res) => {
       }
     }
 
+    // Stock (src/inventory.js): the payment is only started when every line is in stock.
+    try {
+      const shortages = await require('../inventory').checkCartStock(client, items)
+      if (shortages.length) {
+        await client.end()
+        return res.status(409).json({
+          code: 'insufficient_stock',
+          message: 'Einige Artikel sind nicht mehr in der gewünschten Menge verfügbar. Bitte passen Sie den Warenkorb an.',
+          shortages,
+        })
+      }
+    } catch (stockErr) {
+      console.warn('[checkout] stock check failed (not blocking):', stockErr?.message || stockErr)
+    }
+
     // Shipping is quoted here per seller (own shipping groups + own free-shipping threshold) —
     // never taken from the client's body.shipping_cents, which a customer could set to 0.
     const shippingCountry = normalizeShippingCountry(body.shipping_country || body.country) || 'DE'
@@ -3517,6 +3532,7 @@ const storeOrdersCancelPOST = async (req, res) => {
 
     // payment_status only says 'refunded' once Stripe confirmed the refund; a refund still
     // processing keeps 'bezahlt' and the webhook (refund.updated) completes it.
+    try { await require('../inventory').restoreOrderStock(client, orderId) } catch (stockErr) { console.warn('[cancel] stock restore failed:', stockErr?.message || stockErr) }
     const markRefunded = totalCents > 0 && !refundStillProcessing
     await client.query(
       `UPDATE store_orders SET order_status = 'storniert',
@@ -4018,6 +4034,13 @@ const storeOrdersPOST = async (req, res) => {
           lineRates.has(it) ? lineRates.get(it) : null,
         ]
       )
+    }
+
+    // Stock: deduct once per order (never below 0). Must not fail the already paid order.
+    try {
+      await require('../inventory').deductOrderStock(client, orderId)
+    } catch (stockErr) {
+      console.error('[checkout] stock deduction failed for order', orderId, stockErr?.message || stockErr)
     }
 
     // Settlement: verified payment snapshot + immutable per-seller payables. A failure here must not

@@ -502,6 +502,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           if (!r.ok) { await client.end(); return res.status(r.status).json({ ...(r.code ? { code: r.code } : {}), message: r.message }) }
           processing = r.processing
           wholeOrder = r.all_cancelled
+          try { await require('../inventory').restoreOrderStock(client, id, { sellerId }) } catch (stockErr) { console.warn('[cancel] stock restore failed:', stockErr?.message || stockErr) }
         } else if (paid) {
           const r = await refundWholeOrderPayment(client, {
             orderId: id, piId: String(row.payment_intent_id || '').trim(), totalCents: Number(row.total_cents), secretKey, actor, reason: 'cancellation',
@@ -513,6 +514,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           return res.status(409).json({ code: 'contact_support', message: 'Unbezahlte Bestellung mit mehreren Händlern — bitte über den Support.' })
         }
         if (wholeOrder) {
+          try { await require('../inventory').restoreOrderStock(client, id) } catch (stockErr) { console.warn('[cancel] stock restore failed:', stockErr?.message || stockErr) }
           const { appendBonusLedger } = require('./store-checkout')
           await reverseBonusForCancel(client, {
             orderId: id, customerId: row.customer_id, orderNumber: row.order_number,

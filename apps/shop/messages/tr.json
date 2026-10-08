@@ -183,7 +183,9 @@
     "enterOtherBillingAddress": "Farklı fatura adresi girin…",
     "couponCode": "Kupon kodu",
     "removeBonusDiscount": "Bonus indirimini kaldır",
-    "couponDiscount": "Kupon indirimi"
+    "couponDiscount": "Kupon indirimi",
+    "insufficientStock": "Bazı ürünler istenen miktarda artık mevcut değil. Lütfen sepetinizi güncelleyin.",
+    "sellerUnavailable": "Bazı ürünler şu anda satışta değil. Lütfen sepetinizden çıkarın."
   },
   "accountPanel": {
     "hello": "Merhaba, {name}",

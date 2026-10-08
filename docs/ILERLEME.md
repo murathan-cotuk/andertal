@@ -10,6 +10,18 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — E, 2. adım: checkout stok yönetimi (bitti) — kullanıcı kararı "Düşüm + kontrol"
+
+- **Bulgu**: sipariş akışında hiçbir yer stoğu okumuyor/yazmıyordu (yalnız shop'ta "Sepete ekle" düğmesi 0 stokta pasifti). Stok 1 olan ürün sınırsız satılabiliyor, stok hiç azalmıyordu.
+- Yeni `src/inventory.js`: satırın stoğu nerede — satıcı = ürün sahibi (veya sahipsiz ürün) → varyant (`…-variant-i` / `…-v-i` / `…-listing-<s>-variant-i` sırası) yoksa ürün; başka satıcının teklifi (gölge olmayan listing) → listing stoğu. Varyantta stok alanı yoksa "takip edilmiyor" (engellemez, düşmez).
+- **Kontrol**: `/store/payment-intent` aynı stoğu paylaşan satırların adetlerini toplar; yetmezse 409 `insufficient_stock` (+ satırlar, mevcut/istenen). Kontrol hata verirse ödeme engellenmez (loglanır).
+- **Düşüm**: sipariş oluşturulunca bir kez (`store_orders.stock_deducted_at`), atomik `GREATEST(0, …)` — 0'ın altına inmez; idempotent tekrar sipariş isteği düşmez.
+- **Geri ekleme**: gönderim öncesi iptal — müşteri iptali ve SC tam iptal tüm satırlar; satıcının kendi kalem iptali yalnız onun satırları; satır başına bir kez (`store_order_items.stock_restored_at`). İadeler (Retoure) otomatik stoğa dönmez (ürün durumu satıcı kararı).
+- Şema: `ensureInventorySchema` boot'ta (`ADD COLUMN IF NOT EXISTS`).
+- Shop: proxy artık `code`'u geçirir; checkout `insufficient_stock` / `seller_unavailable` için 6 dilde mesaj (`checkout.insufficientStock`, `checkout.sellerUnavailable`).
+- Test: `inventory.test.js` (3 birim + 1 gerçek Postgres: düşüm, 0 tabanı, idempotent, satıcı bazlı geri ekleme). `npm test` 228 geçti / 0 hata.
+- **Canlı etki (okuma 2026-10-08)**: başka satıcıların aktif teklifleri (test verisi "automotive/appliances | | | title_de") stok 0 → artık satılamaz; satıcının SC'de stok girmesi gerekir. Sahip ürünlerin varyant stokları dolu (ör. 10/50/100) → satış sürer, satışta azalır. Varyantlı ürünlerin üst `inventory` alanı 0 ama stok varyantta olduğu için etkilenmez.
+
 ## 2026-10-08 — E. Shop vitrini, 1. adım: Grundpreis listelerde + Merchant feed (bitti)
 
 - **Grundpreis ürün kartlarında** (PAngV §4: fiyatın gösterildiği her yerde): yeni `components/product/CardGrundpreis.jsx` (PDP ile aynı `computeGrundpreis`; varyantın kendi içeriği önce; indirimli fiyat gösteriliyorsa ona göre). Fiyatın altında küçük gri satır: ürün kartı (grid + liste), kategori satırı, landing ürün döşemesi (beyaz yazı), arama sonuç döşemesi. Satıcı içerik miktarı girmediyse hiçbir şey çizilmez → diğer kartların görünümü aynı. Canlıda 7 yayındaki üründe içerik miktarı var; bunlarda satır görünür.

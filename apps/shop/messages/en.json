@@ -183,7 +183,9 @@
     "enterOtherBillingAddress": "Enter different billing address…",
     "couponCode": "Coupon code",
     "removeBonusDiscount": "Remove bonus discount",
-    "couponDiscount": "Coupon discount"
+    "couponDiscount": "Coupon discount",
+    "insufficientStock": "Some items are no longer available in the requested quantity. Please adjust your cart.",
+    "sellerUnavailable": "Some items are currently unavailable. Please remove them from your cart."
   },
   "accountPanel": {
     "hello": "Hello, {name}",

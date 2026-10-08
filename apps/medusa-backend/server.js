@@ -2061,6 +2061,12 @@ async function start() {
         } catch (jtlErr) {
           console.error('[jtl-partner] schema migration failed:', jtlErr && jtlErr.message)
         }
+        // Checkout stock deduction / restore markers (src/inventory.js).
+        try {
+          await require('./src/inventory').ensureInventorySchema(client)
+        } catch (invErr) {
+          console.error('[inventory] schema migration failed:', invErr && invErr.message)
+        }
         await client.end()
         log.info('Admin Hub and support-case tables ready')
       } catch (migErr) {

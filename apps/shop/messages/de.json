@@ -183,7 +183,9 @@
     "enterOtherBillingAddress": "Andere Rechnungsadresse eingeben …",
     "couponCode": "Gutscheincode",
     "removeBonusDiscount": "Bonusrabatt entfernen",
-    "couponDiscount": "Gutschein-Rabatt"
+    "couponDiscount": "Gutschein-Rabatt",
+    "insufficientStock": "Einige Artikel sind nicht mehr in der gewünschten Menge verfügbar. Bitte passen Sie den Warenkorb an.",
+    "sellerUnavailable": "Einige Artikel sind derzeit nicht verfügbar. Bitte entfernen Sie sie aus dem Warenkorb."
   },
   "accountPanel": {
     "hello": "Hallo, {name}",
