@@ -1343,6 +1343,8 @@ function renderCommissionInvoiceDocument(doc, opts) {
     shippingCents: opts.shippingCents || opts.order?.shipping_cents || 0,
     labelCents: opts.labelCents || 0,
     refundCents: opts.refundCents || 0,
+    commissionVatCents: opts.commissionVatCents != null ? opts.commissionVatCents : null,
+    commissionVatScheme: opts.commissionVatScheme || null,
   })
 }
 

@@ -764,3 +764,21 @@ withDb('seller view: multi-seller order stays "offen" for the seller who has not
   const sh = (await c.query(`SELECT label_url FROM order_shipments WHERE order_id = $1 AND seller_id = 'seller_a'`, [order.id])).rows[0]
   assert.equal(sh.label_url, 'https://l/a')
 })
+
+withDb('commission invoice per seller from payables: own amount, own VAT scheme, own number', async (c) => {
+  await h.addSeller(c, 'seller_a', { rate: 0.1 })
+  await h.addSeller(c, 'seller_b', { rate: 0.2 })
+  const { order } = await h.addPaidOrder(c, { items: [{ seller: 'seller_a', price: 5000 }, { seller: 'seller_b', price: 1000 }] })
+  await s.createPayablesForOrder(c, order.id)
+  // Production columns the PDF query reads (not in the minimal test schema).
+  for (const col of ['coupon_discount_cents integer DEFAULT 0', 'stripe_application_fee_cents integer', 'seller_net_after_commission_cents integer', 'platform_bonus_funding_cents integer DEFAULT 0']) {
+    await c.query('ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS ' + col)
+  }
+  const { buildProvisionsfakturPdfBuffer } = require('../order-pdf-buffers')
+  await assert.rejects(() => buildProvisionsfakturPdfBuffer(c, order.id), /seller_id required/)
+  const a = await buildProvisionsfakturPdfBuffer(c, order.id, { sellerId: 'seller_a' })
+  const b = await buildProvisionsfakturPdfBuffer(c, order.id, { sellerId: 'seller_b' })
+  assert.match(a.filename, /Provisionsfaktur-\d+-1\.pdf/)
+  assert.match(b.filename, /Provisionsfaktur-\d+-2\.pdf/)
+  assert.ok(a.content.length > 1000 && b.content.length > 1000)
+})

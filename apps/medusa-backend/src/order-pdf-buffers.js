@@ -287,11 +287,15 @@ function renderProvisionsfakturPdfDocument(doc, {
   platformLines,
   platformVatPercent,
   bonusFundingCents = 0,
+  settlement = null,
+  documentNumber = null,
 }) {
   const on = order.order_number != null ? String(order.order_number) : String(order.id || '').slice(0, 8)
-  const grossSalesCents = Number(order.subtotal_cents || order.total_cents || 0)
+  const grossSalesCents = settlement ? settlement.grossSalesCents : Number(order.subtotal_cents || order.total_cents || 0)
   const storedNet = Number(order.seller_net_after_commission_cents)
-  const payoutCents = Number.isFinite(storedNet) && storedNet > 0 ? storedNet : Math.max(0, grossSalesCents - Number(commissionCents || 0))
+  const payoutCents = settlement
+    ? Math.max(0, settlement.grossSalesCents + settlement.shippingCents - settlement.commissionCents - settlement.commissionVatCents)
+    : (Number.isFinite(storedNet) && storedNet > 0 ? storedNet : Math.max(0, grossSalesCents - Number(commissionCents || 0)))
   const rate = displayCommissionRatePct(commissionRatePct)
 
   renderCommissionInvoiceDocument(doc, {
@@ -304,9 +308,14 @@ function renderProvisionsfakturPdfDocument(doc, {
     payoutCents,
     platformLines,
     platformVatPercent,
-    invoiceNumber: `PROV-${on}`,
+    invoiceNumber: `PROV-${documentNumber || on}`,
     bonusFundingCents,
-    customerPaidCents: resolveOrderPaidTotalCents(order),
+    customerPaidCents: settlement ? settlement.grossSalesCents + settlement.shippingCents : resolveOrderPaidTotalCents(order),
+    ...(settlement ? {
+      shippingCents: settlement.shippingCents,
+      commissionVatCents: settlement.commissionVatCents,
+      commissionVatScheme: settlement.commissionVatScheme,
+    } : {}),
   })
 }
 
@@ -516,7 +525,35 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId, locale) {
   return { filename: getOrderPdfFilename('lieferschein', on, resolvedLocale), content: buf }
 }
 
-async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
+/**
+ * Per-order commission invoice from the settlement payables of ONE seller (frozen rate, commission
+ * and commission VAT + scheme, e.g. reverse charge). Previously the whole order's
+ * stripe_application_fee was billed to the first seller with a flat 19 % — wrong amount for
+ * multi-seller orders and German VAT shown to reverse-charge / non-EU sellers (§14c UStG).
+ * Number: PROV-<order>, and PROV-<order>-<n> per seller on multi-seller orders (the platform is
+ * the issuer — one number per document).
+ */
+async function loadSellerCommissionForOrder(pgClient, orderId, sellerId) {
+  const r = await pgClient.query(
+    `SELECT kind, gross_cents, shipping_cents, commission_cents, commission_vat_cents, commission_vat_scheme, commission_rate_snapshot
+       FROM seller_payables WHERE order_id = $1::uuid AND seller_id = $2`,
+    [orderId, sellerId],
+  ).catch(() => ({ rows: [] }))
+  if (!r.rows.length) return null
+  const sum = (k) => r.rows.reduce((a, p) => a + Number(p[k] || 0), 0)
+  const items = r.rows.filter((p) => p.kind === 'item')
+  const schemes = [...new Set(r.rows.map((p) => p.commission_vat_scheme).filter(Boolean))]
+  return {
+    grossSalesCents: items.reduce((a, p) => a + Number(p.gross_cents || 0), 0),
+    shippingCents: sum('shipping_cents'),
+    commissionCents: sum('commission_cents'),
+    commissionVatCents: sum('commission_vat_cents'),
+    commissionVatScheme: schemes[0] || 'domestic',
+    ratePct: items.length ? Number(items[0].commission_rate_snapshot) * 100 : null,
+  }
+}
+
+async function buildProvisionsfakturPdfBuffer(pgClient, orderId, { sellerId = null } = {}) {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query(
     `SELECT id, order_number, seller_id, created_at, subtotal_cents, total_cents, shipping_cents,
@@ -528,8 +565,18 @@ async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
   const order = oRes.rows?.[0]
   if (!order) return null
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
-  const sellerInfo = await querySellerInfoForOrderDocuments(pgClient, order, iRes.rows || [])
+  const enrichedItems = await enrichOrderItemRows(pgClient, iRes.rows || [])
+  const orderSellers = [...new Set(enrichedItems.map((it) => realSellerKey(it.seller_id)).filter(Boolean))].sort()
+  const sid = realSellerKey(sellerId) || (orderSellers.length === 1 ? orderSellers[0] : null)
+  if (!sid && orderSellers.length > 1) {
+    const err = new Error('seller_id required for a multi-seller order')
+    err.status = 400
+    err.sellers = orderSellers
+    throw err
+  }
+  const sellerInfo = sid ? await _querySellerInfo(pgClient, sid) : await querySellerInfoForOrderDocuments(pgClient, order, iRes.rows || [])
   const platform = await loadPlatformIssuer(pgClient)
+  const fromPayables = sid ? await loadSellerCommissionForOrder(pgClient, id, sid) : null
 
   const storedFee = Number(order.stripe_application_fee_cents)
   const subtotal = Number(order.subtotal_cents || order.total_cents || 0)
@@ -538,20 +585,23 @@ async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
   const commissionRatePct = sellerCommissionRatePct(sellerRate)
 
   const on = order.order_number != null ? String(order.order_number) : String(id).slice(0, 8)
+  const docNo = orderSellers.length > 1 && sid ? `${on}-${orderSellers.indexOf(sid) + 1}` : on
 
   const buf = await pdfDocToBuffer((doc) =>
     renderProvisionsfakturPdfDocument(doc, {
       order,
       sellerInfo,
       shopName: platform.shopName,
-      commissionCents,
-      commissionRatePct,
+      commissionCents: fromPayables ? fromPayables.commissionCents : commissionCents,
+      commissionRatePct: fromPayables && fromPayables.ratePct != null ? fromPayables.ratePct : commissionRatePct,
       platformLines: platform.lines,
       platformVatPercent: platform.vatPercent,
-      bonusFundingCents: Number(order.platform_bonus_funding_cents || 0),
+      bonusFundingCents: orderSellers.length > 1 ? 0 : Number(order.platform_bonus_funding_cents || 0),
+      settlement: fromPayables,
+      documentNumber: docNo,
     }),
   )
-  return { filename: `Provisionsfaktur-${on}.pdf`, content: buf }
+  return { filename: `Provisionsfaktur-${docNo}.pdf`, content: buf }
 }
 
 /**

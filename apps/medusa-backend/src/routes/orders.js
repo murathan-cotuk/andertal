@@ -435,7 +435,18 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
             return res.status(403).json({ message: 'Access denied' })
           }
         }
-        const pdf = await buildProvisionsfakturPdfBuffer(client, id)
+        // Commission invoice per seller: a seller gets its own, the superuser picks ?seller_id=.
+        const provSeller = isSuper ? (String(req.query?.seller_id || '').trim() || null) : loggedSellerId
+        let pdf
+        try {
+          pdf = await buildProvisionsfakturPdfBuffer(client, id, { sellerId: provSeller })
+        } catch (pe) {
+          if (pe?.status === 400) {
+            await client.end(); client = null
+            return res.status(400).json({ code: 'seller_required', message: pe.message, sellers: pe.sellers || [] })
+          }
+          throw pe
+        }
         await client.end(); client = null
         if (!pdf) return res.status(404).json({ message: 'Order not found' })
         res.setHeader('Content-Type', 'application/pdf')

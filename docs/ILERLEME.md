@@ -10,6 +10,12 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — G, 2. adım: sipariş başı Provisionsrechnung settlement'tan (bitti) — VERGİ DÜZELTMESİ
+
+- **Hatalar** (`GET /orders/:id/pdf/provisionsfaktur`): (1) tutar eski `stripe_application_fee_cents` (tüm sipariş) — çok satıcılı siparişte tüm komisyon ilk satıcıya; (2) KDV her satıcıya düz %19 — ters ibraz (AB, KDV no'lu) ve AB dışı satıcıya Alman KDV gösterimi (§14c UStG: gösterilen vergi borçlanılır); settlement `commission_vat_scheme`/`commission_vat_cents`'i doğru hesaplıyordu ama belge kullanmıyordu; (3) platform düzenleyici olduğu için iki satıcıya aynı `PROV-<sipariş>` numarası.
+- Artık belge satıcının `seller_payables` satırlarından: mal brüt, kendi kargosu, dondurulmuş oran, komisyon, komisyon KDV'si + şeması (layout zaten "§ 13b … Steuerschuldnerschaft des Leistungsempfängers" / "§ 3a Abs. 2" satırlarını basıyor — artık veri geliyor). Numara: tek satıcıda `PROV-<sipariş>`, çok satıcıda `PROV-<sipariş>-<n>` (satıcı id sırası, sabit). Satıcı kendi belgesini alır; superuser çok satıcılıda `?seller_id=` (yoksa 400 + satıcı listesi). Payable'sız eski siparişte eski hesap.
+- Test: settlement +1 (gerçek PG: iki satıcı → ayrı numaralı iki belge, seller_id'siz ret). Settlement 44/44, `npm test` 233/0.
+
 ## 2026-10-08 — G. Faturalar, 1. adım: satıcı başına müşteri faturası (bitti) — VERGİ DÜZELTMESİ
 
 - **Hata (§14 UStG)**: çok satıcılı siparişte müşteri faturası (shop indirme, SC indirme, sipariş e-postası eki) ilk satıcının kimliğiyle ve TÜM satıcıların kalemleri + toplamlarıyla tek belge olarak düzenleniyordu — satıcı A, B'nin malını faturalıyor görünüyordu.
