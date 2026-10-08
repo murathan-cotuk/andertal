@@ -626,6 +626,117 @@ def format_all_attrs(attrs: dict[str, str]) -> str:
     return " | ".join(f"{k}={attrs[k]}" for k in sorted(attrs.keys()))
 
 
+def attr_get(attrs: dict[str, str], *keys: str) -> str:
+    for k in keys:
+        v = (attrs.get(k) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def extract_eu_responsible(desc_html: str) -> dict[str, str]:
+    """Best-effort parse of EU responsible person from description text."""
+    text = strip_html(desc_html)
+    out = {"EU_Verantwortliche_Person": "", "EU_Verantwortliche_Adresse": "", "EU_Verantwortliche_Email": ""}
+    if not text:
+        return out
+    # patterns: "Verantwortliche Person: Name" / "EU Responsible Person: ..."
+    m = re.search(
+        r"(?is)(?:verantwortliche\s*person|eu\s*responsible\s*person|responsible\s*person)\s*[:\-]\s*([^\n|;]{3,120})",
+        text,
+    )
+    if m:
+        out["EU_Verantwortliche_Person"] = m.group(1).strip(" .;")
+    m = re.search(r"(?is)(?:e-?mail|email)\s*[:\-]\s*([\w.+-]+@[\w.-]+\.\w+)", text)
+    if m:
+        out["EU_Verantwortliche_Email"] = m.group(1).strip()
+    m = re.search(
+        r"(?is)(?:adresse|address|anschrift)\s*[:\-]\s*([^\n|]{5,160})",
+        text,
+    )
+    if m and out["EU_Verantwortliche_Person"]:
+        out["EU_Verantwortliche_Adresse"] = m.group(1).strip(" .;")
+    return out
+
+
+def gpsr_block(attrs: dict[str, str], product: dict) -> dict[str, str]:
+    """GPSR manufacturer + EU responsible columns from attributes / product / description."""
+    # Prefer gpsr_* then meta_manufacturer_*:gpsr
+    name = attr_get(attrs, "gpsr_manufacturer_name", "meta_manufacturer_name:gpsr")
+    street = attr_get(attrs, "gpsr_manufacturer_street", "meta_manufacturer_street:gpsr")
+    house = attr_get(attrs, "gpsr_manufacturer_housenumber", "meta_manufacturer_housenumber:gpsr")
+    plz = attr_get(attrs, "gpsr_manufacturer_postalcode", "meta_manufacturer_postalcode:gpsr")
+    city = attr_get(attrs, "gpsr_manufacturer_city", "meta_manufacturer_city:gpsr")
+    state = attr_get(attrs, "gpsr_manufacturer_state", "meta_manufacturer_state:gpsr")
+    country = attr_get(attrs, "gpsr_manufacturer_country", "meta_manufacturer_country:gpsr")
+    email = attr_get(attrs, "gpsr_manufacturer_email", "meta_manufacturer_email:gpsr")
+    home = attr_get(attrs, "gpsr_manufacturer_homepage", "meta_manufacturer_homepage:gpsr")
+    hersteller_jtl = (product.get("Hersteller") or "").strip()
+
+    eu = extract_eu_responsible(product.get("Beschreibung") or "")
+    # Also check dedicated attr keys if they ever appear
+    if not eu["EU_Verantwortliche_Person"]:
+        eu["EU_Verantwortliche_Person"] = attr_get(
+            attrs,
+            "gpsr_responsible_person_name",
+            "verantwortliche_person_information",
+            "responsible_person_eu",
+        )
+
+    addr_parts = [p for p in (street, house, plz, city, state, country) if p]
+    return {
+        "Hersteller_JTL": hersteller_jtl,
+        "GPSR_Hersteller_Name": name or hersteller_jtl,
+        "GPSR_Hersteller_Strasse": street,
+        "GPSR_Hersteller_Hausnummer": house,
+        "GPSR_Hersteller_PLZ": plz,
+        "GPSR_Hersteller_Stadt": city,
+        "GPSR_Hersteller_Bundesland": state,
+        "GPSR_Hersteller_Land": country,
+        "GPSR_Hersteller_Email": email,
+        "GPSR_Hersteller_Homepage": home,
+        "GPSR_Hersteller_Adresse_voll": ", ".join(addr_parts),
+        **eu,
+    }
+
+
+# Fixed lead columns immediately after Artikelnummer (user-facing)
+LEAD_COLUMNS = [
+    "Artikelname",
+    "GTIN",
+    "Bestellmenge_seit_01_01_2025",
+    "Andertal_Kategorie_Name",
+    "Andertal_Kategorie_Slug",
+    "Andertal_Kategorie_ID",
+    "Andertal_Kategorie_Pfad",
+    "Farbe",
+    "Farbe_Quelle",
+    "Größe",
+    "Größe_Quelle",
+    "Material",
+    "Material_Quelle",
+    "Maß",
+    "Maß_Quelle",
+    "Hersteller_JTL",
+    "GPSR_Hersteller_Name",
+    "GPSR_Hersteller_Strasse",
+    "GPSR_Hersteller_Hausnummer",
+    "GPSR_Hersteller_PLZ",
+    "GPSR_Hersteller_Stadt",
+    "GPSR_Hersteller_Bundesland",
+    "GPSR_Hersteller_Land",
+    "GPSR_Hersteller_Email",
+    "GPSR_Hersteller_Homepage",
+    "GPSR_Hersteller_Adresse_voll",
+    "EU_Verantwortliche_Person",
+    "EU_Verantwortliche_Adresse",
+    "EU_Verantwortliche_Email",
+    "WEE_Nummer",
+    "WEE_Kategorie",
+    "Alle_Attribute",
+]
+
+
 def main() -> int:
     best = BASE / "MC Bestellungen ab 01.01.2025.csv"
     prod = BASE / "MC Alle Produkte Detayli.csv"
@@ -655,36 +766,25 @@ def main() -> int:
     log("4/5 Andertal category leaves + match...")
     leaves, cat_inv = load_andertal_leaves(AMAZON_CATS)
 
-    log("5/5 Enrich rows + write xlsx...")
-    # Column order: Artikelnummer, then new cols, then rest of product, then attrs
-    lead_extra = [
-        "Bestellmenge_seit_01_01_2025",
-        "Andertal_Kategorie_Name",
-        "Andertal_Kategorie_Slug",
-        "Andertal_Kategorie_ID",
-        "Andertal_Kategorie_Pfad",
-        "Andertal_Match_Score",
+    log("5/5 Enrich rows + write xlsx (AN + lead columns rebuilt)...")
+    # Remaining original product columns (after lead block)
+    skip_in_tail = {
+        "Artikelnummer",
+        "Artikelname",
+        "GTIN",
+        "Hersteller",
         "Farbe",
-        "Farbe_Quelle",
         "Größe",
-        "Größe_Quelle",
         "Material",
-        "Material_Quelle",
-        "Maß",
-        "Maß_Quelle",
-        "Alle_Attribute",
-    ]
-    # avoid duplicating attr columns that already exist in prod_fields
-    rest_fields = [c for c in prod_fields if c != "Artikelnummer"]
-    # drop old Farbe/Größe/Material from rest if present — we rewrite after AN
-    skip_dup = {"Farbe", "Größe", "Material", "Material..", "Grundfarbe"}
-    rest_fields = [c for c in rest_fields if c not in skip_dup]
-    # keep remaining KEY_ATTRS that aren't in lead
-    other_key = [k for k in KEY_ATTRS if k not in ("Farbe", "Größe", "Material", "Material..", "Grundfarbe")]
+        "Material..",
+        "Grundfarbe",
+    }
+    tail_fields = [c for c in prod_fields if c and c not in skip_in_tail]
 
     wide = []
     matched = 0
     inferred_any = 0
+    gpsr_filled = 0
     for i, r in enumerate(products):
         sku = r["Artikelnummer"].strip()
         attrs = dict(attr_by_sku.get(sku, {}))
@@ -692,19 +792,27 @@ def main() -> int:
         if cat["Andertal_Kategorie_ID"]:
             matched += 1
         inferred = infer_attrs(r, attrs)
-        if any(inferred[k + "_Quelle"] == "inferred" for k in ("Farbe", "Größe", "Material") if inferred.get(k)):
+        if any(inferred.get(k + "_Quelle") == "inferred" and inferred.get(k) for k in ("Farbe", "Größe", "Material")):
             inferred_any += 1
-        # sync inferred into attrs for Alle_Attribute display
         for k in ("Farbe", "Größe", "Material"):
             if inferred.get(k) and not attrs.get(k):
                 attrs[k] = inferred[k]
         if inferred.get("Maß"):
             attrs["Maß"] = inferred["Maß"]
 
+        gpsr = gpsr_block(attrs, r)
+        if gpsr["GPSR_Hersteller_Name"] or gpsr["GPSR_Hersteller_Email"]:
+            gpsr_filled += 1
+
         out = {
             "Artikelnummer": sku,
+            "Artikelname": r.get("Artikelname") or "",
+            "GTIN": r.get("GTIN") or "",
             "Bestellmenge_seit_01_01_2025": int(order_counts.get(sku, 0)),
-            **cat,
+            "Andertal_Kategorie_Name": cat["Andertal_Kategorie_Name"],
+            "Andertal_Kategorie_Slug": cat["Andertal_Kategorie_Slug"],
+            "Andertal_Kategorie_ID": cat["Andertal_Kategorie_ID"],
+            "Andertal_Kategorie_Pfad": cat["Andertal_Kategorie_Pfad"],
             "Farbe": inferred["Farbe"],
             "Farbe_Quelle": inferred["Farbe_Quelle"],
             "Größe": inferred["Größe"],
@@ -713,27 +821,18 @@ def main() -> int:
             "Material_Quelle": inferred["Material_Quelle"],
             "Maß": inferred["Maß"],
             "Maß_Quelle": inferred["Maß_Quelle"],
+            **gpsr,
+            "WEE_Nummer": attr_get(attrs, "WEE_Nummer"),
+            "WEE_Kategorie": attr_get(attrs, "WEE_Kategorie"),
             "Alle_Attribute": format_all_attrs(attrs),
         }
-        for k in rest_fields:
+        for k in tail_fields:
             out[k] = r.get(k, "")
-        for k in other_key:
-            out[k] = attrs.get(k, "") if k not in out else out.get(k, "")
-            if k in attrs and not out.get(k):
-                out[k] = attrs[k]
         wide.append(out)
         if (i + 1) % 5000 == 0:
             log(f"   ... enriched {i + 1:,}/{len(products):,}")
 
-    cols = ["Artikelnummer"] + lead_extra + rest_fields + [k for k in other_key if k not in lead_extra]
-    # unique preserve order
-    seen = set()
-    cols_u = []
-    for c in cols:
-        if c not in seen:
-            seen.add(c)
-            cols_u.append(c)
-
+    cols_u = ["Artikelnummer"] + LEAD_COLUMNS + [c for c in tail_fields if c not in LEAD_COLUMNS]
     df_prod = pd.DataFrame(wide)
     for c in cols_u:
         if c not in df_prod.columns:
@@ -758,14 +857,20 @@ def main() -> int:
             {"Kenntnis": "Produkte entfernt (keine Bestellung)", "Wert": total_products - len(products)},
             {"Kenntnis": "Mit Andertal-Kategorie Match", "Wert": matched},
             {"Kenntnis": "Mit inferred Farbe/Groesse/Material", "Wert": inferred_any},
+            {"Kenntnis": "Mit GPSR Hersteller Daten", "Wert": gpsr_filled},
             {"Kenntnis": "Attribute-Zeilen", "Wert": len(attr_long)},
             {"Kenntnis": "Kategoriequelle", "Wert": str(AMAZON_CATS.name)},
+            {"Kenntnis": "Hinweis EU Verantwortliche", "Wert": "In IMT-Attributen kaum vorhanden; nur Beschreibung-Parse oder leer"},
             {"Kenntnis": "Encoding", "Wert": ENC},
         ]
     )
 
     if OUT.exists():
-        OUT.unlink()
+        try:
+            OUT.unlink()
+        except PermissionError:
+            log("ERROR: Excel datei ist offen — bitte schliessen und erneut starten")
+            return 1
 
     with pd.ExcelWriter(OUT, engine="openpyxl") as writer:
         df_meta.to_excel(writer, sheet_name="Info", index=False)
@@ -775,16 +880,17 @@ def main() -> int:
 
     log(f"DONE -> {OUT}")
     log(f"   size: {OUT.stat().st_size / (1024 * 1024):.1f} MB")
-    log(f"   Produkte {len(df_prod):,} | Kategorie-Match {matched:,} | inferred {inferred_any:,}")
-    # spot-check first row
+    log(f"   Produkte {len(df_prod):,} | Kat-Match {matched:,} | inferred {inferred_any:,} | GPSR {gpsr_filled:,}")
     if len(df_prod):
         r0 = df_prod.iloc[0]
+        log(f"   COLS after AN: {list(df_prod.columns[1:12])}")
         log(f"   sample AN={r0['Artikelnummer']} qty={r0['Bestellmenge_seit_01_01_2025']}")
-        log(f"   sample name={r0.get('Artikelname', '')}")
-        log(f"   sample cat={r0['Andertal_Kategorie_Name']} | {r0['Andertal_Kategorie_Slug']}")
-        log(f"   sample Farbe={r0['Farbe']} ({r0['Farbe_Quelle']}) Groesse={r0['Größe']} ({r0['Größe_Quelle']})")
+        log(f"   sample cat={r0['Andertal_Kategorie_Name']} | {r0['Andertal_Kategorie_Slug']} | {r0['Andertal_Kategorie_ID']}")
+        log(f"   sample GPSR={r0['GPSR_Hersteller_Name']} | {r0['GPSR_Hersteller_Land']}")
+        log(f"   sample Farbe={r0['Farbe']} Groesse={r0['Größe']} Mat={r0['Material']}")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
