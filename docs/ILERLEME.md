@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — F, 4. adım: pazarlama e-postalarında abonelikten çıkma uygulanıyor (bitti) — F ALANI KAPANDI
+
+- **Hata (UWG §7)**: abonelikten çıkma (newsletter linki) kaydediliyordu ama pazarlama flow'ları gönderimden önce buna bakmıyordu — çıkan müşteri terk edilmiş sepet, win-back, doğum günü, favori stok/fiyat ve değerlendirme isteği e-postalarını almaya devam ediyordu. `sendImmediateStepsForFlow` artık bu tetikleyicilerde (`MARKETING_FLOW_TRIGGERS`) `store_newsletter_subscribers.status = 'unsubscribed'` alıcıyı atlar. İşlem e-postaları (sipariş, iade, hesap) etkilenmez. Sorgu prod'da EXPLAIN ile doğrulandı; şu an 5 aktif abone, 0 çıkmış.
+- Gönderim hızı: flow e-postaları dakikada 180/kapsam (`FLOW_EMAIL_MAX_PER_MINUTE`) — yerinde.
+- **Açık (kullanıcı/kurulum)**: sağlayıcıdan geri dönen hatalı adres (bounce) / spam şikâyeti işlenmiyor (Resend webhook + gizli anahtar kurulumu gerekir — Stripe dashboard işleri gibi sona). Pazarlama flow metinlerinde `{UNSUBSCRIBE_URL}` bulunması superuser'ın sorumluluğunda (UWG §7 Abs. 3 itiraz bilgisi).
+- **F alanı özeti**: iptal/iade/iade onay-ret tetikleyicileri; IBAN değişikliği güvenlik e-postası; zil paneli + iade erişimi satıcıya göre; elle iade sahipliği; şifre sıfırlama (müşteri + satıcı); pazarlama opt-out uygulaması. Kullanıcıya iş: yeni 4 olay için SC Flows'ta metin oluşturmak.
+
 ## 2026-10-08 — F, 3. adım: şifre sıfırlama (müşteri + satıcı) (bitti)
 
 - **Bulgu**: shop "Passwort vergessen" `/store/customers/password-token`'ı çağırıyordu — bu uç bu backend'de yoktu (Medusa kalıntısı) ve sayfa her durumda "e-posta gönderildi" diyordu; yeni şifre sayfası da yoktu. Sellercentral'de şifre sıfırlama hiç yoktu (middleware `/forgot-password`'ı tanıyordu ama sayfa yoktu).

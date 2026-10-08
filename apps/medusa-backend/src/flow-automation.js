@@ -912,6 +912,11 @@ async function notifySuperuserFlowFailure(client, {
 /**
  * Send consecutive flow steps from the start until a positive wait_hours is encountered.
  */
+/** Advertising flows — skipped for recipients who opted out (see sendImmediateStepsForFlow). */
+const MARKETING_FLOW_TRIGGERS = new Set([
+  'abandoned_cart', 'win_back', 'customer_birthday', 'favorite_low_stock', 'favorite_price_drop', 'review_request',
+])
+
 async function sendImmediateStepsForFlow({
   client,
   transport,
@@ -932,6 +937,21 @@ async function sendImmediateStepsForFlow({
   elapsedHours,
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
+  // Advertising e-mails (UWG §7): a recipient who unsubscribed (newsletter unsubscribe link /
+  // opt-out) gets none of them any more. Transactional mails (orders, returns, account) are not
+  // affected. Previously the opt-out was recorded but never checked before sending.
+  if (MARKETING_FLOW_TRIGGERS.has(String(triggerKey || '').trim()) && toEmail) {
+    try {
+      const optedOut = await client.query(
+        `SELECT 1 FROM store_newsletter_subscribers WHERE LOWER(email) = LOWER($1) AND status = 'unsubscribed' LIMIT 1`,
+        [String(toEmail).trim()],
+      )
+      if (optedOut.rows.length) {
+        logger.info(`[flow-automation] skip ${triggerKey}: recipient unsubscribed`)
+        return 0
+      }
+    } catch (_) { /* table missing → nothing recorded */ }
+  }
   let idx = 0
   let emailsSent = 0
   let cumulativeWaitHours = 0
