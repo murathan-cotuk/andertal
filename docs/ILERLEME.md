@@ -10,6 +10,11 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — SC top bar + sidebar eski koyu tasarıma döndü (kullanıcı isteği)
+
+- Kullanıcı Konsept'teki açık renk top bar'ı beğenmedi. `globals.css`'ten Konsept shell kuralları kaldırıldı: açık top bar + logo alanı gradyanı, arama pill'i, sağ ikonların koyu renk zorlaması, sidebar'da açık bölüm = turuncu pill / seçili alt öğe pill'i. Top bar ve sidebar yine eski siyah tasarımda (`--sellercentral-polaris-topbar-bg`, b2f9873 koyu sidebar).
+- Korunanlar: bej sayfa zemini + beyaz kartlar, liste/detay şablonları, toplu işlem çubuğu, mobil alt sekme çubuğu, kaydet çubuğu. **Bundan sonra top bar / sidebar'a Konsept stili uygulanmaz.**
+
 ## 2026-10-08 — B: kısmi iade sipariş durumu + paket bazlı takip yenileme (bitti)
 
 - **Hata**: iade parası Stripe'ta başarılı olunca `returns.js` siparişi her durumda `order_status = 'refunded'` yapıyordu; kısmi iadede `payment_status` doğru olarak `bezahlt` kalıyordu → "refunded + bezahlt" çelişkisi (canlıdaki 3 eski sipariş bu). SC işlemler sayfası bu siparişleri "hiç ödenmeyecek" sayıyordu, payouts raporu tüm sipariş tutarını iade sayıyordu.

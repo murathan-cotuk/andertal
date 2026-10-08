@@ -675,47 +675,9 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
   --p-color-bg-fill-brand: var(--andertal-ink);
 }
 
-/* ═══ SC Konsept s32/s33/s39 — shell (visual only): light top bar on the warm ground, dark sidebar
-       column running up through the logo area, beige page ground under white cards. ═══ */
-#AppFrameTopBar { --p-color-bg-inverse: var(--andertal-ground); }
-#AppFrameTopBar .Polaris-TopBar { background: var(--andertal-ground) !important; border-bottom: 1px solid #ece5da; }
-@media (min-width: 48em) {
-  /* Logo area keeps the sidebar's dark colour so the sidebar reads as one column from the top. */
-  #AppFrameTopBar .Polaris-TopBar {
-    background: linear-gradient(to right, var(--andertal-ink) 0, var(--andertal-ink) var(--pg-layout-width-nav-base, 240px), var(--andertal-ground) var(--pg-layout-width-nav-base, 240px)) !important;
-  }
-}
+/* ═══ SC Konsept s32/s33/s39 — beige page ground under white cards. Top bar + sidebar stay on the
+       original dark design (user preference, 2026-10-08). ═══ */
 .Polaris-Frame, #AppFrameMain, .andertal-page-content { background-color: var(--andertal-ground) !important; }
-/* Search pill */
-#AppFrameTopBar .andertal-search-input {
-  background: #efe9df !important; border: 1px solid var(--andertal-line) !important; border-radius: 999px !important;
-  color: var(--andertal-ink) !important; box-shadow: none !important; padding: 8px 16px !important;
-}
-#AppFrameTopBar .andertal-search-input:focus { background: #fff !important; border-color: var(--andertal-brand) !important; box-shadow: 0 0 0 3px rgba(238, 138, 18, 0.18) !important; }
-#AppFrameTopBar .andertal-search-input::placeholder { color: #8a8175 !important; }
-#AppFrameTopBar .andertal-search-input::-webkit-search-cancel-button { filter: invert(1); }
-/* Icons, language pill and account chip in ink on the light bar (unread badges keep their red) */
-#AppFrameTopBar .Polaris-TopBar__RightContent a[title],
-#AppFrameTopBar .Polaris-TopBar__RightContent button[title],
-#AppFrameTopBar .Polaris-TopBar__RightContent span:not([style*="background"]),
-#AppFrameTopBar .Polaris-TopBar__RightContent svg,
-#AppFrameTopBar .Polaris-TopBar__NavigationIcon,
-#AppFrameTopBar .Polaris-TopBar-UserMenu__Details * { color: var(--andertal-ink) !important; }
-#AppFrameTopBar .Polaris-TopBar__RightContent svg:not([fill="none"]) { fill: currentColor; }
-#AppFrameTopBar .Polaris-TopBar__NavigationIcon svg { fill: var(--andertal-ink) !important; }
-#AppFrameTopBar .Polaris-TopBar__RightContent .Polaris-Button--variantPlain {
-  border: 1px solid var(--andertal-line) !important; border-radius: 999px !important; padding: 4px 10px !important; background: #fff !important;
-}
-#AppFrameTopBar .Polaris-TopBar-Menu__Activator { background: #fff !important; border: 1px solid var(--andertal-line) !important; border-radius: 999px !important; }
-/* Sidebar: open section = orange pill, selected sub-item = light pill (Konsept s33) */
-#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--open,
-#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--open:hover { background: var(--andertal-brand) !important; }
-#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--open .Polaris-Navigation__Item,
-#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--open .Polaris-Navigation__Text { color: var(--andertal-ink) !important; font-weight: 700; }
-#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--open .Polaris-Icon svg { fill: var(--andertal-ink) !important; }
-#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected { background: rgba(255, 255, 255, 0.1) !important; }
-#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Item,
-#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Text { color: #ffffff !important; font-weight: 700; }
 /* Bulk action bar (Konsept s32/s33): dark bar, white outline buttons, orange primary */
 .sc-bulk-bar .Polaris-Button--variantSecondary { --pc-button-bg: transparent !important; --pc-button-box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset !important; background: transparent !important; color: #fff !important; }
 .sc-bulk-bar .Polaris-Button--variantSecondary * { color: #fff !important; }
