@@ -378,6 +378,7 @@ const STATEMENTS = [
      UNIQUE (order_id, seller_id)
    )`,
   `CREATE INDEX IF NOT EXISTS idx_order_shipments_tracking ON order_shipments (lower(tracking_number)) WHERE tracking_number IS NOT NULL`,
+  `ALTER TABLE order_shipments ADD COLUMN IF NOT EXISTS label_url text`,
 ]
 
 /**

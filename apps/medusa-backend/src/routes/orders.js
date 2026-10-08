@@ -7,6 +7,7 @@ const { enqueueFlowEvent } = require('../flow-queue')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { sqlOrderOwnedBySeller, sqlOrderItemOwnedBySeller, sqlOrderItemSellerIdsAgg } = require('../seller-scope')
 const { authorizeOrderPatch } = require('../order-patch-policy')
+const { applySellerShipmentView, sqlSellerDeliveryStatus } = require('../seller-order-view')
 
 function getClientIpFromRequest(req) {
   const xff = req.headers['x-forwarded-for']
@@ -63,7 +64,16 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         }
         if (order_status) { params.push(order_status); conditions.push(`o.order_status = $${params.length}`) }
         if (payment_status) { params.push(payment_status); conditions.push(`o.payment_status = $${params.length}`) }
-        if (delivery_status) { params.push(delivery_status); conditions.push(`o.delivery_status = $${params.length}`) }
+        if (delivery_status) {
+          // Seller: multi-seller orders filter on the seller's own parcel (seller-order-view.js).
+          const sellerForView = req.sellerUser?.is_superuser === true ? '' : String(req.sellerUser?.seller_id || '').trim()
+          params.push(delivery_status)
+          const dn = params.length
+          if (sellerForView) {
+            params.push(sellerForView)
+            conditions.push(`${sqlSellerDeliveryStatus('o', `${params.length}`, sqlOrderItemSellerIdsAgg('o'))} = ${dn}`)
+          } else conditions.push(`o.delivery_status = ${dn}`)
+        }
         // Non-superuser: only orders that belong to them OR contain their line items
         // (covers multi-seller carts that were still stamped with another seller_id).
         const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
@@ -102,7 +112,19 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           : ', NULL::bigint AS seller_items_subtotal_cents'
         const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered, ${sqlOrderItemSellerIdsAgg('o')} AS item_seller_ids${sellerSubtotalSelect} FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
         const countR = await client.query(`SELECT COUNT(*) FROM store_orders o ${where}`, params)
-        const orders = (r.rows || []).map(row => {
+        // Seller view of multi-seller orders: own parcel's shipping fields.
+        let ownShipments = new Map()
+        if (!isSuperuser && filterSellerId && r.rows.length) {
+          const shR = await client.query(
+            'SELECT * FROM order_shipments WHERE seller_id = $1 AND order_id = ANY($2::uuid[])',
+            [filterSellerId, r.rows.map((x) => x.id)],
+          ).catch(() => ({ rows: [] }))
+          ownShipments = new Map(shR.rows.map((sh) => [String(sh.order_id), sh]))
+        }
+        const orders = (r.rows || []).map(rawRow => {
+          const multiSeller = !isSuperuser && Array.isArray(rawRow.item_seller_ids)
+            && rawRow.item_seller_ids.map((s) => String(s || '').trim()).filter((s) => s && s !== 'default').length > 1
+          const row = applySellerShipmentView(rawRow, ownShipments.get(String(rawRow.id)), { multiSeller })
           const paidTotal = resolveOrderPaidTotalCents(row)
           const sellerSub = row.seller_items_subtotal_cents != null ? Number(row.seller_items_subtotal_cents) : null
           // For non-superuser list views, show only that seller's merchandise subtotal
@@ -185,11 +207,19 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           const shR = await client.query('SELECT * FROM order_shipments WHERE order_id = $1::uuid ORDER BY created_at', [row.id])
           shipments = (shR.rows || []).filter((sh) => isSuperuser || !callerSellerId || String(sh.seller_id) === String(callerSellerId))
         } catch (_) {}
+        let viewRow = row
+        if (!isSuperuser && callerSellerId) {
+          try {
+            const { orderSellerIds } = require('../settlement/shipments')
+            const multiSeller = (await orderSellerIds(client, row.id)).length > 1
+            viewRow = applySellerShipmentView(row, shipments[0], { multiSeller })
+          } catch (_) {}
+        }
         await client.end()
         const paidTotal = resolveOrderPaidTotalCents(row)
         res.json({
           order: {
-            ...row,
+            ...viewRow,
             subtotal_cents: !isSuperuser && callerSellerId ? sellerSubtotal : row.subtotal_cents,
             total_cents: !isSuperuser && callerSellerId ? sellerSubtotal : paidTotal,
             seller_items_subtotal_cents: sellerSubtotal,

@@ -46,14 +46,14 @@ async function findShipmentByTracking(client, trackingNumber) {
   )).rows[0] || null
 }
 
-async function recordShipment(client, { orderId, sellerId, carrierName = null, trackingNumber = null, deliveryStatus = null, shippedAt = null, sellerReportedDelivered = false }) {
+async function recordShipment(client, { orderId, sellerId, carrierName = null, trackingNumber = null, deliveryStatus = null, shippedAt = null, sellerReportedDelivered = false, labelUrl = null }) {
   const sid = realSellerId(sellerId)
   if (!orderId || !sid) return null
   const status = normStatus(deliveryStatus) || (trackingNumber ? 'versendet' : 'offen')
   const r = await client.query(
-    `INSERT INTO order_shipments (order_id, seller_id, carrier_name, tracking_number, delivery_status, shipped_at, seller_reported_delivered_at)
+    `INSERT INTO order_shipments (order_id, seller_id, carrier_name, tracking_number, delivery_status, shipped_at, seller_reported_delivered_at, label_url)
      VALUES ($1::uuid, $2::varchar, NULLIF($3::text, ''), NULLIF($4::text, ''), $5::varchar, CASE WHEN $5::varchar IN ('versendet', 'zugestellt') THEN COALESCE($6::timestamptz, now()) END,
-             CASE WHEN $7::boolean THEN now() END)
+             CASE WHEN $7::boolean THEN now() END, NULLIF($8::text, ''))
      ON CONFLICT (order_id, seller_id) DO UPDATE SET
        carrier_name = COALESCE(EXCLUDED.carrier_name, order_shipments.carrier_name),
        tracking_number = COALESCE(EXCLUDED.tracking_number, order_shipments.tracking_number),
@@ -63,9 +63,10 @@ async function recordShipment(client, { orderId, sellerId, carrierName = null, t
          THEN order_shipments.delivery_status ELSE EXCLUDED.delivery_status END,
        shipped_at = COALESCE(order_shipments.shipped_at, EXCLUDED.shipped_at),
        seller_reported_delivered_at = COALESCE(order_shipments.seller_reported_delivered_at, EXCLUDED.seller_reported_delivered_at),
+       label_url = COALESCE(EXCLUDED.label_url, order_shipments.label_url),
        updated_at = now()
      RETURNING *`,
-    [orderId, sid, carrierName ? String(carrierName) : '', trackingNumber ? String(trackingNumber).trim() : '', status, shippedAt, !!sellerReportedDelivered],
+    [orderId, sid, carrierName ? String(carrierName) : '', trackingNumber ? String(trackingNumber).trim() : '', status, shippedAt, !!sellerReportedDelivered, labelUrl ? String(labelUrl) : ''],
   )
   return r.rows[0]
 }

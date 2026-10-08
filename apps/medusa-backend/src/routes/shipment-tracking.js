@@ -762,7 +762,7 @@ module.exports = function createShipmentTrackingRouter({
         // Per-seller shipment (multi-seller orders keep each parcel's own tracking number).
         try {
           const { recordShipment } = require('../settlement/shipments')
-          await recordShipment(client, { orderId: id, sellerId: billingSellerId, carrierName, trackingNumber, deliveryStatus: 'versendet' })
+          await recordShipment(client, { orderId: id, sellerId: billingSellerId, carrierName, trackingNumber, deliveryStatus: 'versendet', labelUrl })
         } catch (shErr) { console.warn('[label] recordShipment:', shErr?.message || shErr) }
         await client.end()
         res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName, charge_method: chargeResult.charge_method })

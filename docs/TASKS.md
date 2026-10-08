@@ -88,7 +88,7 @@ Kaynak: `docs/designs/claude-frontendfigma/Andertal Shop-SC Konsept.pdf`.
 Her alan tek tek ve uçtan uca ele alınır: önce denetim raporu, sonra kod, veri, test ve doküman. Bir alan bitmeden sonrakine geçilmez. Hedef: uluslararası pazaryeri standardı (Amazon, Zalando, Otto seviyesi), modern görünüm, eksiksiz fonksiyon. Kural: çalışan hiçbir şey bozulmaz; her değişiklik geriye uyumludur ve testlidir. Referans derinlik: ödeme altyapısı (`docs/Odeme-Payout-Implementasyon.md`).
 
 - [x] **A. Ürün oluşturma ve yayınlama:** ürün ekleme, varyantlar, Eigenschaften, marka, kategori, GPSR/yasal alanlar, kaydetme (taslak), yayına alma, mevcut katalog ürününe teklif ekleme, toplu yükleme.
-- [ ] **B. Sipariş yaşam döngüsü:** sipariş, hazırlama, kargo etiketi ve takip, teslim onayı (ödeme saati), iptal, iade ve Widerruf.
+- [x] **B. Sipariş yaşam döngüsü:** sipariş, hazırlama, kargo etiketi ve takip, teslim onayı (ödeme saati), iptal, iade ve Widerruf. (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: izinli production düzeltmeleri; olay geçmişi paket bazlı değil; kısmi iptalde bonus orantısı; iptal e-postası → F.)
 - [ ] **C. Satıcı kaydı ve onboarding:** kayıt, onay, sözleşme, hukuki ve vergi bilgileri, ödeme hesabı.
 - [ ] **D. Kategori ağacı ve import:** Excel import, kategori atama, filtreler, uyumluluk profilleri.
 - [ ] **E. Shop vitrini:** ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi. A'dan devreden: Grundpreis ürün kartlarında da gösterilmeli; Google Merchant feed'e `unit_pricing_measure` eklenmeli.

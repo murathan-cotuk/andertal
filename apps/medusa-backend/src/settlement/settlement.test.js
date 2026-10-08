@@ -749,3 +749,18 @@ withDb('label charge reversal: unbooked charge removed; booked charge gets a cou
   const sum = (await c.query(`SELECT COALESCE(SUM(amount_cents), 0)::int AS s FROM seller_ledger_adjustments WHERE seller_id = 'seller_a'`)).rows[0].s
   assert.equal(sum, 0)
 })
+
+withDb('seller view: multi-seller order stays "offen" for the seller who has not shipped yet', async (c) => {
+  await h.addSeller(c, 'seller_a')
+  await h.addSeller(c, 'seller_b')
+  const { order } = await h.addPaidOrder(c, { items: [{ seller: 'seller_a', price: 1000 }, { seller: 'seller_b', price: 2000 }] })
+  await s.recordShipment(c, { orderId: order.id, sellerId: 'seller_a', carrierName: 'DHL', trackingNumber: 'A1', deliveryStatus: 'versendet', labelUrl: 'https://l/a' })
+  await c.query(`UPDATE store_orders SET delivery_status = 'versendet', tracking_number = 'A1' WHERE id = $1`, [order.id])
+  const { sqlSellerDeliveryStatus } = require('../seller-order-view')
+  const agg = `ARRAY(SELECT DISTINCT i.seller_id FROM store_order_items i WHERE i.order_id = o.id)`
+  const view = async (sid) => (await c.query(`SELECT ${sqlSellerDeliveryStatus('o', '$2', agg)} AS ds FROM store_orders o WHERE o.id = $1`, [order.id, sid])).rows[0].ds
+  assert.equal(await view('seller_a'), 'versendet')
+  assert.equal(await view('seller_b'), 'offen')
+  const sh = (await c.query(`SELECT label_url FROM order_shipments WHERE order_id = $1 AND seller_id = 'seller_a'`, [order.id])).rows[0]
+  assert.equal(sh.label_url, 'https://l/a')
+})

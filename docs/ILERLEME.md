@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — B: paketleme + satıcı görünümü (bitti) — B ALANI KAPANDI
+
+- **Hata (çok satıcılı)**: SC sipariş listesi / paketleme sayfası sipariş başlığındaki `delivery_status`'a bakıyordu. Satıcı A gönderince sipariş "versendet" oluyor, satıcı B kendi paketini "Zu versenden" sekmesinde ve paketleme kuyruğunda artık görmüyordu; B ayrıca A'nın takip no'su ve Sendcloud etiket linkini görüyordu.
+- `src/seller-order-view.js`: satıcı görünümünde çok satıcılı siparişin kargo alanları (durum, takip no, kargo firması, gönderim tarihi, etiket linki, teslim onayı) satıcının kendi `order_shipments` kaydından gelir; tek satıcılı siparişte başlık (değişmedi). Liste (`delivery_status` filtresi SQL'de aynı kuralla) ve detay GET'te uygulanır. Superuser görünümü değişmedi.
+- `order_shipments.label_url` (ensure ile `ADD COLUMN IF NOT EXISTS`); etiket satın alma paketin etiket linkini kaydeder.
+- Paketleme "Speichern" hatası artık gösteriliyor (önceden sessizce yutuluyordu).
+- Test: `seller-order-view.test.js` (2), settlement +1 (gerçek PG: A versendet / B offen; label_url). Settlement 43/43, `npm test` geçti (0 fail), SC esbuild OK.
+- **B alanı özeti** (hepsi 2026-10-07/08): Widerruf/iade süresi + çoklu iade + backend iade tutarı; müşteri iptal/iade hata kodları; satıcı başına gönderi + ödeme saati; kısmi iade sipariş durumu; paket bazlı takip yenileme; SC iptali iade ile; etiket fiyatı sunucuda + ücret geri alma + doğru satıcıya fatura; satıcı görünümü. İzin bekleyen production işleri: 3 eski "refunded + bezahlt" sipariş; geçmişte `default`'a yazılmış etiket ücretleri (önce okuma sorgusu).
+
 ## 2026-10-08 — B: kargo etiketi satın alma (bitti) — PARA DÜZELTMESİ
 
 Denetimde bulunan açıklar ve düzeltmeler:

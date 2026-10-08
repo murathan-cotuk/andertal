@@ -25,6 +25,7 @@ export default function VersandPage() {
   const [scannedQty, setScannedQty] = useState({});
   const [barcodeInput, setBarcodeInput] = useState("");
   const [scanError, setScanError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
   const [trackings, setTrackings] = useState({});
@@ -291,6 +292,7 @@ export default function VersandPage() {
 
   const handleSaveAll = async () => {
     setSaving(true);
+    setSaveError("");
     const shippedAt = new Date().toISOString();
     try {
       const client = getMedusaAdminClient();
@@ -308,7 +310,10 @@ export default function VersandPage() {
         });
       }
       setPhase("done");
-    } catch { /* ignore */ }
+    } catch (e) {
+      // Previously swallowed: the page stayed on "ship" with no hint why nothing was saved.
+      setSaveError(e?.message || "Error");
+    }
     setSaving(false);
   };
 
@@ -386,6 +391,11 @@ export default function VersandPage() {
           </div>
         )}
 
+        {saveError ? (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#b91c1c" }}>
+            {saveError}
+          </div>
+        ) : null}
         <div style={{ background: "#fcebd5", border: "1px solid #f5d3a8", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#7f3f00" }}>
           {s.labelStepHint}
         </div>
