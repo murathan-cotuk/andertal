@@ -1,4 +1,5 @@
 'use strict'
+const { wouldCreateCycle, wouldCreateCycleDb } = require('../category-cycle')
 const { Router } = require('express')
 const categoryAutoTranslate = require('../category-auto-translate')
 const {
@@ -710,6 +711,15 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
             results.errors.push({ row: item._row, error: 'Category cannot be its own parent' })
             continue
           }
+          if (parentId !== undefined && nextParent && wouldCreateCycle(
+            (pid) => (byId.get(pid) || createdById.get(pid) || {}).parent_id,
+            existingRow.id,
+            nextParent,
+          )) {
+            results.failed++
+            results.errors.push({ row: item._row, error: `Parent would create a loop (a category cannot sit under its own subcategory): ${item.parent_id}` })
+            continue
+          }
           const ur = await client.query(
             `UPDATE admin_hub_categories SET
               name = $1, slug = $2, parent_id = $3, active = $4, sort_order = $5,
@@ -929,6 +939,23 @@ const adminHubCategoryByIdGET = async (req, res) => {
 const adminHubCategoryByIdPUT = async (req, res) => {
   const adminHubService = resolveAdminHub()
   const body = req.body || {}
+  // Moving a category under one of its own subcategories would loop the tree.
+  if (body.parent_id) {
+    if (String(body.parent_id) === String(req.params.id)) return res.status(400).json({ code: 'category_cycle', message: 'Category cannot be its own parent' })
+    const cc = getCategoriesPgClient()
+    if (cc) {
+      try {
+        await cc.connect()
+        const cyc = await wouldCreateCycleDb(cc, req.params.id, body.parent_id)
+        await cc.end()
+        if (cyc) return res.status(400).json({ code: 'category_cycle', message: 'Eine Kategorie kann nicht unter ihre eigene Unterkategorie verschoben werden.' })
+      } catch (e) {
+        try { await cc.end() } catch (_) {}
+        if (/invalid input syntax for type uuid/i.test(String(e?.message))) return res.status(400).json({ message: 'Invalid parent_id' })
+        throw e
+      }
+    }
+  }
   if (adminHubService) {
     try {
       const category = await adminHubService.updateCategory(req.params.id, body)
@@ -965,6 +992,29 @@ const adminHubCategoryByIdPUT = async (req, res) => {
 }
 
 const adminHubCategoryByIdDELETE = async (req, res) => {
+  // Products still assigned to the category would silently drop out of every category page /
+  // filter (and their compliance profile). Only sub-categories were checked before.
+  {
+    const cc = getCategoriesPgClient()
+    if (cc) {
+      try {
+        await cc.connect()
+        const used = await cc.query(
+          `SELECT COUNT(*)::int AS n FROM admin_hub_products
+            WHERE LOWER(TRIM(COALESCE(metadata->>'category_id', ''))) = LOWER($1)
+               OR LOWER(TRIM(COALESCE(metadata->>'admin_category_id', ''))) = LOWER($1)
+               OR (jsonb_typeof(metadata->'category_ids') = 'array' AND metadata->'category_ids' ? $1)`,
+          [String(req.params.id || '').trim()],
+        )
+        await cc.end()
+        const n = Number(used.rows[0]?.n || 0)
+        if (n > 0) return res.status(409).json({ code: 'category_in_use', count: n, message: `${n} Produkt(e) sind dieser Kategorie zugeordnet — bitte zuerst umhängen.` })
+      } catch (e) {
+        try { await cc.end() } catch (_) {}
+        console.warn('category delete usage check:', e?.message || e)
+      }
+    }
+  }
   const adminHubService = resolveAdminHub()
   if (adminHubService) {
     try {
@@ -1311,22 +1361,22 @@ function createCategoriesRouter() {
   const router = Router()
 
   router.get('/admin-hub/categories', (req, res) => adminHubCategoriesGET(req, res))
-  router.post('/admin-hub/categories', (req, res) => adminHubCategoriesPOST(req, res))
-  router.post('/admin-hub/categories/import', (req, res) => adminHubCategoriesImportPOST(req, res))
+  router.post('/admin-hub/categories', requireSuperuser, (req, res) => adminHubCategoriesPOST(req, res))
+  router.post('/admin-hub/categories/import', requireSuperuser, (req, res) => adminHubCategoriesImportPOST(req, res))
   router.post('/admin-hub/categories/excel-upsert', requireSuperuser, adminHubCategoriesExcelUpsertPOST)
   router.get('/admin-hub/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
-  router.put('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
-  router.delete('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
+  router.put('/admin-hub/categories/:id', requireSuperuser, (req, res) => adminHubCategoryByIdPUT(req, res))
+  router.delete('/admin-hub/categories/:id', requireSuperuser, (req, res) => adminHubCategoryByIdDELETE(req, res))
 
   router.get('/admin-hub/v1/categories', (req, res) => adminHubCategoriesGET(req, res))
-  router.post('/admin-hub/v1/categories', (req, res) => adminHubCategoriesPOST(req, res))
+  router.post('/admin-hub/v1/categories', requireSuperuser, (req, res) => adminHubCategoriesPOST(req, res))
   router.post('/admin-hub/v1/categories/excel-upsert', requireSuperuser, adminHubCategoriesExcelUpsertPOST)
   router.get('/admin-hub/v1/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/v1/categories/compliance-overview', requireSuperuser, adminHubComplianceOverviewGET)
   router.get('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
-  router.put('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
-  router.delete('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
+  router.put('/admin-hub/v1/categories/:id', requireSuperuser, (req, res) => adminHubCategoryByIdPUT(req, res))
+  router.delete('/admin-hub/v1/categories/:id', requireSuperuser, (req, res) => adminHubCategoryByIdDELETE(req, res))
 
   router.post('/admin-hub/v1/categories/warm-translations', requireSuperuser, adminHubCategoriesWarmTranslationsPOST)
   router.get('/admin-hub/v1/compliance-profiles', requireSuperuser, adminHubComplianceProfilesGET)

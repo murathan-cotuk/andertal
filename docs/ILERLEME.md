@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — D. Kategori ağacı, 1. adım: yazma yetkisi + döngü + silme koruması (bitti)
+
+- **Yetki açığı**: `POST /categories`, `/categories/import`, `PUT`/`DELETE /categories/:id` (her iki önek) yalnız oturum istiyordu — her satıcı 25k'lık ağaçta kategori oluşturabiliyor, yeniden adlandırabiliyor, silebiliyor, toplu import yapabiliyordu (SC'de bu sayfalar zaten yalnız superuser; satıcı sayfası salt okunur). Artık `requireSuperuser` (excel-upsert ve uyumluluk uçları zaten öyleydi).
+- **Ağaç döngüsü**: Excel upsert yalnız "kendi kendinin parent'ı" durumunu reddediyordu; A'yı kendi alt kategorisinin altına taşımak (A→…→A) ağaç yürüyüşlerini (breadcrumb, alt ağaç id'leri, ağaç cache) sonsuz döngüye sokardı. Yeni `src/category-cycle.js`: `wouldCreateCycle` (Excel upsert, batch içi güncel parent'larla) + `wouldCreateCycleDb` (recursive CTE, `PUT /categories/:id`; 400 `category_cycle`). Test PG'de denendi.
+- **Silme koruması**: kategori silinirken yalnız alt kategori kontrol ediliyordu; ürünü olan kategori silinince ürünler kategori sayfalarından/filtrelerden ve uyumluluk profilinden düşerdi. Artık atanmış ürün varsa 409 `category_in_use` (+ adet).
+- **Canlı ağaç (okuma, 2026-10-08)**: 25.188 kategori, döngü 0, kopuk parent 0, en derin 8 seviye. Kategori listesi zaten varsayılan "slim" (OOM önlemi yerinde).
+- Test: `category-cycle.test.js` (3). `npm test` 221/221.
+
 ## 2026-10-08 — C, 3. adım: sözleşme imzası + ödeme hesabı denetimi (bitti) — C ALANI KAPANDI
 
 - İmza (`seller-agreement.js`): ekip üyesi de QR/imza token'ı açabiliyordu ve imza sahibin değil üyenin kendi satırına yazılıyordu (hesap "imzasız" kalıyordu) → `sign-token` yalnız hesap sahibi (403 `owner_only`, SC'de 6 dil mesaj). İmzada şifre yeniden kontrol edilen `/seller/sign/*` artık login ile aynı hız sınırında (`authLimiter`). İmza görseli ≤ 512 KB.
