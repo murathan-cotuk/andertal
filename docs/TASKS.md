@@ -93,7 +93,7 @@ Her alan tek tek ve uçtan uca ele alınır: önce denetim raporu, sonra kod, ve
 - [x] **D. Kategori ağacı ve import:** Excel import, kategori atama, filtreler, uyumluluk profilleri. (2026-10-08 kapandı; ayrıntı ILERLEME.md.)
 - [x] **E. Shop vitrini:** (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: kategori sayfasında sunucu tarafı sayfalama.) ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi. A'dan devreden: ~~Grundpreis ürün kartlarında~~ ✅ 2026-10-08; ~~Merchant feed `unit_pricing_measure`~~ ✅ 2026-10-08.
 - [x] **F. Bildirimler ve e-postalar:** (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: bounce/şikâyet webhook kurulumu; yeni olaylar için Flows metinleri — kullanıcı.) müşteriye ve satıcıya ne, ne zaman gider; zil paneli; flow otomasyonu.
-- [ ] **G. Faturalar ve vergi:** müşteri faturası, Provisionsrechnung, OSS, DAC7 raporu.
+- [x] **G. Faturalar ve vergi:** (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: OSS raporu — Steuerberater.) müşteri faturası, Provisionsrechnung, OSS, DAC7 raporu.
 
 A alanı (tamamlandı 2026-10-07):
 - [x] EAN/GTIN: yeni girilen kod GS1 kontrol hanesiyle doğrulanır (GTIN-8/12/13/14); önceden kayıtlı kodlar muaf. Çakışma kontrolü tüm ürünleri belleğe çekmek yerine veritabanında yapılır (`src/product-ean.js`). SC'de alan anında uyarır.

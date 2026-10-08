@@ -86,7 +86,8 @@ module.exports = function createDac7Router({ getSellerDbClient }) {
           ...f,
           revenue_cents: f.consideration_cents,
           commission_cents: f.fees_cents,
-          exceeds_revenue: f.consideration_cents >= DAC7_MIN_REVENUE_CENTS,
+          // De minimis (PStTG § 4 Abs. 5 Nr. 4): excluded with < 30 sales AND ≤ 2 000 € — exactly 2 000 € is not reportable.
+          exceeds_revenue: f.consideration_cents > DAC7_MIN_REVENUE_CENTS,
           exceeds_transactions: f.transaction_count >= DAC7_MIN_TRANSACTIONS,
           missing_fields: dac7MissingFields(s),
         }

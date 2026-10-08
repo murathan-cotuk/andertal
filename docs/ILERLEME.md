@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — G, 3. adım: DAC7 eşiği + OSS bulgusu (bitti) — G ALANI KAPANDI, PROGRAM A–G TAMAM
+
+- **DAC7** (`routes/dac7.js`): veriler settlement ledger'dan (çeyreklik, ücret sonrası bedel, TIN/DOB/IBAN/adres eksik alan listesi) — doğru. Düzeltme: alt sınır PStTG § 4 Abs. 5 Nr. 4 "< 30 satış VE ≤ 2.000 €" → tam 2.000,00 € artık raporlanmaz (`>=` → `>`). Çıktı hâlâ "interne Vorschau" (BZSt formatı değil) — bilinçli.
+- **OSS bulgusu (değiştirilmedi — vergi danışmanı kararı)**: superuser "Finanzamt" PDF'inin OSS bölümü (`queryFinanzamtOss`) tüm satıcıların mal satışlarını platformun satışıymış gibi ülke bazında topluyor ve satıcı KDV no'sunu `store_orders.seller_id`'den (artık hep `default`) okuyor → satıcı VAT bilgisi gelmiyor. Pazaryerinde malların tedarikçisi satıcıdır; OSS onların yükümlülüğü (platform yalnız § 25e / AB dışı satıcı / ithalat istisnalarında "fiktiver Lieferer"). Raporun amacı ve içeriği Steuerberater ile netleştirilmeli.
+- **G alanı özeti**: müşteri faturası satıcı başına (§14); Provisionsrechnung settlement'tan (tutar, KDV şeması/§14c, benzersiz no); DAC7 eşiği; OSS bulgusu raporlandı.
+
+### PROGRAM A–G ÖZETİ (2026-10-07/08)
+A ürün; B sipariş yaşam döngüsü; C satıcı kaydı/onay; D kategori; E vitrin/checkout; F bildirimler; G fatura/vergi — hepsi kapandı. Kullanıcı kararı/izni bekleyenler: (1) 3 eski "refunded + bezahlt" sipariş, (2) `default`'a yazılmış geçmiş etiket ücretleri (önce okuma), (3) zorunlu bilgisi eksik 2 onaylı satıcı, (4) yeni 4 olay için SC Flows metinleri, (5) OSS raporu — Steuerberater, (6) Resend bounce webhook + Stripe dashboard işleri (sona bırakıldı), (7) handoff Faz 3 family_link (sonraya).
+
 ## 2026-10-08 — G, 2. adım: sipariş başı Provisionsrechnung settlement'tan (bitti) — VERGİ DÜZELTMESİ
 
 - **Hatalar** (`GET /orders/:id/pdf/provisionsfaktur`): (1) tutar eski `stripe_application_fee_cents` (tüm sipariş) — çok satıcılı siparişte tüm komisyon ilk satıcıya; (2) KDV her satıcıya düz %19 — ters ibraz (AB, KDV no'lu) ve AB dışı satıcıya Alman KDV gösterimi (§14c UStG: gösterilen vergi borçlanılır); settlement `commission_vat_scheme`/`commission_vat_cents`'i doğru hesaplıyordu ama belge kullanmıyordu; (3) platform düzenleyici olduğu için iki satıcıya aynı `PROV-<sipariş>` numarası.
