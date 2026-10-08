@@ -528,7 +528,15 @@
     "backToLogin": "Back to sign in",
     "resetSent": "If an account with this email exists, a reset email has been sent.",
     "enterEmail": "Please enter your email address.",
-    "emailPlaceholder": "your@email.com"
+    "emailPlaceholder": "your@email.com",
+    "resetPasswordTitle": "Set a new password",
+    "resetNewPassword": "New password",
+    "resetConfirmPassword": "Repeat password",
+    "resetSavePassword": "Save password",
+    "resetPasswordRule": "At least 8 characters, with at least one letter and one digit.",
+    "resetPasswordMismatch": "The passwords do not match.",
+    "resetPasswordDone": "Your password has been changed. You can sign in now.",
+    "resetLinkInvalid": "This link is invalid or has expired. Please request a new one."
   },
   "product": {
     "inclVat": "incl. VAT",

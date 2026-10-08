@@ -511,7 +511,15 @@
     "backToLogin": "Torna all'accesso",
     "resetSent": "Se esiste un account con questa e-mail, è stata inviata un'e-mail di reimpostazione.",
     "enterEmail": "Inserisci il tuo indirizzo e-mail.",
-    "emailPlaceholder": "tua@email.it"
+    "emailPlaceholder": "tua@email.it",
+    "resetPasswordTitle": "Imposta una nuova password",
+    "resetNewPassword": "Nuova password",
+    "resetConfirmPassword": "Ripeti la password",
+    "resetSavePassword": "Salva password",
+    "resetPasswordRule": "Almeno 8 caratteri, con almeno una lettera e una cifra.",
+    "resetPasswordMismatch": "Le password non coincidono.",
+    "resetPasswordDone": "La tua password è stata modificata. Ora puoi accedere.",
+    "resetLinkInvalid": "Il link non è valido o è scaduto. Richiedine uno nuovo."
   },
   "product": {
     "inclVat": "IVA inclusa",

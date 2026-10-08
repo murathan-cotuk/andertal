@@ -528,7 +528,15 @@
     "backToLogin": "Zurück zur Anmeldung",
     "resetSent": "Wenn ein Konto mit dieser E-Mail existiert, wurde eine E-Mail zum Zurücksetzen gesendet.",
     "enterEmail": "Bitte geben Sie Ihre E-Mail-Adresse ein.",
-    "emailPlaceholder": "deine@email.de"
+    "emailPlaceholder": "deine@email.de",
+    "resetPasswordTitle": "Neues Passwort festlegen",
+    "resetNewPassword": "Neues Passwort",
+    "resetConfirmPassword": "Passwort wiederholen",
+    "resetSavePassword": "Passwort speichern",
+    "resetPasswordRule": "Mindestens 8 Zeichen, mit mindestens einem Buchstaben und einer Ziffer.",
+    "resetPasswordMismatch": "Die Passwörter stimmen nicht überein.",
+    "resetPasswordDone": "Ihr Passwort wurde geändert. Sie können sich jetzt anmelden.",
+    "resetLinkInvalid": "Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an."
   },
   "product": {
     "inclVat": "inkl. MwSt.",

@@ -768,7 +768,7 @@ export default function PolarisLayout({ children }) {
   };
 
   useEffect(() => {
-    if (pathname === "/login" || pathname === "/register") return;
+    if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password") return;
     const loggedIn = localStorage.getItem("sellerLoggedIn");
     if (!loggedIn) {
       router.push("/login");
@@ -877,7 +877,7 @@ export default function PolarisLayout({ children }) {
     return "S";
   };
 
-  if (pathname === "/login" || pathname === "/register") {
+  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password") {
     return <>{children}</>;
   }
 

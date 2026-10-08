@@ -511,7 +511,15 @@
     "backToLogin": "Volver al inicio de sesión",
     "resetSent": "Si existe una cuenta con este correo, se ha enviado un correo de restablecimiento.",
     "enterEmail": "Por favor, introduce tu dirección de correo.",
-    "emailPlaceholder": "tu@email.es"
+    "emailPlaceholder": "tu@email.es",
+    "resetPasswordTitle": "Establecer nueva contraseña",
+    "resetNewPassword": "Nueva contraseña",
+    "resetConfirmPassword": "Repetir contraseña",
+    "resetSavePassword": "Guardar contraseña",
+    "resetPasswordRule": "Al menos 8 caracteres, con al menos una letra y un número.",
+    "resetPasswordMismatch": "Las contraseñas no coinciden.",
+    "resetPasswordDone": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión.",
+    "resetLinkInvalid": "El enlace no es válido o ha caducado. Solicita uno nuevo."
   },
   "product": {
     "inclVat": "IVA incluido",

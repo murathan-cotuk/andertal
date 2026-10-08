@@ -511,7 +511,15 @@
     "backToLogin": "Retour à la connexion",
     "resetSent": "Si un compte existe avec cet e-mail, un e-mail de réinitialisation a été envoyé.",
     "enterEmail": "Veuillez entrer votre adresse e-mail.",
-    "emailPlaceholder": "votre@email.fr"
+    "emailPlaceholder": "votre@email.fr",
+    "resetPasswordTitle": "Définir un nouveau mot de passe",
+    "resetNewPassword": "Nouveau mot de passe",
+    "resetConfirmPassword": "Répéter le mot de passe",
+    "resetSavePassword": "Enregistrer le mot de passe",
+    "resetPasswordRule": "Au moins 8 caractères, avec au moins une lettre et un chiffre.",
+    "resetPasswordMismatch": "Les mots de passe ne correspondent pas.",
+    "resetPasswordDone": "Votre mot de passe a été modifié. Vous pouvez vous connecter.",
+    "resetLinkInvalid": "Ce lien est invalide ou a expiré. Veuillez en demander un nouveau."
   },
   "product": {
     "inclVat": "TVA incluse",

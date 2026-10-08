@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { tokens } from "@/design-system/tokens";
 
 const MEDUSA_BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -10,6 +10,7 @@ const MEDUSA_BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http:
 export default function ForgotPasswordPage() {
   const tUi = useTranslations("shopUi");
   const t = useTranslations("auth");
+  const locale = useLocale();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +30,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch(`${MEDUSA_BACKEND_URL}/store/customers/password-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: val }),
+        body: JSON.stringify({ email: val, locale }),
       });
       // Security best-practice: don't reveal if email exists.
       if (!res.ok) {

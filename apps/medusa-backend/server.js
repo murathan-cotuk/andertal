@@ -373,7 +373,19 @@ async function start() {
       message: { error: 'Too many payment requests. Please slow down.' },
     })
 
+    // Password reset mails — answers are always 200 (no account enumeration), so every request
+    // counts: 5 per 15 min per IP keeps the endpoint from being used to spam inboxes.
+    const passwordResetLimiter = _rl({
+      windowMs: 15 * 60 * 1000,
+      max: 5,
+      message: { error: 'Too many password reset requests. Please try again later.' },
+    })
+
     app.use(generalLimiter)
+    app.use('/store/customers/password-token', passwordResetLimiter)
+    app.use('/admin-hub/auth/password-token', passwordResetLimiter)
+    app.use('/store/customers/password-reset', authLimiter)
+    app.use('/admin-hub/auth/password-reset', authLimiter)
     app.use('/admin-hub/auth/login',           authLimiter)
     app.use('/seller/sign',                    authLimiter)   // agreement signing re-checks the password
     app.use('/admin-hub/auth/register',        registerLimiter)
@@ -2258,6 +2270,7 @@ async function start() {
     const ADMIN_HUB_PUBLIC_PATTERNS = [
       /^\/auth\/login(\/|\?|$)/,
       /^\/auth\/register(\/|\?|$)/,
+      /^\/auth\/password-(token|reset)(\/|\?|$)/,
       // Billbee integration callbacks use Basic Auth, not seller JWT.
       /^\/v1\/integrations\/billbee\/webhook(\/|\?|$)/,
     ]
@@ -2381,6 +2394,7 @@ async function start() {
 
     // ── Seller Auth ───────────────────────────────────────────────────────────
     httpApp.use('/', createSellerAuthRouter())
+    httpApp.use('/', require('./src/routes/password-reset')())
 
     // --- Platform Checkout + Store Public: extracted to src/routes/platform-checkout.js ---
     // platform-checkout.js's module.exports IS createPlatformCheckoutRouter itself (static props attached to it) —

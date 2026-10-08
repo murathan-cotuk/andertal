@@ -528,7 +528,15 @@
     "backToLogin": "Girişe geri dön",
     "resetSent": "Bu e-posta ile bir hesap varsa, sıfırlama e-postası gönderildi.",
     "enterEmail": "Lütfen e-posta adresinizi girin.",
-    "emailPlaceholder": "eposta@adresiniz.com"
+    "emailPlaceholder": "eposta@adresiniz.com",
+    "resetPasswordTitle": "Yeni şifre belirle",
+    "resetNewPassword": "Yeni şifre",
+    "resetConfirmPassword": "Şifreyi tekrarla",
+    "resetSavePassword": "Şifreyi kaydet",
+    "resetPasswordRule": "En az 8 karakter; en az bir harf ve bir rakam.",
+    "resetPasswordMismatch": "Şifreler eşleşmiyor.",
+    "resetPasswordDone": "Şifreniz değiştirildi. Artık giriş yapabilirsiniz.",
+    "resetLinkInvalid": "Bağlantı geçersiz veya süresi dolmuş. Lütfen yenisini isteyin."
   },
   "product": {
     "inclVat": "KDV dahil",

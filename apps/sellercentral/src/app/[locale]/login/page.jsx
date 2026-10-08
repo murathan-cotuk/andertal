@@ -9,6 +9,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
+import { lt } from "@/lib/locale-text";
 
 const LOCALES = [
   { code: "en", label: "EN" }, { code: "de", label: "DE" }, { code: "tr", label: "TR" },
@@ -61,6 +62,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("auth.login");
+  const uiLocale = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -259,7 +261,12 @@ function LoginForm() {
                   {loading ? t("submitting") : t("submit")}
                 </button>
               </form>
-              <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#5e574e" }}>
+              <p style={{ textAlign: "center", marginTop: 16, marginBottom: 0, fontSize: 14 }}>
+                <Link href="/forgot-password" style={{ color: "#5e574e", textDecoration: "none" }}>
+                  {lt(uiLocale, "Forgot password?", "Şifremi unuttum?", "Mot de passe oublié ?", "¿Olvidaste tu contraseña?", "Password dimenticata?", "Passwort vergessen?")}
+                </Link>
+              </p>
+              <p style={{ textAlign: "center", marginTop: 12, fontSize: 14, color: "#5e574e" }}>
                 <Link href="/register" style={{ color: "#1d1b18", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
               </p>
             </>

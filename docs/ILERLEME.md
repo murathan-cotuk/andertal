@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — F, 3. adım: şifre sıfırlama (müşteri + satıcı) (bitti)
+
+- **Bulgu**: shop "Passwort vergessen" `/store/customers/password-token`'ı çağırıyordu — bu uç bu backend'de yoktu (Medusa kalıntısı) ve sayfa her durumda "e-posta gönderildi" diyordu; yeni şifre sayfası da yoktu. Sellercentral'de şifre sıfırlama hiç yoktu (middleware `/forgot-password`'ı tanıyordu ama sayfa yoktu).
+- `src/password-reset.js`: tek kullanımlık token (32 bayt; yalnız SHA-256 saklanır; 60 dk; yeni istek eskileri geçersiz kılar; atomik tüketim), şifre kuralı kayıtla aynı (8+, harf + rakam), e-posta platform posta ayarıyla (Resend/SMTP — flow'larla aynı; yoksa env sağlayıcısı). Kısa sistem metni DE (+ diğer dillerde EN).
+- `src/routes/password-reset.js`: `POST /store/customers/password-token|password-reset`, `POST /admin-hub/auth/password-token|password-reset` (public desenine eklendi). İstek yanıtı hesap var/yok ayırt etmez. Satıcı sıfırlamasında tüm oturumlar kapatılır. Sınır: istek 5/15 dk/IP (her istek sayılır), sıfırlama login limiti. Bağlantı adresleri flow e-postalarıyla aynı env alias'larından.
+- Shop: `/[locale]/reset-password` (forgot sayfasıyla aynı görünüm), forgot sayfası dili gönderir; 8 yeni `auth.*` metni 6 dilde.
+- SC: `/forgot-password`, `/reset-password` (`components/auth/PasswordResetCard.jsx`, giriş kartıyla aynı görünüm, 6 dil); girişte "Passwort vergessen?" bağlantısı; middleware + layout bu sayfaları oturumsuz açar.
+- Test: `password-reset.test.js` (gerçek PG: hash'li saklama, tek kullanım, eskiyi geçersiz kılma, süre, tür) + uç uca deneme (bilinmeyen e-posta aynı yanıt, zayıf şifre, sıfırlama, hash doğrulama, tekrar kullanım reddi). `npm test` 229/0, shop + SC esbuild OK.
+
 ## 2026-10-08 — F, 2. adım: zil paneli + iade erişimi satıcıya göre (bitti) — GÜVENLİK DÜZELTMESİ
 
 - **Sızıntı**: iade kayıtları satıcı başına tutuluyor (`store_returns.seller_id`, çok satıcılı siparişte satıcı başına bir iade), ama zil paneli (akış, okunmamış sayısı, tümünü okundu say), SC iade listesi ve iade PATCH "satıcının siparişte kalemi var mı" ile süzüyordu → satıcı A, B'nin iadesini görüyor ve durumunu (genehmigt/abgelehnt/eingegangen) değiştirebiliyordu (para iadesi settlement satır kontrolüyle zaten engelliydi).
