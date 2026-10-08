@@ -32,7 +32,7 @@ const isRealVariant = (v) => v && Array.isArray(v.option_values) && v.option_val
 /**
  * @returns {string[]} missing requirement keys: 'title' | 'price' | 'image' | 'category'
  */
-const listingReadinessMissing = ({ title, priceCents, metadata, variants }) => {
+const listingReadinessMissing = ({ title, priceCents, metadata, variants, categoryValid = true }) => {
   const meta = metadata && typeof metadata === 'object' ? metadata : {}
   const vs = (Array.isArray(variants) ? variants : []).filter(isRealVariant)
   const missing = []
@@ -56,7 +56,9 @@ const listingReadinessMissing = ({ title, priceCents, metadata, variants }) => {
   if (!parentImage && !variantImage) missing.push('image')
 
   const cats = Array.isArray(meta.category_ids) ? meta.category_ids.filter(Boolean) : []
-  if (!cats.length && !String(meta.category_id || '').trim()) missing.push('category')
+  // categoryValid=false: the id points to a deleted / inactive category (product would be
+  // invisible in every category page and get no compliance profile).
+  if ((!cats.length && !String(meta.category_id || '').trim()) || categoryValid === false) missing.push('category')
 
   return missing
 }
@@ -67,9 +69,9 @@ const READINESS_LABELS = { title: 'title', price: 'price', image: 'image', categ
  * Applies the gate. `previousStatus` = stored status before this save (null for a new product).
  * @returns {{ status: string, missing: string[], message: string | null }}
  */
-const applyListingReadinessGate = ({ status, previousStatus = null, title, priceCents, metadata, variants }) => {
+const applyListingReadinessGate = ({ status, previousStatus = null, title, priceCents, metadata, variants, categoryValid = true }) => {
   if (!isLiveStatus(status) || isLiveStatus(previousStatus)) return { status, missing: [], message: null }
-  const missing = listingReadinessMissing({ title, priceCents, metadata, variants })
+  const missing = listingReadinessMissing({ title, priceCents, metadata, variants, categoryValid })
   if (!missing.length) return { status, missing, message: null }
   return {
     status: 'draft',
@@ -78,4 +80,22 @@ const applyListingReadinessGate = ({ status, previousStatus = null, title, price
   }
 }
 
-module.exports = { listingReadinessMissing, applyListingReadinessGate, isLiveStatus }
+/** Does the product's category (category_id / category_ids) exist and is active? true when none set. */
+async function productCategoryValid(client, metadata) {
+  const meta = metadata && typeof metadata === 'object' ? metadata : {}
+  const ids = [...new Set([meta.category_id, ...(Array.isArray(meta.category_ids) ? meta.category_ids : [])]
+    .map((x) => String(x || '').trim().toLowerCase()).filter(Boolean))]
+  if (!ids.length) return true
+  try {
+    const r = await client.query(
+      `SELECT COUNT(*)::int AS n FROM admin_hub_categories WHERE LOWER(id::text) = ANY($1::text[]) AND COALESCE(active, true) = true`,
+      [ids],
+    )
+    return Number(r.rows[0]?.n || 0) > 0
+  } catch (_) {
+    return true // lookup failure must not block saving
+  }
+}
+
+module.exports = {
+  productCategoryValid, listingReadinessMissing, applyListingReadinessGate, isLiveStatus }

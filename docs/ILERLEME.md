@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — D, 2. adım: ürün-kategori ataması + import/filtre denetimi (bitti) — D ALANI KAPANDI
+
+- **Geçersiz kategoriyle yayın**: yayın hazırlık kapısı yalnız "kategori id'si dolu mu" bakıyordu; silinmiş veya pasif kategoriye bağlı ürün yayına çıkabiliyordu (hiçbir kategori sayfasında görünmez, uyumluluk profili gelmez). `productCategoryValid` (`product-readiness.js`) yayına alırken kategorinin var ve aktif olduğunu kontrol eder; değilse diğer eksikler gibi taslakta kalır ("category"). Zaten yayındaki ürünler etkilenmez. Test +1.
+- Canlı (okuma): yayındaki 9 ürünün hepsi var olan, aktif kategoride.
+- Import ekranları: kategori CSV yol ağacı ve Excel upsert yalnız superuser sayfalarında (ContentCategoriesPage, import-export proxy → excel-upsert) — D/1'deki superuser kuralıyla uyumlu.
+- Mağaza filtre/liste sorguları parametreli (ham interpolasyon yok); kategori listesi slim.
+- `npm test` geçti (0 fail).
+- **D alanı özeti**: kategori yazma yalnız superuser; ağaç döngüsü engeli (Excel + PUT); ürünü olan kategori silinemez; geçersiz kategoriyle yayın engeli; canlı ağaç ve ürün-kategori bütünlüğü temiz. Uyumluluk profilleri handoff Faz 0c/0e'de yapılmıştı.
+
 ## 2026-10-08 — D. Kategori ağacı, 1. adım: yazma yetkisi + döngü + silme koruması (bitti)
 
 - **Yetki açığı**: `POST /categories`, `/categories/import`, `PUT`/`DELETE /categories/:id` (her iki önek) yalnız oturum istiyordu — her satıcı 25k'lık ağaçta kategori oluşturabiliyor, yeniden adlandırabiliyor, silebiliyor, toplu import yapabiliyordu (SC'de bu sayfalar zaten yalnız superuser; satıcı sayfası salt okunur). Artık `requireSuperuser` (excel-upsert ve uyumluluk uçları zaten öyleydi).

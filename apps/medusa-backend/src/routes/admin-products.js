@@ -16,7 +16,7 @@ const {
 const { assignAnId, normalizeAnId, ensureVariantAnIds, findProductByAnId } = require('../an-id')
 const { collectVariantEans, collectProductRowEans, validateProductEansDb } = require('../product-ean')
 const { collectProductRowSkus, validateSellerSkusDb } = require('../product-sku')
-const { applyListingReadinessGate } = require('../product-readiness')
+const { applyListingReadinessGate, productCategoryValid } = require('../product-readiness')
 const { validateVariantMatrix } = require('../product-variants')
 const { normalizeListingStatus, gateListingStatus } = require('../listing-status')
 const { explainStoreVisibility } = require('../shop-visibility')
@@ -849,7 +849,8 @@ const createAdminHubProductDb = async (body) => {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
       if (status.toLowerCase() === 'published') status = 'draft'
     }
-    const readiness = applyListingReadinessGate({ status, title, priceCents: price, metadata: metaObj, variants: variantsArr })
+    const categoryValid = String(status || '').toLowerCase() === 'published' ? await productCategoryValid(client, metaObj) : true
+    const readiness = applyListingReadinessGate({ status, title, priceCents: price, metadata: metaObj, variants: variantsArr, categoryValid })
     if (readiness.message) {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${readiness.message}` : readiness.message
       status = readiness.status
@@ -1061,8 +1062,9 @@ const updateAdminHubProductDb = async (id, body) => {
     }
     let publishMissing = []
     if (!skipComplianceGates) {
+      const categoryValid = String(status || '').toLowerCase() === 'published' ? await productCategoryValid(client, metadataObj) : true
       const readiness = applyListingReadinessGate({
-        status, previousStatus: existing.status, title, priceCents: price, metadata: metadataObj, variants: nextVariantsArr,
+        status, previousStatus: existing.status, title, priceCents: price, metadata: metadataObj, variants: nextVariantsArr, categoryValid,
       })
       if (readiness.message) {
         complianceWarning = complianceWarning ? `${complianceWarning} · ${readiness.message}` : readiness.message

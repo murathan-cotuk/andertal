@@ -45,3 +45,14 @@ test('already-live products are never taken offline, drafts are untouched', () =
   assert.equal(applyListingReadinessGate({ ...incomplete, status: 'draft' }).message, null)
   assert.equal(applyListingReadinessGate({ ...incomplete, status: 'published', previousStatus: 'draft' }).status, 'draft')
 })
+
+test('deleted / inactive category blocks publishing like a missing one', () => {
+  const ready = {
+    status: 'published', title: 'Mug', priceCents: 990,
+    metadata: { media: ['https://x/1.jpg'], category_id: 'c-gone' }, variants: [],
+  }
+  assert.equal(applyListingReadinessGate(ready).status, 'published')
+  const r = applyListingReadinessGate({ ...ready, categoryValid: false })
+  assert.equal(r.status, 'draft')
+  assert.deepEqual(r.missing, ['category'])
+})
