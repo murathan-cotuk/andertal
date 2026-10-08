@@ -508,6 +508,25 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
     router.patch('/admin-hub/v1/sellers/:id', adminHubSellerPATCH)
     router.patch('/admin-hub/v1/sellers/:id/approve', adminHubSellerApprovePATCH)
     router.post('/admin-hub/v1/sellers/:id/impersonate', adminHubSellerImpersonatePOST)
+    // GET /admin-hub/v1/seller/approval-readiness — the seller's own missing required data
+    // (seller-approval-readiness.js), shown in Sellercentral even after approval.
+    router.get('/admin-hub/v1/seller/approval-readiness', async (req, res) => {
+      const sellerId = String(req.sellerUser?.seller_id || '').trim()
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      if (req.sellerUser?.is_superuser) return res.json({ ready: true, blockers: [], warnings: [] })
+      const client = getDbClient ? getDbClient() : getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const row = (await client.query('SELECT * FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL LIMIT 1', [sellerId])).rows[0]
+        await client.end()
+        if (!row) return res.json({ ready: true, blockers: [], warnings: [] })
+        res.json({ approval_status: row.approval_status || 'registered', ...require('../seller-approval-readiness').approvalReadiness(row) })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    })
     router.patch('/admin-hub/v1/seller/company-info', require('../seller-permission').requireSellerPage('/settings/verification'), adminHubSellerCompanyInfoPATCH)
 
 

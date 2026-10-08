@@ -9,6 +9,7 @@ import { Page, Banner, Button, Spinner } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import LiveVisitorsPanel from "@/components/dashboard/LiveVisitorsPanel";
 import OnboardingChecklist from "@/components/dashboard/OnboardingChecklist";
+import LegalDataBanner from "@/components/dashboard/LegalDataBanner";
 import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 import {
   generatePayoutPeriods,
@@ -359,6 +360,7 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {!isSuperuser && <LegalDataBanner locale={locale} />}
       <OnboardingChecklist locale={locale} isSuperuser={isSuperuser} />
 
       {isSuperuser && <LiveVisitorsPanel />}

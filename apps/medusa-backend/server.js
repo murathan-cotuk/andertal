@@ -1220,6 +1220,13 @@ async function start() {
           console.warn('[seed-return-requested-customer-ships-flow]', e?.message || e)
         }
         try {
+          // Cancelled / refunded / return approved / return rejected (only where no flow exists yet).
+          const { seedOrderOutcomeFlows } = require('./src/seed-order-outcome-flows')
+          await seedOrderOutcomeFlows(client)
+        } catch (e) {
+          console.warn('[seed-order-outcome-flows]', e?.message || e)
+        }
+        try {
           const { dedupeAndNormalizeFlows } = require('./src/flow-catalog')
           await dedupeAndNormalizeFlows(client)
         } catch (e) {

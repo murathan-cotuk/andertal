@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — Bekleyen işler (kullanıcı: "sırasıyla hepsini yap") — 1–4
+
+1. **3 eski "refunded + bezahlt" sipariş** (#100006, #100007, #100008): okuma ile doğrulandı — üçü de iadeyle tamamen geri ödenmiş, açık iade yok, payable yok → doğru durum `refunded/refunded`. Production UPDATE otomatik izin denetimince **reddedildi**; yapılmadı. Kullanıcı kendisi çalıştırmalı (aşağıdaki SQL) veya izin vermeli:
+   `UPDATE store_orders SET payment_status = 'refunded', updated_at = now() WHERE id IN ('0630507c-275f-4618-a9b8-6e7829db7ae1','5f54d009-0aaf-495d-9334-e75ead15a203','f5f56af9-1022-4778-a70a-5887c140b0f9') AND order_status = 'refunded' AND payment_status = 'bezahlt';`
+2. **`default`'a yazılmış etiket ücretleri**: okuma — yok (tek etiket ücreti 4,12 € doğru satıcıda; ücretlendirilmiş iade etiketi yok). İş yok.
+3. **Eksik bilgili onaylı satıcılar**: onay geri alınmadı (öneri). Satıcı tarafında `GET /admin-hub/v1/seller/approval-readiness` + SC gösterge paneli `LegalDataBanner` — eksikleri 6 dilde listeler, "Jetzt ergänzen" → Verifizierung. Tüm (onaylı dahil) satıcılarda görünür.
+4. **Yeni olay flow metinleri**: `src/seed-order-outcome-flows.js` — boot'ta, yalnız o tetikleyici + kitle için flow yoksa oluşturur (superuser'ınkine dokunmaz; SC Flows'ta düzenlenebilir): Bestellung storniert (Kunde + Seller), Erstattung ausgeführt, Retoure genehmigt, Retoure abgelehnt — 6 dil, olgusal işlem metni, mevcut seed kabuğu. Test: dil eksiksizliği + gerçek PG (UTF8 DB'de) oluştur/tekrarlama/var olana dokunmama. Not: yerel test kümesi WIN1252 → PG testi orada atlanır.
+
 ## 2026-10-08 — G, 3. adım: DAC7 eşiği + OSS bulgusu (bitti) — G ALANI KAPANDI, PROGRAM A–G TAMAM
 
 - **DAC7** (`routes/dac7.js`): veriler settlement ledger'dan (çeyreklik, ücret sonrası bedel, TIN/DOB/IBAN/adres eksik alan listesi) — doğru. Düzeltme: alt sınır PStTG § 4 Abs. 5 Nr. 4 "< 30 satış VE ≤ 2.000 €" → tam 2.000,00 € artık raporlanmaz (`>=` → `>`). Çıktı hâlâ "interne Vorschau" (BZSt formatı değil) — bilinçli.
