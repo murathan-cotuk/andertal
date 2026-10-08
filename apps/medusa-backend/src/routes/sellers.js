@@ -373,6 +373,17 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
         params.push(toJsonOrNull(body.documents))
         n++
       }
+      // Verkäufervertrag accepted on the verification page (checkbox) — recorded once, with
+      // version + IP like at registration. Previously the checkbox was required but never saved.
+      if (body.agreement_accepted === true) {
+        const agreementIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null
+        updates.push(`agreement_accepted_at = CASE WHEN agreement_accepted THEN agreement_accepted_at ELSE now() END`)
+        updates.push(`agreement_version = CASE WHEN agreement_accepted THEN agreement_version ELSE $${n} END`)
+        params.push(require('../seller-agreement-contract').AGREEMENT_VERSION); n++
+        updates.push(`agreement_ip = CASE WHEN agreement_accepted THEN agreement_ip ELSE $${n} END`)
+        params.push(agreementIp); n++
+        updates.push('agreement_accepted = true')
+      }
       // Auto-advance status if submitting docs
       if (body.documents !== undefined) {
         updates.push(`approval_status = CASE WHEN approval_status = 'registered' THEN 'documents_submitted' ELSE approval_status END`)
@@ -497,7 +508,7 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
     router.patch('/admin-hub/v1/sellers/:id', adminHubSellerPATCH)
     router.patch('/admin-hub/v1/sellers/:id/approve', adminHubSellerApprovePATCH)
     router.post('/admin-hub/v1/sellers/:id/impersonate', adminHubSellerImpersonatePOST)
-    router.patch('/admin-hub/v1/seller/company-info', adminHubSellerCompanyInfoPATCH)
+    router.patch('/admin-hub/v1/seller/company-info', require('../seller-permission').requireSellerPage('/settings/verification'), adminHubSellerCompanyInfoPATCH)
 
 
   return router

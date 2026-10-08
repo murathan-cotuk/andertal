@@ -909,6 +909,8 @@ export default function VerificationSettingsPage() {
         payment_bic: form.bic.replace(/\s/g, "").toUpperCase() || null,
       });
       await client.updateSellerIban(form.iban.trim() || null);
+      // The required agreement checkbox is now recorded (version + time + IP) server-side.
+      await client.updateSellerCompanyInfo({ agreement_accepted: true });
       let pipelineResult = null;
       try { pipelineResult = await client.startVerification(); } catch (_) {}
       const account = await client.getSellerAccount();

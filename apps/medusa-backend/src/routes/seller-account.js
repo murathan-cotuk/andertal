@@ -1,4 +1,5 @@
 'use strict'
+const { requireSellerPage } = require('../seller-permission')
 const { Router } = require('express')
 const { z } = require('zod')
 
@@ -314,13 +315,11 @@ module.exports = function createSellerAccountRouter({
             await client.end()
             return res.status(409).json({ message: 'Dieser Benutzer ist bereits Mitglied Ihres Teams.' })
           }
-          // User registered but not linked (sub_of_seller_id IS NULL) — directly link them
-          await client.query(
-            `UPDATE seller_users SET sub_of_seller_id = $1, updated_at = now() WHERE email = $2 AND sub_of_seller_id IS NULL`,
-            [inviterSellerId, normalEmail]
-          ).catch(() => {})
+          // An existing independent account is never converted into a team member: that used to
+          // happen silently, without the account holder's consent — any seller could take over
+          // another seller's (or a superuser's) login by "inviting" its e-mail address.
           await client.end()
-          return res.json({ success: true, linked: true })
+          return res.status(409).json({ code: 'account_exists', message: 'Für diese E-Mail besteht bereits ein eigenes Verkäuferkonto.' })
         }
         // Check if pending invite from a different seller already exists
         const pendingInv = await client.query(
@@ -353,11 +352,12 @@ module.exports = function createSellerAccountRouter({
             await dbClient2.end()
             if (transport) {
               const displayName = [first_name, last_name].filter(Boolean).join(' ')
+              const esc = (v) => String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
               await transport.sendMail({
                 to: normalEmail,
                 subject: 'Einladung zur Andertal Seller Platform',
                 text: `${displayName ? `Hallo ${displayName},\n\n` : ''}Sie wurden eingeladen, der Andertal Seller Platform beizutreten.\n\nRegistrierungslink: ${inviteUrl}\n\nDieser Link ist 7 Tage gültig.`,
-                html: `<p>${displayName ? `Hallo <strong>${displayName}</strong>,` : ''}</p><p>Sie wurden eingeladen, der <strong>Andertal Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
+                html: `<p>${displayName ? `Hallo <strong>${esc(displayName)}</strong>,` : ''}</p><p>Sie wurden eingeladen, der <strong>Andertal Seller Platform</strong> beizutreten.</p><p><a href="${inviteUrl}">Jetzt registrieren</a></p><p>Dieser Link ist 7 Tage gültig.</p>`
               })
             }
           }
@@ -430,6 +430,8 @@ module.exports = function createSellerAccountRouter({
         // Ensure the sub-user belongs to this seller
         const check = await client.query('SELECT id FROM seller_users WHERE id = $1 AND sub_of_seller_id = $2', [id, sellerId])
         if (!check.rows.length) { await client.end(); return res.status(404).json({ message: 'Benutzer nicht gefunden' }) }
+        // A team member cannot widen its own permissions.
+        if (String(id) === String(req.sellerUser?.id || '')) { await client.end(); return res.status(403).json({ code: 'permission_denied', message: 'Eigene Berechtigungen können nicht geändert werden.' }) }
         const r = await client.query(
           `UPDATE seller_users SET permissions = $1::jsonb, updated_at = now() WHERE id = $2 RETURNING id, email, first_name, last_name, permissions`,
           [permissions ? JSON.stringify(permissions) : null, id]
@@ -481,16 +483,17 @@ module.exports = function createSellerAccountRouter({
     }
 
   const router = Router()
-  router.patch('/admin-hub/v1/seller/iban', adminHubSellerIbanPATCH)
+  router.patch('/admin-hub/v1/seller/iban', requireSellerPage('/settings/payments'), adminHubSellerIbanPATCH)
   router.get('/admin-hub/v1/seller/account', adminHubSellerAccountGET)
   router.patch('/admin-hub/v1/seller/account', adminHubSellerAccountPATCH)
   router.patch('/admin-hub/v1/seller/password', adminHubSellerPasswordPATCH)
   router.get('/admin-hub/v1/seller/profile', adminHubSellerProfileGET)
-  router.post('/admin-hub/users/invite', adminHubUsersInvitePOST)
-  router.get('/admin-hub/v1/subusers', adminHubSubusersGET)
-  router.patch('/admin-hub/v1/subusers/:id', adminHubSubuserUpdatePATCH)
-  router.delete('/admin-hub/v1/subusers/:id', adminHubSubuserDeleteDELETE)
-  router.delete('/admin-hub/v1/pending-invites/:id', adminHubPendingInviteDeleteDELETE)
+  const teamPage = requireSellerPage('/settings/users-permissions')
+  router.post('/admin-hub/users/invite', teamPage, adminHubUsersInvitePOST)
+  router.get('/admin-hub/v1/subusers', teamPage, adminHubSubusersGET)
+  router.patch('/admin-hub/v1/subusers/:id', teamPage, adminHubSubuserUpdatePATCH)
+  router.delete('/admin-hub/v1/subusers/:id', teamPage, adminHubSubuserDeleteDELETE)
+  router.delete('/admin-hub/v1/pending-invites/:id', teamPage, adminHubPendingInviteDeleteDELETE)
 
   return router
 }

@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — C, 2. adım: ekip/davet güvenliği + sözleşme kaydı (bitti) — GÜVENLİK DÜZELTMESİ
+
+- **Hesap ele geçirme (davet)**: `POST /admin-hub/users/invite` kayıtlı ve bağımsız bir hesabın e-postası davet edilince onu sessizce davet edenin alt kullanıcısı yapıyordu (`sub_of_seller_id` güncelleme) — herhangi bir satıcı başka bir satıcının (superuser dahil) girişini kendi hesabına bağlayabiliyordu. Artık 409 `account_exists`; bağımsız hesap asla dönüştürülmez. Davet e-postasında ad HTML-escape.
+- **Ekip izinleri API'de yoktu**: alt kullanıcı izinleri (SC sayfa yolu listesi) yalnız menüyü gizliyordu; "yalnız Bestellungen" yetkili üye API ile IBAN, şirket/vergi bilgisi, ödeme hesabı, ekip davet/izin değiştirebiliyordu. Yeni `src/seller-permission.js` (`requireSellerPage`, SC menü kuralının aynısı; sahip/superuser/`null` izin = serbest): IBAN, `payout-account`(+onboarding-link), `legal-profile` → `/settings/payments`; `company-info` → `/settings/verification`; davet, alt kullanıcı listesi/izin/silme, bekleyen davet silme → `/settings/users-permissions`. Üye kendi izinlerini değiştiremez.
+- **Sözleşme kabulü kaydedilmiyordu**: doğrulama sayfasındaki zorunlu "Verkäufervertrag" kutusu kaydedilmiyordu (canlıda onaylı bir satıcıda `agreement_accepted=false` bunun sonucu). `company-info` artık `agreement_accepted: true` ile kabulü sürüm + zaman + IP olarak bir kez yazar; SC gönderimde yollar. SQL test Postgres'te denendi.
+- Test: `seller-permission.test.js` (2). `npm test` 218/218, SC esbuild OK.
+- Bilinen: doğrulama sayfası IBAN'ı da kaydettiği için `/settings/verification` yetkili ama `/settings/payments` yetkisiz üye orada IBAN kaydında 403 alır (bilinçli). IBAN değişikliğinde sahibine e-posta bildirimi yok → F alanı.
+
 ## 2026-10-08 — C. Satıcı kaydı ve onay, 1. adım: kabul kapısı (bitti)
 
 Denetim bulguları ve düzeltmeler:

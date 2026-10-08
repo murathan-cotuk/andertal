@@ -303,7 +303,7 @@ module.exports = function createSettlementRouter({ loadPlatformCheckoutRow, reso
     res.json({ account: s, readiness: await settlement.sellerAccountReadiness(client, sellerId) })
   }))
 
-  router.patch('/admin-hub/v1/seller/legal-profile', handler(async (req, res, client, scope) => {
+  router.patch('/admin-hub/v1/seller/legal-profile', require('../seller-permission').requireSellerPage('/settings/payments'), handler(async (req, res, client, scope) => {
     const sellerId = sellerParam(req, scope)
     const b = req.body || {}
     const type = b.legal_entity_type != null ? String(b.legal_entity_type).toLowerCase() : undefined
@@ -332,7 +332,7 @@ module.exports = function createSettlementRouter({ loadPlatformCheckoutRow, reso
   }))
 
   // Creates / updates the Custom account. Terms acceptance is recorded only with accept_stripe_tos.
-  router.post('/admin-hub/v1/seller/payout-account', handler(async (req, res, client, scope) => {
+  router.post('/admin-hub/v1/seller/payout-account', require('../seller-permission').requireSellerPage('/settings/payments'), handler(async (req, res, client, scope) => {
     if (scope.isSuperuser && !req.body?.seller_id) return res.status(400).json({ message: 'seller_id required' })
     const sellerId = sellerParam(req, scope)
     const stripe = await stripeFor(client)
@@ -351,7 +351,7 @@ module.exports = function createSettlementRouter({ loadPlatformCheckoutRow, reso
     res.json({ account_id: account.id, payouts_enabled: account.payouts_enabled, requirements: account.requirements || null })
   }))
 
-  router.post('/admin-hub/v1/seller/payout-account/onboarding-link', handler(async (req, res, client, scope) => {
+  router.post('/admin-hub/v1/seller/payout-account/onboarding-link', require('../seller-permission').requireSellerPage('/settings/payments'), handler(async (req, res, client, scope) => {
     const sellerId = sellerParam(req, scope)
     const stripe = await stripeFor(client)
     if (!stripe) return res.status(503).json({ message: 'Stripe not configured' })
