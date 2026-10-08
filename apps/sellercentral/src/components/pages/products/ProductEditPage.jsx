@@ -14,6 +14,7 @@ import {
   TextField,
   BlockStack,
   InlineStack,
+  Badge,
   Box,
   Banner,
   Divider,
@@ -562,7 +563,7 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
-export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, onCreated, sellerListings = [], eanSiblings = [] }) {
+export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, onCreated, sellerListings = [], eanSiblings = [], familyMembers = [] }) {
   const router = useRouter();
   const locale = useLocale();
   const pe = useMemo(() => productEditCopy(locale), [locale]);
@@ -3170,6 +3171,33 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             </BlockStack>
           </Modal.Section>
         </Modal>
+      )}
+
+      {/* Faz 3 family_link: the other products of this family (each its own EAN product). */}
+      {!isNew && Array.isArray(familyMembers) && familyMembers.length > 1 && (
+        <Box paddingBlockEnd="200">
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h3" variant="headingSm">
+                {lt(locale, "Variant family", "Varyant ailesi", "Famille de variantes", "Familia de variantes", "Famiglia di varianti", "Variantenfamilie")}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {lt(locale, "Each variant is its own product (own EAN, price, stock). The shop shows them together on one product page.", "Her varyant ayrı bir üründür (kendi EAN, fiyat, stok). Shop bunları tek ürün sayfasında birlikte gösterir.", "Chaque variante est un produit distinct (EAN, prix, stock propres). La boutique les affiche sur une seule page.", "Cada variante es su propio producto (EAN, precio, stock). La tienda las muestra en una sola página.", "Ogni variante è un prodotto a sé (EAN, prezzo, stock propri). Il negozio le mostra in un'unica pagina.", "Jede Variante ist ein eigenes Produkt (eigene EAN, Preis, Bestand). Der Shop zeigt sie gemeinsam auf einer Produktseite.")}
+              </Text>
+              <InlineStack gap="200" wrap>
+                {familyMembers.map((m) => (
+                  m.current ? (
+                    <Badge key={m.id} tone="info">{m.option_value || m.title}</Badge>
+                  ) : (
+                    <Link key={m.id} href={`/products/${encodeURIComponent(m.id)}`} style={{ textDecoration: "none" }}>
+                      <Badge>{m.option_value || m.title}</Badge>
+                    </Link>
+                  )
+                ))}
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Box>
       )}
 
       {!isNew && isSuperuser && (sellerListings.length > 0 || eanSiblings.length > 0) && (

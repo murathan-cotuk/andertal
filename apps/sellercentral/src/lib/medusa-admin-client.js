@@ -239,6 +239,7 @@ class MedusaAdminClient {
       product: res?.product ?? null,
       seller_listings: res?.seller_listings ?? [],
       ean_siblings: res?.ean_siblings ?? [],
+      family_members: res?.family_members ?? [],
     };
   }
 

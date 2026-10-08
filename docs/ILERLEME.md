@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — Bekleyen işler 7: Handoff Faz 3 family_link — adım 1–3 (bitti; 4. adım kullanıcıda)
+
+- Durum: canlıda aile kaydı yok (`family_id` 0, `admin_hub_product_families` 0); SC birleştirme varsayılanı `legacyFold: true` → bugünkü ürünler etkilenmez, yeni kod yalnız aile üyelerinde çalışır.
+- (1) Store API (`routes/store-products.js` + `src/family-variants.js`): aile üyesinin PDP'sinde diğer görünür üyeler tek eksenli varyant olarak döner (ailenin `variation_groups` sırası, görüntülenen üye ilk → önseçili). Her varyant üyenin kendi sepet kimliği, fiyat haritası (`metadata.prices`), stoğu, görseli, EAN'ı. Kendi varyantı olan üye varsa genişletme yapılmaz.
+- (2) Sepet/checkout: varyant kimliği üyeyi gösterdiği için sepet üye ürününü ekler; fiyat `line-unit-price.js`, stok `inventory.js` (ürün satırı) — ek değişiklik gerekmedi.
+- (3) SC: `GET /admin-hub/products/:id` `family_members` döner; ürün düzenlemede "Variantenfamilie" kartı (6 dil, diğer üyelere bağlantı).
+- Test: `family-variants.test.js` (2). `npm test` geçti, SC bundle kontrolü OK.
+- **(4) Kullanıcıda**: canlıda bir aile ile (SC'de birleştirirken `legacyFold: false`) PDP/sepet/checkout doğrulandıktan sonra varsayılanı `legacyFold: false` yapmak ve `scripts/backfill-variants-to-products.js --apply` (production yazımı — kullanıcı onayı/çalıştırması; dry-run: 8 ana ürün → 145 satır).
+
 ## 2026-10-08 — ACİL düzeltme: stok kontrolü EAN varyant kimliklerini tanımıyordu (bitti)
 
 - Shop, EAN'lı varyantlar için sepet kimliğini `<ürün>-ean-<EAN>` üretiyor (`stableVariantId`). `inventory.js` yalnız `-variant-<i>`/`-v-<i>` okuyordu → EAN kimliğinde ürün satırının stoğuna (varyantlı üründe 0) düşüp ödemeyi `insufficient_stock` ile reddedebilirdi. Artık sepetle aynı çözümleyici (`product-identity.resolveVariantFromCartId`), yedek olarak indeks. Test +1 (EAN kimliği → varyant stoğu). E/2 stok kodu deploy edilmeden önce bu düzeltme gerekli.

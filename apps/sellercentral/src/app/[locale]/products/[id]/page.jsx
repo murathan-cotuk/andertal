@@ -20,6 +20,7 @@ export default function ProductDetailRoute() {
   const [product, setProduct] = useState(null);
   const [sellerListings, setSellerListings] = useState([]);
   const [eanSiblings, setEanSiblings] = useState([]);
+  const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const client = getMedusaAdminClient();
@@ -41,16 +42,18 @@ export default function ProductDetailRoute() {
     try {
       setLoading(true);
       setError(null);
-      const { product: data, seller_listings, ean_siblings } = await client.getAdminHubProductFull(idOrHandle);
+      const { product: data, seller_listings, ean_siblings, family_members } = await client.getAdminHubProductFull(idOrHandle);
       setProduct(data || null);
       setSellerListings(seller_listings || []);
       setEanSiblings(ean_siblings || []);
+      setFamilyMembers(family_members || []);
       if (!data) setError("Product not found");
     } catch (err) {
       setError(userError(err, null, "Failed to load product"));
       setProduct(null);
       setSellerListings([]);
       setEanSiblings([]);
+      setFamilyMembers([]);
     } finally {
       setLoading(false);
     }
@@ -117,7 +120,7 @@ export default function ProductDetailRoute() {
         onReload={fetchProduct}
         onCreated={handleCreated}
         sellerListings={sellerListings}
-        eanSiblings={eanSiblings}
+        eanSiblings={eanSiblings} familyMembers={familyMembers}
       />
     </DashboardLayout>
   );

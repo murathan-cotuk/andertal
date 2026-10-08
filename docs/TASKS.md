@@ -72,7 +72,7 @@ Kaynak: `docs/HANDOFF-cursor-plan-sc-variation-compliance.md`, referans görsell
 - [x] **Faz 0f** — Açıklamanın hemen altında "Güvenlik ve ürün kaynakları": solda yasal garanti (AB ≥ 2 yıl, 6 dil sabit metin + `warranty_info_url`, superuser ayarı, varsayılan `/pages/gewaehrleistung`), sağda GPSR kişileri + `safety_information_text` / `safety_information_pdf`.
 - [x] **Faz 1** — Farbe ≠ Design: varyasyon grubu seçiminde `metafield_key` korunur, Farbe seçilince Design'a dönmez.
 - [x] **Faz 2** — Varyant formu = ürün formu (ülke fiyatları, Genel/Spez/Rechtlich düzeni).
-- [ ] **Faz 3** — (ön koşul gerekli, ayrıntı ILERLEME.md: shop/store API aile üyelerini varyant olarak göstermeden varsayılan açılmaz; dry-run: 8 ürün → 145 satır) — `family_link` (`legacyFold: false`); çocuklar ProductEditPage'de; backfill yalnız dry-run.
+- [~] **Faz 3** — family_link: store API + PDP varyantları + SC aile kartı hazır (2026-10-08). Kalan (kullanıcı): canlı doğrulama → `legacyFold: false` varsayılan + backfill `--apply`. Ayrıntı ILERLEME.md.
 
 ### JTL ortaklık ve entegrasyon (`docs/jtl.md`)
 

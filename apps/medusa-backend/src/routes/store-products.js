@@ -1162,6 +1162,32 @@ const storeProductByIdFromAdminHubGET = async (req, res) => {
     await enrichMappedStoreProduct(winnerRow, mapped, {
       alsoMatchIds: [landed.id, winnerRow._listing_id, canonicalProductId(winnerRow), canonicalProductId(landed)],
     })
+    // Faz 3 family_link: the family's other members as variants of this PDP (src/family-variants.js).
+    if (winnerRow.family_id && !winnerRow._listing_id) {
+      try {
+        const fc = getDbClient()
+        await fc.connect()
+        const fam = (await fc.query('SELECT metadata FROM admin_hub_product_families WHERE id = $1', [winnerRow.family_id])).rows[0]
+        const rows = (await fc.query('SELECT * FROM admin_hub_products WHERE family_id = $1', [winnerRow.family_id])).rows
+        await fc.end()
+        const approved = await getApprovedSellerIdsSet()
+        const country = (req.query && req.query.country) || 'DE'
+        const visible = rows.filter((r) => !isFamilyShell(r) && isStorePublishedStatus(r.status) && isStoreVisibleSellerProduct(r, approved))
+        const famMeta = fam && fam.metadata && typeof fam.metadata === 'object' ? fam.metadata : {}
+        const built = require('../family-variants').buildFamilyVariants({
+          currentId: winnerRow.id,
+          members: visible.map((r) => ({ row: r, mapped: mapAdminHubToStoreProduct(r, country) })),
+          variationGroups: famMeta.variation_groups,
+        })
+        if (built) {
+          mapped.variants = built.variants
+          mapped.variation_groups = built.variation_groups
+          mapped.family_members = built.family_members
+        }
+      } catch (famErr) {
+        console.warn('[store-products] family variants:', famErr?.message || famErr)
+      }
+    }
     res.json({ product: mapped, multi_offer: multiOffer })
   } catch (err) {
     console.error('Store product by id GET (admin hub):', err)

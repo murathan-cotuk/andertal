@@ -1648,7 +1648,19 @@ const adminHubProductByIdGET = async (req, res) => {
       }
     }
     product.shop_visibility = shopVisibility
-    res.json({ product, seller_listings, ean_siblings })
+    // Faz 3: other members of this product's family (family_link) for the Sellercentral edit page.
+    let family_members = []
+    if (product.family_id) {
+      try {
+        const fr = await dbQ(
+          `SELECT id, title, handle, status, sku, metadata->>'family_option_value' AS option_value
+             FROM admin_hub_products WHERE family_id = $1 ORDER BY created_at`,
+          [product.family_id],
+        )
+        family_members = (fr.rows || []).map((r) => ({ ...r, current: String(r.id) === String(product.id) }))
+      } catch (_) { family_members = [] }
+    }
+    res.json({ product, seller_listings, ean_siblings, family_members })
   } catch (err) {
     console.error('Admin Hub product GET error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
