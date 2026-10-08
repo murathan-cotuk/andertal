@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — PDP "Lieferung bis …" (bitti, karar 3)
+
+- Kargo grubuna `handling_days` (hazırlık) + `transit_days` (taşıma) — iş günü, 0–30, boş = tarih yok (`server.js` ensure; `store-checkout.js` POST/PATCH; public `/store/shipping-groups` döner).
+- `apps/shop/src/lib/delivery-estimate.js`: bugün (Europe/Berlin) + hazırlık + taşıma (en az 1) iş günü; hafta sonu ve bundesweite Feiertage (Paskalya bağlı olanlar dahil) atlanır; test `delivery-estimate.test.mjs` 3/3.
+- PDP: masaüstü buybox "Auf Lager · Lieferung bis Mo., 12. Oktober"; mobil kartta aynı not. Yalnız iki değer de girilmişse ve ürün o pazara gönderilebiliyorsa. `product.deliveryBy` 6 dil.
+- SC Einstellungen → Versand: grup formunda "Bearbeitungszeit (Werktage)" + "Laufzeit (Werktage)" (6 dil, açıklamalı).
+- Kontrol: değişen dosyalar esbuild ile derleniyor; backend `npm test` 195/195. (Tam `next build` bu turda çalıştırılmadı.)
+
 ## 2026-10-07 — B: satıcı başına gönderi (bitti, karar 1)
 
 - Settlement şeması: `order_shipments` (sipariş × satıcı: kargo, takip no, durum offen→versendet→zugestellt, satıcı bildirimi, teslim onayı + kaynak; takip no indeksi).
