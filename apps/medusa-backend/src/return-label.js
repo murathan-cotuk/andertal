@@ -120,7 +120,7 @@ async function chargeReturnLabelOnCarrierMovement(pgClient, { returnId, stripe }
   const { chargeSellerForLabel } = require('./seller-billing')
   try {
     const retR = await pgClient.query(
-      `SELECT r.order_id, r.label_cost_cents, r.label_charge_status, o.seller_id, o.order_number
+      `SELECT r.order_id, r.label_cost_cents, r.label_charge_status, r.seller_id AS return_seller_id, o.seller_id, o.order_number
        FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`,
       [returnId],
     )
@@ -128,10 +128,16 @@ async function chargeReturnLabelOnCarrierMovement(pgClient, { returnId, stripe }
     if (!row) return { ok: false, reason: 'return_not_found' }
     if (row.label_charge_status !== 'pending') return { ok: false, reason: `already_${row.label_charge_status}` }
     if (!row.label_cost_cents || Number(row.label_cost_cents) <= 0) return { ok: false, reason: 'no_cost_recorded' }
-    if (!row.seller_id) return { ok: false, reason: 'order_has_no_seller' }
+    // store_orders.seller_id is the platform ('default'): bill the return's seller, or the order's
+    // only real seller. Previously return labels were booked against 'default' (nobody paid).
+    const { orderSellerIds } = require('./settlement/shipments')
+    const { realSellerId } = require('./settlement/payables')
+    const sellers = await orderSellerIds(pgClient, row.order_id).catch(() => [])
+    const billSellerId = realSellerId(row.return_seller_id) || (sellers.length === 1 ? sellers[0] : null) || realSellerId(row.seller_id)
+    if (!billSellerId) return { ok: false, reason: 'order_has_no_seller' }
 
     await chargeSellerForLabel(pgClient, {
-      sellerId: row.seller_id,
+      sellerId: billSellerId,
       orderId: row.order_id,
       amountCents: row.label_cost_cents,
       orderNumber: row.order_number,

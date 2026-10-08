@@ -560,48 +560,19 @@ module.exports = function createShipmentTrackingRouter({
           })
         }
         const methods = resp.data?.shipping_methods || []
-        const markup = 1 + (Number(sc.markup_pct) || 5) / 100
         const weightKg = weightG / 1000
-        const rates = []
+        const { computeLabelRates } = require('../label-pricing')
+        const rates = computeLabelRates(methods, { toCountry, weightKg, markupPct: sc.markup_pct })
         // Superuser-only diagnostic: lets us see exactly what Sendcloud returned for each DHL
         // method's weight bracket without needing server-log access, since the account may
         // simply not have differentiated min/max_weight configured per method.
         const debugMethods = []
-        for (const method of methods) {
-          // Platform ships via DHL only for now — other carriers stay hidden until
-          // seller-owned carrier integrations are wired up.
-          const carrierKey = String(method.carrier || method.name || '').toLowerCase()
-          if (!carrierKey.includes('dhl')) continue
-          const minW = method.min_weight != null && method.min_weight !== '' ? Number(method.min_weight) : null
-          const maxW = method.max_weight != null && method.max_weight !== '' ? Number(method.max_weight) : null
-          if (isSuperuser) debugMethods.push({ id: method.id, name: method.name, carrier: method.carrier, min_weight: method.min_weight, max_weight: method.max_weight })
-          if (minW != null && !Number.isNaN(minW) && minW > 0 && weightKg < minW) continue
-          if (maxW != null && !Number.isNaN(maxW) && maxW > 0 && weightKg > maxW) continue
-          const countryEntry = (method.countries || []).find((c) => (c.iso_2 || '').toUpperCase() === toCountry)
-          if (!countryEntry) continue
-          const price = countryEntry.price
-          if (price == null) continue
-          const leadHours = countryEntry.lead_time_hours != null ? Number(countryEntry.lead_time_hours) : null
-          let deliveryDays = null
-          if (leadHours != null) {
-            if (leadHours <= 24) deliveryDays = 'Lieferung am nächsten Werktag'
-            else if (leadHours <= 48) deliveryDays = 'Lieferung in 1–2 Werktagen'
-            else if (leadHours <= 72) deliveryDays = 'Lieferung in 2–3 Werktagen'
-            else deliveryDays = `Lieferung in ca. ${Math.ceil(leadHours / 24)} Werktagen`
+        if (isSuperuser) {
+          for (const method of methods) {
+            if (!String(method.carrier || method.name || '').toLowerCase().includes('dhl')) continue
+            debugMethods.push({ id: method.id, name: method.name, carrier: method.carrier, min_weight: method.min_weight, max_weight: method.max_weight })
           }
-          rates.push({
-            service_id: method.id,
-            name: method.name,
-            carrier: method.carrier || (method.name || '').toLowerCase(),
-            price_eur: Math.round(Number(price) * markup * 100) / 100,
-            price_base: Math.round(Number(price) * 100) / 100,
-            min_weight: method.min_weight,
-            max_weight: method.max_weight,
-            delivery_days: deliveryDays,
-            tracking: true,
-          })
         }
-        rates.sort((a, b) => a.price_eur - b.price_eur)
         if (rates.length === 0) {
           return respondSellerSystemError(req, res, {
             errorCode: 'SENDCLOUD_NO_RATES',
@@ -643,17 +614,37 @@ module.exports = function createShipmentTrackingRouter({
         // match the same "has an item here" access pattern as every other seller-scoped order query
         // in this file (sellerOrderAccessSQL).
         const orderR = await client.query(
-          `SELECT id, order_number, seller_id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2, sendcloud_label_url, tracking_number
+          `SELECT id, order_number, seller_id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2, sendcloud_label_url, tracking_number, delivery_status
            FROM store_orders WHERE id=$1::uuid${sellerOrderAccessSQL(isSuperuser)}`,
           isSuperuser ? [id] : [id, callerSellerId],
         )
         const order = orderR.rows[0]
         if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found or belongs to a different seller.' }) }
-        const orderSellerId = String(order.seller_id || '').trim()
-        const billingSellerId = isSuperuser ? orderSellerId : callerSellerId
+        // store_orders.seller_id is the platform ('default') — the label is billed to the real
+        // seller: the caller, or for the superuser the order's only seller (or body.seller_id).
+        const { orderSellerIds } = require('../settlement/shipments')
+        const realSellers = await orderSellerIds(client, id).catch(() => [])
+        const billingSellerId = isSuperuser
+          ? (String(req.body?.seller_id || '').trim() || (realSellers.length === 1 ? realSellers[0] : ''))
+          : callerSellerId
+        if (!billingSellerId || (isSuperuser && !realSellers.includes(billingSellerId))) {
+          await client.end()
+          return res.status(400).json({ code: 'seller_required', message: 'Mehrere Händler — bitte seller_id angeben.', sellers: realSellers })
+        }
 
         const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm } = req.body || {}
-        if (!service_id || !price_eur) { await client.end(); return res.status(400).json({ message: 'service_id und price_eur erforderlich' }) }
+        if (!service_id) { await client.end(); return res.status(400).json({ message: 'service_id erforderlich' }) }
+
+        // Double click / retry: one label per seller and order within 2 minutes.
+        const recent = await client.query(
+          `SELECT 1 FROM seller_ledger_adjustments WHERE seller_id = $1 AND order_id = $2::uuid AND type = 'shipping_label'
+             AND amount_cents < 0 AND created_at > now() - interval '2 minutes' LIMIT 1`,
+          [billingSellerId, id],
+        ).catch(() => ({ rows: [] }))
+        if (recent.rows.length && req.body?.confirm_additional !== true) {
+          await client.end()
+          return res.status(409).json({ code: 'label_just_purchased', message: 'Für diese Bestellung wurde gerade ein Etikett gekauft.' })
+        }
 
         const checkoutRow = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
@@ -668,12 +659,39 @@ module.exports = function createShipmentTrackingRouter({
         }
         const stripe = new (require('stripe'))(secretKey)
 
+        // Price is re-quoted here — the browser's price_eur is only used to detect a change.
+        const scQuote = await getSendcloudCredentials(client)
+        if (!scQuote.public_key || !scQuote.secret_key) {
+          await client.end()
+          return respondSellerSystemError(req, res, {
+            errorCode: 'SENDCLOUD_NOT_CONFIGURED',
+            errorMessage: 'Sendcloud nicht konfiguriert',
+            sellerId: billingSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/purchase' }),
+          })
+        }
+        const { computeLabelRates, normalizeWeightKg } = require('../label-pricing')
+        const quoteCountry = (order.country || 'DE').trim().toUpperCase().slice(0, 2)
+        const methodsResp = await sendcloudRequest(`/api/v2/shipping_methods?to_country=${quoteCountry}`, scQuote)
+        const quoted = methodsResp.status < 400
+          ? computeLabelRates(methodsResp.data?.shipping_methods || [], { toCountry: quoteCountry, weightKg: normalizeWeightKg(weight_kg), markupPct: scQuote.markup_pct })
+            .find((r) => String(r.service_id) === String(service_id))
+          : null
+        if (!quoted) {
+          await client.end()
+          return res.status(409).json({ code: 'rate_unavailable', message: 'Versandoption für dieses Gewicht/Land nicht verfügbar — bitte Preise neu laden.' })
+        }
+        if (price_eur != null && Math.abs(Number(price_eur) - quoted.price_eur) > 0.005) {
+          await client.end()
+          return res.status(409).json({ code: 'price_changed', message: `Preis geändert: ${quoted.price_eur.toFixed(2)} €`, price_eur: quoted.price_eur })
+        }
+
         let chargeResult
         try {
           chargeResult = await chargeSellerForLabel(client, {
             sellerId: billingSellerId,
             orderId: id,
-            amountCents: Math.round(Number(price_eur) * 100),
+            amountCents: Math.round(quoted.price_eur * 100),
             orderNumber: order.order_number,
             stripe,
           })
@@ -682,15 +700,13 @@ module.exports = function createShipmentTrackingRouter({
           return res.status(402).json({ message: chargeErr?.message || 'Payment failed' })
         }
 
-        const sc = await getSendcloudCredentials(client)
-        if (!sc.public_key || !sc.secret_key) {
-          await client.end()
-          return respondSellerSystemError(req, res, {
-            errorCode: 'SENDCLOUD_NOT_CONFIGURED',
-            errorMessage: 'Sendcloud nicht konfiguriert',
-            sellerId: billingSellerId,
-            context: JSON.stringify({ order_id: id, endpoint: 'label/purchase' }),
-          })
+        const sc = scQuote
+        const { reverseLabelCharge } = require('../seller-billing')
+        const undoCharge = async (why) => {
+          try { return await reverseLabelCharge(client, chargeResult, { stripe, reason: why }) } catch (rErr) {
+            console.error('[label] charge reversal failed — manual correction needed:', chargeResult?.ledger_id, rErr?.message || rErr)
+            return { reversed: false }
+          }
         }
         const parcelBody = JSON.stringify({ parcel: {
           name: [order.first_name, order.last_name].filter(Boolean).join(' ') || order.email || 'Kunde',
@@ -709,8 +725,15 @@ module.exports = function createShipmentTrackingRouter({
           request_label: true,
           order_number: String(id).slice(0, 8),
         }})
-        const scResp = await sendcloudRequest('/api/v2/parcels', sc, { method: 'POST', body: parcelBody })
+        let scResp
+        try {
+          scResp = await sendcloudRequest('/api/v2/parcels', sc, { method: 'POST', body: parcelBody })
+        } catch (netErr) {
+          await undoCharge('sendcloud_unreachable')
+          throw netErr
+        }
         if (scResp.status >= 400) {
+          await undoCharge('sendcloud_parcel_error')
           await client.end()
           return respondSellerSystemError(req, res, {
             errorCode: 'SENDCLOUD_PARCEL_ERROR',

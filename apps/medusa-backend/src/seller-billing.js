@@ -131,6 +131,37 @@ async function chargeSellerForLabel(client, { sellerId, orderId, amountCents, or
   return { charge_method: 'card', ledger_id: r.rows[0].id, stripe_payment_intent_id: paymentIntent.id }
 }
 
+/**
+ * Undoes a label charge whose label could not be created (Sendcloud error after the charge).
+ * Card → Stripe refund of that PaymentIntent. The adjustment row is removed while it is not yet
+ * mirrored into the append-only settlement ledger / a payout; otherwise a counter-adjustment.
+ */
+async function reverseLabelCharge(client, chargeResult, { stripe = null, reason = 'label_not_created' } = {}) {
+  if (!chargeResult || !chargeResult.ledger_id) return { reversed: false }
+  if (chargeResult.charge_method === 'card' && chargeResult.stripe_payment_intent_id && stripe) {
+    await stripe.refunds.create(
+      { payment_intent: chargeResult.stripe_payment_intent_id, metadata: { reason } },
+      { idempotencyKey: `andertal-label-reversal-${chargeResult.ledger_id}` },
+    )
+  }
+  const del = await client.query(
+    `DELETE FROM seller_ledger_adjustments a
+      WHERE a.id = $1::uuid AND a.settled_payout_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM seller_ledger_entries e WHERE e.idempotency_key = 'LEGACY_ADJ:' || a.id::text)
+      RETURNING id`,
+    [chargeResult.ledger_id],
+  ).catch(() => ({ rows: [] }))
+  if (del.rows.length) return { reversed: true, method: 'deleted' }
+  const row = (await client.query('SELECT * FROM seller_ledger_adjustments WHERE id = $1::uuid', [chargeResult.ledger_id])).rows[0]
+  if (!row) return { reversed: false }
+  await client.query(
+    `INSERT INTO seller_ledger_adjustments (seller_id, type, amount_cents, description_key, description_params, order_id, charge_method)
+     VALUES ($1, 'manual_adjustment', $2, 'shipping_label_reversal', $3::jsonb, $4, $5)`,
+    [row.seller_id, -Number(row.amount_cents), JSON.stringify({ reversed_id: String(row.id), reason }), row.order_id, row.charge_method || 'balance'],
+  )
+  return { reversed: true, method: 'counter_adjustment' }
+}
+
 /** Payout = Warenwert − Provision netto + Kundenversand (nur ohne Plattformetikett) − Etikett-Verrechnung. */
 function sellerPeriodPayoutCents({
   grossCents = 0,
@@ -546,6 +577,7 @@ async function aggregateMarketplacePeriodSales(client, periodStart, periodEnd) {
 
 module.exports = {
   chargeSellerForLabel,
+  reverseLabelCharge,
   getSellerAvailableCents,
   sellerPeriodPayoutCents,
   aggregateSellerPeriodSales,

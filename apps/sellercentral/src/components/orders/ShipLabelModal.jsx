@@ -200,7 +200,19 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
           : sellerTechnicalMessage(locale));
       }
     } catch (e) {
-      setError(resolveSellerFacingError(e, locale, isSuperuser));
+      // The backend re-quotes the label price; a changed price is shown before anything is charged.
+      if (e?.code === "price_changed" && Number(e?.body?.price_eur) > 0) {
+        const p = Number(e.body.price_eur);
+        setSelectedRate((r) => (r ? { ...r, price_eur: p } : r));
+        setRates((list) => (list || []).map((r) => (selectedRate && r.service_id === selectedRate.service_id ? { ...r, price_eur: p } : r)));
+        setError(lt(locale, `Price updated to ${p.toFixed(2)} € — please confirm again.`, `Fiyat ${p.toFixed(2)} € olarak güncellendi — lütfen tekrar onaylayın.`, `Prix mis à jour : ${p.toFixed(2)} € — veuillez confirmer à nouveau.`, `Precio actualizado a ${p.toFixed(2)} €: confirme de nuevo.`, `Prezzo aggiornato a ${p.toFixed(2)} € — confermare di nuovo.`, `Preis aktualisiert auf ${p.toFixed(2)} € — bitte erneut bestätigen.`));
+      } else if (e?.code === "rate_unavailable") {
+        setError(lt(locale, "This shipping option is no longer available for this weight/country — please reload the rates.", "Bu kargo seçeneği bu ağırlık/ülke için artık yok — fiyatları yeniden yükleyin.", "Cette option n'est plus disponible pour ce poids/pays — rechargez les tarifs.", "Esta opción ya no está disponible para este peso/país: recargue las tarifas.", "Opzione non più disponibile per questo peso/paese — ricaricare le tariffe.", "Diese Versandoption ist für Gewicht/Land nicht mehr verfügbar — bitte Preise neu laden."));
+      } else if (e?.code === "label_just_purchased") {
+        setError(lt(locale, "A label was just bought for this order — reload the order before buying another one.", "Bu sipariş için az önce etiket alındı — yenisini almadan önce siparişi yenileyin.", "Une étiquette vient d'être achetée pour cette commande — rechargez la commande.", "Se acaba de comprar una etiqueta para este pedido: recargue el pedido.", "È appena stata acquistata un'etichetta per questo ordine — ricaricare l'ordine.", "Für diese Bestellung wurde gerade ein Etikett gekauft — bitte Bestellung neu laden."));
+      } else {
+        setError(resolveSellerFacingError(e, locale, isSuperuser));
+      }
     }
     setCheckingOut(false);
   };

@@ -730,3 +730,22 @@ withDb('seller cancel: refunds only its own lines + shipping; order cancelled on
   assert.equal(b.all_cancelled, true)
   assert.equal(stripe.calls.refunds.reduce((x, r) => x + r.amount, 0), 2000 + 490 + 3000 + 390)
 })
+
+withDb('label charge reversal: unbooked charge removed; booked charge gets a counter-adjustment', async (c) => {
+  await h.addSeller(c, 'seller_a')
+  const { order } = await h.addPaidOrder(c, { items: [{ seller: 'seller_a', price: 1000 }] })
+  const { reverseLabelCharge } = require('../seller-billing')
+  const { appendLedgerEntry } = require('./ledger')
+  const add = async () => (await c.query(
+    `INSERT INTO seller_ledger_adjustments (seller_id, type, amount_cents, order_id, charge_method) VALUES ('seller_a', 'shipping_label', -499, $1, 'balance') RETURNING id`,
+    [order.id],
+  )).rows[0].id
+  const a1 = await add()
+  assert.deepEqual(await reverseLabelCharge(c, { ledger_id: a1, charge_method: 'balance' }), { reversed: true, method: 'deleted' })
+  assert.equal((await c.query('SELECT COUNT(*)::int AS n FROM seller_ledger_adjustments')).rows[0].n, 0)
+  const a2 = await add()
+  await appendLedgerEntry(c, { sellerId: 'seller_a', orderId: order.id, eventType: 'ADJUSTMENT', amountCents: -499, idempotencyKey: `LEGACY_ADJ:${a2}`, referenceId: String(a2) })
+  assert.deepEqual(await reverseLabelCharge(c, { ledger_id: a2, charge_method: 'balance' }), { reversed: true, method: 'counter_adjustment' })
+  const sum = (await c.query(`SELECT COALESCE(SUM(amount_cents), 0)::int AS s FROM seller_ledger_adjustments WHERE seller_id = 'seller_a'`)).rows[0].s
+  assert.equal(sum, 0)
+})

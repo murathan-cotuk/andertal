@@ -10,6 +10,18 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — B: kargo etiketi satın alma (bitti) — PARA DÜZELTMESİ
+
+Denetimde bulunan açıklar ve düzeltmeler:
+- **Fiyat tarayıcıdan geliyordu**: `label/purchase` satıcıdan `price_eur` ne gelirse onu tahsil ediyordu (Sendcloud farkını platform öderdi). Artık fiyat sunucuda yeniden hesaplanır (`src/label-pricing.js` `computeLabelRates`, rates ucu da aynı fonksiyonu kullanır); tarayıcı fiyatı farklıysa 409 `price_changed` (yeni fiyatla), seçenek yoksa 409 `rate_unavailable`. SC etiket penceresi yeni fiyatı gösterip tekrar onay ister (6 dil).
+- **Ücret alınıp etiket oluşmazsa iade yoktu**: Sendcloud hatası / erişilemezse `reverseLabelCharge` (`seller-billing.js`): kart → Stripe iadesi; bakiye kaydı ledger'a/ödemeye girmediyse silinir, girdiyse karşı kayıt.
+- **Superuser etiketi `default` hesabına yazılıyordu** (`store_orders.seller_id` = platform): artık siparişin tek gerçek satıcısı veya `body.seller_id` (çok satıcılıda zorunlu, 400 `seller_required`).
+- **İade etiketi (`return-label.js`) de `default`'a yazılıyordu** → iadenin satıcısı / siparişin tek satıcısı.
+- Çift tıklama: aynı satıcı + sipariş için 2 dk içinde ikinci etiket 409 `label_just_purchased` (`confirm_additional: true` ile bilinçli ek paket mümkün).
+- `delivery_status` sorguda yoktu → `order_shipped` akışı her etikette yeniden tetikleniyordu; düzeltildi.
+- Test: `label-pricing.test.js` (2), settlement +1 (geri alma: silme / karşı kayıt). Settlement 42/42 (gerçek PG), `npm test` 197/197, SC esbuild OK.
+- Not: canlıda geçmişte `default`'a yazılmış etiket/iade etiketi kayıtları olabilir — kontrolü production sorgusu ister (izinle).
+
 ## 2026-10-08 — B: Sellercentral'den sipariş iptali artık müşteriye para iade ediyor (bitti) — PARA DÜZELTMESİ
 
 - **Hata**: SC "Stornieren" (liste menüsü + detayda durum = storniert) yalnız `order_status`'u değiştiriyordu. Superuser iptalinde **müşteriye iade yapılmıyordu** (para çekili kalıyordu, satıcı payable'ı duruyordu); satıcıda 403 dönüyordu.
