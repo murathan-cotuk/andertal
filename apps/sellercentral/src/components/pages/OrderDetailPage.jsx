@@ -208,6 +208,21 @@ export default function OrderDetailPage() {
   };
 
   const handleSaveStatus = async () => {
+    // "Storniert" = cancellation with refund, not a bare status change (backend refuses that for paid orders).
+    if (orderStatus === "storniert" && order?.order_status !== "storniert") {
+      if (!(await confirmDelete(lt(locale, "Cancel this order? Paid amounts are refunded to the customer.", "Sipariş iptal edilsin mi? Ödenen tutar müşteriye iade edilir.", "Annuler cette commande ? Les montants payés sont remboursés au client.", "¿Cancelar este pedido? Los importes pagados se reembolsan al cliente.", "Annullare questo ordine? Gli importi pagati vengono rimborsati al cliente.", "Bestellung stornieren? Bezahlte Beträge werden dem Kunden erstattet."), { title: lt(locale, "Cancel order", "Siparişi iptal et", "Annuler la commande", "Cancelar pedido", "Annulla ordine", "Bestellung stornieren"), confirm: lt(locale, "Cancel order", "İptal et", "Annuler la commande", "Cancelar pedido", "Annulla ordine", "Stornieren") }))) return;
+      setSaving(true);
+      try {
+        await getMedusaAdminClient().cancelOrder(id);
+        await loadOrder();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch (e) {
+        setError(userError(e, locale, c.saveFailed));
+      }
+      setSaving(false);
+      return;
+    }
     setSaving(true);
     try {
       const client = getMedusaAdminClient();

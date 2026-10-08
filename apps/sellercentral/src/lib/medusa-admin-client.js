@@ -1096,6 +1096,11 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/shipment-events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
   }
 
+  /** Cancellation with refund (superuser: whole order; seller: its own unshipped lines). */
+  async cancelOrder(orderId) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/cancel`, { method: 'POST' })
+  }
+
   /** trackingNumber: a specific parcel of a multi-seller order (order_shipments); omitted = own / order-level. */
   async refreshTracking(orderId, trackingNumber = null) {
     return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/refresh-tracking`, {

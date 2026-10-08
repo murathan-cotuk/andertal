@@ -13,11 +13,12 @@ export function __registerConfirmModal(setState) {
   _setState = setState;
 }
 
-export function confirmDelete(message) {
+/** opts.title / opts.confirm override the "delete" wording (e.g. order cancellation). */
+export function confirmDelete(message, opts = {}) {
   return new Promise((resolve) => {
     _resolve = resolve;
     if (_setState) {
-      _setState({ open: true, message: message || "" });
+      _setState({ open: true, message: message || "", title: opts.title || "", confirm: opts.confirm || "" });
     } else {
       // Fallback: native dialog if modal not yet registered
       resolve(typeof window !== "undefined" ? window.confirm(message) : false);

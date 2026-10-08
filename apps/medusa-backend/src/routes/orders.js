@@ -417,6 +417,92 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       }
     }
 
+    // POST /admin-hub/v1/orders/:id/cancel — cancellation with refund (src/order-cancel.js).
+    // Superuser: whole order. Seller: its own not yet shipped lines (+ its shipping); the order is
+    // 'storniert' once nothing is left. Shipped parcels go through the return flow instead.
+    const adminHubOrderCancelPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const id = (req.params.id || '').trim()
+      const isSuperuser = req.sellerUser?.is_superuser === true
+      const sellerId = String(req.sellerUser?.seller_id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      if (!isSuperuser && (!sellerId || sellerId === 'default')) return res.status(403).json({ message: 'Forbidden' })
+      const actor = `${isSuperuser ? 'superuser' : 'seller'}:${req.sellerUser?.email || sellerId}`
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const ownerSql = isSuperuser ? '' : ` AND ${sqlOrderOwnedBySeller('o', '$2')}`
+        const row = (await client.query(
+          `SELECT id, order_number, customer_id, payment_intent_id, payment_status, order_status, delivery_status, tracking_number,
+                  total_cents, COALESCE(bonus_points_redeemed, 0)::int AS bonus_points_redeemed
+             FROM store_orders o WHERE o.id = $1::uuid${ownerSql}`,
+          isSuperuser ? [id] : [id, sellerId],
+        )).rows[0]
+        if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const os = String(row.order_status || '').toLowerCase()
+        if (os === 'storniert') { await client.end(); return res.json({ success: true, already_cancelled: true }) }
+        if (['refunded', 'retoure', 'retoure_anfrage'].includes(os)) {
+          await client.end()
+          return res.status(400).json({ code: 'not_cancellable', message: 'Diese Bestellung kann nicht mehr storniert werden.' })
+        }
+        const { orderSellerIds } = require('../settlement/shipments')
+        const sellers = await orderSellerIds(client, id).catch(() => [])
+        const ownShipment = isSuperuser ? null : (await client.query(
+          'SELECT delivery_status, tracking_number FROM order_shipments WHERE order_id = $1::uuid AND seller_id = $2', [id, sellerId],
+        ).catch(() => ({ rows: [] }))).rows[0]
+        const orderShipped = ['versendet', 'zugestellt', 'shipped', 'delivered'].includes(String(row.delivery_status || '').toLowerCase())
+          || String(row.tracking_number || '').trim() !== ''
+        const shipped = ownShipment
+          ? (ownShipment.delivery_status !== 'offen' || String(ownShipment.tracking_number || '').trim() !== '')
+          : (isSuperuser || sellers.length <= 1 ? orderShipped : false)
+        if (shipped) {
+          await client.end()
+          return res.status(400).json({ code: 'already_shipped', message: 'Bereits versendet — bitte über eine Retoure abwickeln.' })
+        }
+        const { loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform } = require('./platform-checkout')
+        const secretKey = resolveStripeSecretKeyFromPlatform(await loadPlatformCheckoutRow(client))
+        const { refundWholeOrderPayment, refundSellerLines, reverseBonusForCancel } = require('../order-cancel')
+        const paid = String(row.payment_status || '') === 'bezahlt' && Number(row.total_cents) > 0
+        let processing = false
+        let wholeOrder = true
+        if (paid && !isSuperuser) {
+          const r = await refundSellerLines(client, { orderId: id, sellerId, secretKey, actor })
+          if (!r.ok) { await client.end(); return res.status(r.status).json({ ...(r.code ? { code: r.code } : {}), message: r.message }) }
+          processing = r.processing
+          wholeOrder = r.all_cancelled
+        } else if (paid) {
+          const r = await refundWholeOrderPayment(client, {
+            orderId: id, piId: String(row.payment_intent_id || '').trim(), totalCents: Number(row.total_cents), secretKey, actor, reason: 'cancellation',
+          })
+          if (!r.ok) { await client.end(); return res.status(r.status).json({ ...(r.code ? { code: r.code } : {}), message: r.message }) }
+          processing = r.processing
+        } else if (!isSuperuser && sellers.length > 1) {
+          await client.end()
+          return res.status(409).json({ code: 'contact_support', message: 'Unbezahlte Bestellung mit mehreren Händlern — bitte über den Support.' })
+        }
+        if (wholeOrder) {
+          const { appendBonusLedger } = require('./store-checkout')
+          await reverseBonusForCancel(client, {
+            orderId: id, customerId: row.customer_id, orderNumber: row.order_number,
+            bonusPointsRedeemed: row.bonus_points_redeemed, appendBonusLedger,
+          })
+          await client.query(
+            `UPDATE store_orders SET order_status = 'storniert',
+               payment_status = CASE WHEN $2::boolean THEN 'refunded' ELSE payment_status END, updated_at = now()
+             WHERE id = $1::uuid`,
+            [id, paid && !processing],
+          )
+        }
+        await client.end()
+        res.json({ success: true, whole_order: wholeOrder, refund_processing: processing })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const adminHubOrderPATCH = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
@@ -453,6 +539,12 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         }
         const policy = authorizeOrderPatch(req.body, prevRow, { isSuperuser: isSuperuserCaller })
         if (!policy.ok) { await client.end(); return res.status(policy.status).json({ message: policy.message, field: policy.field }) }
+        // A paid order is cancelled through POST /orders/:id/cancel (refunds the customer); a bare
+        // status change used to leave the money charged.
+        if (order_status === 'storniert' && prevRow.order_status !== 'storniert' && String(prevRow.payment_status || '') === 'bezahlt') {
+          await client.end()
+          return res.status(409).json({ code: 'use_cancel', message: 'Bezahlte Bestellungen über „Stornieren“ (mit Erstattung) abbrechen.' })
+        }
         const orderStatusChangedToProcessing = order_status === 'in_bearbeitung' && prevRow.order_status !== 'in_bearbeitung'
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = ${params.length}::uuid`, params)
         // Per-seller shipment record (multi-seller orders keep each seller's parcel separately).
@@ -1052,6 +1144,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
   router.get('/admin-hub/v1/orders/:id/flow-logs', adminHubOrderFlowLogsGET)
   router.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
   router.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
+  router.post('/admin-hub/v1/orders/:id/cancel', adminHubOrderCancelPOST)
   router.post('/admin-hub/v1/orders/:id/items', adminHubOrderAddItemPOST)
   router.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
   router.get('/admin-hub/v1/live-visitors', requireSuperuser, adminHubLiveVisitorsGET)

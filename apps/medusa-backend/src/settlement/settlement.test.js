@@ -704,3 +704,29 @@ withDb('return refund: partial keeps the order paid + closes the return phase; f
   o = (await c.query('SELECT order_status, payment_status FROM store_orders WHERE id = $1', [order.id])).rows[0]
   assert.deepEqual([o.order_status, o.payment_status], ['refunded', 'refunded'])
 })
+
+withDb('seller cancel: refunds only its own lines + shipping; order cancelled once nothing is left', async (c) => {
+  await h.addSeller(c, 'seller_a', { rate: 0.1 })
+  await h.addSeller(c, 'seller_b', { rate: 0.1 })
+  const { order } = await h.addPaidOrder(c, {
+    items: [{ seller: 'seller_a', price: 2000 }, { seller: 'seller_b', price: 3000 }],
+    shippingBySeller: { seller_a: 490, seller_b: 390 },
+  })
+  await s.createPayablesForOrder(c, order.id)
+  const stripe = h.fakeStripe()
+  const { refundSellerLines } = require('../order-cancel')
+  const a = await refundSellerLines(c, { orderId: order.id, sellerId: 'seller_a', actor: 'seller:a', stripe })
+  assert.equal(a.ok, true)
+  assert.equal(a.amount_cents, 2000 + 490)
+  assert.equal(a.all_cancelled, false)
+  assert.equal(stripe.calls.refunds[0].amount, 2490)
+  assert.equal(await h.balanceOf(c, 'seller_a'), 0)
+  // Idempotent: nothing left for seller A.
+  const again = await refundSellerLines(c, { orderId: order.id, sellerId: 'seller_a', actor: 'seller:a', stripe })
+  assert.equal(again.ok, false)
+  assert.equal(again.code, 'nothing_to_cancel')
+  const b = await refundSellerLines(c, { orderId: order.id, sellerId: 'seller_b', actor: 'seller:b', stripe })
+  assert.equal(b.amount_cents, 3000 + 390)
+  assert.equal(b.all_cancelled, true)
+  assert.equal(stripe.calls.refunds.reduce((x, r) => x + r.amount, 0), 2000 + 490 + 3000 + 390)
+})

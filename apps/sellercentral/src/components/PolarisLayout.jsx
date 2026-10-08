@@ -1598,9 +1598,9 @@ export default function PolarisLayout({ children }) {
           <Modal
             open
             onClose={() => __resolveConfirmModal(false)}
-            title={confirmDeleteLabels.title}
+            title={confirmDeleteState.title || confirmDeleteLabels.title}
             primaryAction={{
-              content: confirmDeleteLabels.confirm,
+              content: confirmDeleteState.confirm || confirmDeleteLabels.confirm,
               destructive: true,
               onAction: () => __resolveConfirmModal(true),
             }}

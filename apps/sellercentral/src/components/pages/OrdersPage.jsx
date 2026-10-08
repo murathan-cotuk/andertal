@@ -504,7 +504,7 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   );
 }
 
-function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser, showShipInMenu = true }) {
+function ActionMenu({ order, onUpdate, onCancel, onDelete, onVersenden, isSuperuser, showShipInMenu = true }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const params = useParams();
@@ -533,9 +533,9 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser, showS
     {
       content: ui.cancelOrder,
       destructive: true,
-      onAction: () => {
+      onAction: async () => {
         setOpen(false);
-        onUpdate(order.id, { order_status: "storniert" });
+        if (await confirmDelete(lt(locale, "Cancel this order? Paid amounts are refunded to the customer.", "Sipariş iptal edilsin mi? Ödenen tutar müşteriye iade edilir.", "Annuler cette commande ? Les montants payés sont remboursés au client.", "¿Cancelar este pedido? Los importes pagados se reembolsan al cliente.", "Annullare questo ordine? Gli importi pagati vengono rimborsati al cliente.", "Bestellung stornieren? Bezahlte Beträge werden dem Kunden erstattet."), { title: lt(locale, "Cancel order", "Siparişi iptal et", "Annuler la commande", "Cancelar pedido", "Annulla ordine", "Bestellung stornieren"), confirm: lt(locale, "Cancel order", "İptal et", "Annuler la commande", "Cancelar pedido", "Annulla ordine", "Stornieren") })) onCancel?.(order.id);
       },
     },
     ...(isSuperuser
@@ -1153,6 +1153,18 @@ export default function OrdersPage() {
   };
 
 
+  // Cancellation refunds the customer (backend); a seller only cancels its own unshipped lines.
+  const [cancelError, setCancelError] = useState("");
+  const handleCancel = async (id) => {
+    setCancelError("");
+    try {
+      const res = await getMedusaAdminClient().cancelOrder(id);
+      if (res?.whole_order !== false) setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, order_status: "storniert", payment_status: res?.refund_processing ? o.payment_status : (o.payment_status === "bezahlt" ? "refunded" : o.payment_status) } : o)));
+    } catch (e) {
+      setCancelError(e?.message || "Error");
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       const client = getMedusaAdminClient();
@@ -1363,6 +1375,7 @@ export default function OrdersPage() {
                   <ActionMenu
                     order={order}
                     onUpdate={handleUpdate}
+                    onCancel={handleCancel}
                     onDelete={handleDelete}
                     onVersenden={() => startPacking([order])}
                     isSuperuser={isSuperuser}
@@ -1393,6 +1406,7 @@ export default function OrdersPage() {
           locale={locale}
         />
       )}
+      {cancelError ? <div style={{ marginBottom: 12 }}><Banner tone="critical" onDismiss={() => setCancelError("")}>{cancelError}</Banner></div> : null}
       <ScPageHeader
         breadcrumb={[{ label: ui.orders }]}
         title={lt(locale, "All orders", "Tüm siparişler", "Toutes les commandes", "Todos los pedidos", "Tutti gli ordini", "Alle Bestellungen")}

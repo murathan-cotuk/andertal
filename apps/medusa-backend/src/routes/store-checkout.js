@@ -3477,115 +3477,20 @@ const storeOrdersCancelPOST = async (req, res) => {
 
     const platformRow = await loadPlatformCheckoutRow(client)
     const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
-    let refundStillProcessing = false
-
-    if (totalCents > 0) {
-      if (!piId) {
-        await client.end()
-        return res.status(400).json({ code: 'contact_support', message: 'Keine Zahlungsreferenz — bitte den Support kontaktieren.' })
-      }
-      if (!secretKey) {
-        await client.end()
-        return res.status(503).json({ message: 'Zahlungsrückbuchung ist nicht konfiguriert.' })
-      }
-      try {
-        const stripe = new (require('stripe'))(secretKey)
-        const pi = await stripe.paymentIntents.retrieve(piId)
-        if (pi.status === 'requires_capture') {
-          await stripe.paymentIntents.cancel(piId)
-        } else if (pi.status === 'succeeded') {
-          const ch = pi.latest_charge
-          const chargeId = typeof ch === 'string' ? ch : ch?.id
-          if (!chargeId) {
-            await client.end()
-            return res.status(400).json({ message: 'Keine Charge für Erstattung gefunden.' })
-          }
-          const settlement = require('../settlement')
-          const hasPayables = (await client.query('SELECT 1 FROM seller_payables WHERE order_id = $1::uuid LIMIT 1', [orderId]).catch(() => ({ rows: [] }))).rows.length > 0
-          if (hasPayables) {
-            // Canonical path: full refund of every line + every seller's shipping, idempotent per
-            // order, booked into the seller ledger only once Stripe confirms it.
-            const lines = (await client.query(`SELECT order_item_id, quantity - refunded_quantity AS qty FROM seller_payables WHERE order_id = $1::uuid AND kind = 'item' AND quantity > refunded_quantity`, [orderId])).rows
-              .map((l) => ({ order_item_id: l.order_item_id, quantity: Number(l.qty) }))
-            const shipSellers = (await client.query(`SELECT DISTINCT seller_id FROM seller_payables WHERE order_id = $1::uuid AND kind = 'shipping'`, [orderId])).rows.map((r) => r.seller_id)
-            const pay = (await client.query('SELECT gross_amount_cents FROM order_payments WHERE order_id = $1::uuid', [orderId])).rows[0]
-            const { refund } = await settlement.createRefundRecord(client, {
-              orderId, amountCents: Number(pay?.gross_amount_cents ?? totalCents), lines, shippingSellerIds: shipSellers,
-              reason: 'customer_cancellation', actor: `customer:${payload.email}`, idempotencyKey: `cancel:${orderId}`,
-            })
-            const done = await settlement.executeRefund(client, stripe, refund.id, { actor: `customer:${payload.email}` })
-            if (done.status === 'failed' || done.status === 'canceled') {
-              await client.end()
-              return res.status(502).json({ message: `Stripe-Rückbuchung fehlgeschlagen: ${done.failure_reason || done.status}` })
-            }
-            refundStillProcessing = done.status !== 'succeeded'
-          } else {
-            // Legacy order (before settlement cutover): unchanged behaviour.
-            const isDestinationCharge = !!(pi.transfer_data?.destination)
-            const refundParams = { charge: chargeId }
-            if (isDestinationCharge) {
-              refundParams.reverse_transfer = true
-              refundParams.refund_application_fee = true
-            }
-            await stripe.refunds.create(refundParams, { idempotencyKey: `andertal-cancel-${orderId}` })
-          }
-        } else if (pi.status === 'canceled' || pi.status === 'requires_payment_method') {
-          /* bereits storniert / unbezahlt */
-        } else {
-          await client.end()
-          return res.status(400).json({ message: `Zahlungsstatus „${pi.status}” — automatische Stornierung nicht möglich.` })
-        }
-      } catch (se) {
-        await client.end()
-        return res.status(502).json({ message: se?.message || 'Stripe-Rückbuchung fehlgeschlagen' })
-      }
+    const { refundWholeOrderPayment, reverseBonusForCancel } = require('../order-cancel')
+    const refundRes = await refundWholeOrderPayment(client, {
+      orderId, piId, totalCents, secretKey, actor: `customer:${payload.email}`, reason: 'customer_cancellation',
+    })
+    if (!refundRes.ok) {
+      await client.end()
+      return res.status(refundRes.status).json({ ...(refundRes.code ? { code: refundRes.code } : {}), message: refundRes.message })
     }
+    const refundStillProcessing = refundRes.processing
 
-    const custId = row.customer_id
-    if (custId) {
-      try {
-        const doneEarn = await client.query(
-          `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_cancel_earn' LIMIT 1`,
-          [orderId],
-        )
-        const doneRedeem = await client.query(
-          `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_cancel_redeem' LIMIT 1`,
-          [orderId],
-        )
-        const earned = await client.query(
-          `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
-          [orderId],
-        )
-        const earnedPts = Number(earned.rows[0]?.total || 0)
-        const redeemed = await client.query(
-          `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_redeem'`,
-          [orderId],
-        )
-        const redeemedPts = Number(redeemed.rows[0]?.total || 0)
-        if (earnedPts > 0 && !doneEarn.rows.length) {
-          await appendBonusLedger(client, {
-            customerId: custId,
-            pointsDelta: -earnedPts,
-            description: `Storno Bestellung #${row.order_number} — Punkte zurückgebucht (−${earnedPts})`,
-            source: 'order_cancel_earn',
-            orderId,
-          })
-        }
-        const redeemedFromOrder = Number(row.bonus_points_redeemed || 0)
-        const pointsToGiveBack = redeemedPts < 0 ? -redeemedPts : redeemedFromOrder
-        if (pointsToGiveBack > 0 && !doneRedeem.rows.length) {
-          await appendBonusLedger(client, {
-            customerId: custId,
-            pointsDelta: pointsToGiveBack,
-            description: `Storno Bestellung #${row.order_number} — eingelöste Punkte zurück (+${pointsToGiveBack})`,
-            source: 'order_cancel_redeem',
-            orderId,
-          })
-        }
-      } catch (be) {
-        console.warn('bonus reversal cancel:', be?.message || be)
-      }
-    }
+    await reverseBonusForCancel(client, {
+      orderId, customerId: row.customer_id, orderNumber: row.order_number,
+      bonusPointsRedeemed: row.bonus_points_redeemed, appendBonusLedger,
+    })
 
     // payment_status only says 'refunded' once Stripe confirmed the refund; a refund still
     // processing keeps 'bezahlt' and the webhook (refund.updated) completes it.

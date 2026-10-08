@@ -10,6 +10,16 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — B: Sellercentral'den sipariş iptali artık müşteriye para iade ediyor (bitti) — PARA DÜZELTMESİ
+
+- **Hata**: SC "Stornieren" (liste menüsü + detayda durum = storniert) yalnız `order_status`'u değiştiriyordu. Superuser iptalinde **müşteriye iade yapılmıyordu** (para çekili kalıyordu, satıcı payable'ı duruyordu); satıcıda 403 dönüyordu.
+- Yeni `src/order-cancel.js` (müşteri iptaliyle ortak): `refundWholeOrderPayment` (müşteri iptalindeki Stripe akışının birebir taşınmışı; aynı idempotency anahtarları → çift iptal çift iade yapmaz), `refundSellerLines` (satıcının kalan kalemleri + kendi kargosu, `planReturnRefund` ile; `cancel:<order>:<seller>`), `reverseBonusForCancel`. `/store/orders/:id/cancel` bu fonksiyonları kullanır (davranış aynı).
+- Yeni `POST /admin-hub/v1/orders/:id/cancel`: superuser = tüm sipariş; satıcı = yalnız kendi, henüz gönderilmemiş kalemleri (kendi `order_shipments` kaydı / tek satıcılıda sipariş takip no). Gönderilmişse `already_shipped` → Retoure. Hiç kalem kalmayınca sipariş `storniert` (+ Stripe onaylıysa `refunded`) ve bonus geri alma. Payable'sız eski siparişte satıcı → `contact_support`.
+- PATCH: ödenmiş siparişi çıplak `order_status = storniert` ile değiştirme 409 `use_cancel` (superuser dahil).
+- SC: liste menüsü ve detay "Speichern" (durum Storniert) onay penceresiyle yeni uca gider; hata banner'ı. Onay penceresi `confirmDelete(msg, { title, confirm })` ile "Bestellung stornieren" başlığı/düğmesi (6 dil).
+- Test: settlement +1 (iki satıcılı: A iptal → yalnız A kalemi + A kargosu iade, A bakiyesi 0, tekrar → nothing_to_cancel; B iptal → hepsi iptal). Settlement 41/41 (gerçek PG), `npm test` 195/195, SC esbuild OK.
+- Bilinen sınır: kısmi (satıcı) iptalde bonus puanı orantılı düşülmez; iptal e-postası/flow tetikleyicisi yok (F alanı).
+
 ## 2026-10-08 — SC top bar + sidebar eski koyu tasarıma döndü (kullanıcı isteği)
 
 - Kullanıcı Konsept'teki açık renk top bar'ı beğenmedi. `globals.css`'ten Konsept shell kuralları kaldırıldı: açık top bar + logo alanı gradyanı, arama pill'i, sağ ikonların koyu renk zorlaması, sidebar'da açık bölüm = turuncu pill / seçili alt öğe pill'i. Top bar ve sidebar yine eski siyah tasarımda (`--sellercentral-polaris-topbar-bg`, b2f9873 koyu sidebar).
