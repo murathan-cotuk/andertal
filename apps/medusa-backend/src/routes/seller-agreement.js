@@ -196,6 +196,13 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
           const locale = String(req.body?.locale || sellerUser.locale || 'de').slice(0, 10)
           const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
           await client.connect()
+          // The Verkäufervertrag binds the seller account: only its owner signs. A team member's
+          // signature used to land on the team member's own row (owner stayed "unsigned").
+          const signer = (await client.query('SELECT sub_of_seller_id FROM seller_users WHERE id = $1', [sellerUser.id])).rows[0]
+          if (!signer || signer.sub_of_seller_id) {
+            await client.end()
+            return res.status(403).json({ code: 'owner_only', message: 'Nur der Kontoinhaber kann den Verkäufervertrag unterzeichnen.' })
+          }
           await client.query(
             `INSERT INTO seller_sign_tokens (token, seller_id, locale, ip) VALUES ($1, $2, $3, $4)`,
             [token, String(sellerUser.id), locale, req.ip || null]
@@ -291,6 +298,7 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
         if (!signature_data || typeof signature_data !== 'string' || !signature_data.startsWith('data:image/png;base64,')) {
           return res.status(400).json({ message: 'Valid signature_data (PNG base64 data URL) required' })
         }
+        if (signature_data.length > 512 * 1024) return res.status(413).json({ message: 'Signature image too large' })
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
         if (!dbUrl) return res.status(503).json({ message: 'Service unavailable' })
         try {

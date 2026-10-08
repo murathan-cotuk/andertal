@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — C, 3. adım: sözleşme imzası + ödeme hesabı denetimi (bitti) — C ALANI KAPANDI
+
+- İmza (`seller-agreement.js`): ekip üyesi de QR/imza token'ı açabiliyordu ve imza sahibin değil üyenin kendi satırına yazılıyordu (hesap "imzasız" kalıyordu) → `sign-token` yalnız hesap sahibi (403 `owner_only`, SC'de 6 dil mesaj). İmzada şifre yeniden kontrol edilen `/seller/sign/*` artık login ile aynı hız sınırında (`authLimiter`). İmza görseli ≤ 512 KB.
+- Ödeme hesabı (`POST /seller/payout-account`): Stripe şartlarını yalnız hesap sahibi, IP + user-agent ile kabul ediyor; superuser kabul edemiyor — doğru, değişiklik yok (yalnız C/2'deki sayfa yetkisi eklendi).
+- `npm test` 218/218, SC esbuild OK.
+- **C alanı özeti**: yalnız onaylı satıcı satar (mağaza + ödeme); onayda zorunlu bilgi kapısı (sözleşme, ad, adres, vergi no, LUCID; superuser gerekçeyle geçebilir); otomatik risk onayı eksik bilgide durur; kayıtta sözleşme zorunlu, davet yalnız token; davetle hesap ele geçirme kapandı; ekip izinleri API'de; sözleşme kabulü/imzası doğru hesaba ve kayda geçiyor. Açık: canlıda eksik bilgili 2 onaylı satıcı (kullanıcı kararı); satıcı e-posta doğrulaması yok; IBAN değişikliği bildirimi → F.
+
 ## 2026-10-08 — C, 2. adım: ekip/davet güvenliği + sözleşme kaydı (bitti) — GÜVENLİK DÜZELTMESİ
 
 - **Hesap ele geçirme (davet)**: `POST /admin-hub/users/invite` kayıtlı ve bağımsız bir hesabın e-postası davet edilince onu sessizce davet edenin alt kullanıcısı yapıyordu (`sub_of_seller_id` güncelleme) — herhangi bir satıcı başka bir satıcının (superuser dahil) girişini kendi hesabına bağlayabiliyordu. Artık 409 `account_exists`; bağımsız hesap asla dönüştürülmez. Davet e-postasında ad HTML-escape.

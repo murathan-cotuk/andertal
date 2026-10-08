@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Banner, BlockStack, Box, Button, Card, Checkbox, InlineStack, Modal, Spinner, Text, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { lt } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
@@ -783,8 +784,12 @@ export default function VerificationSettingsPage() {
         setQrDataUrl(res.qr_data_url);
         setQrLoading(false);
       }
-    }).catch(() => {
-      if (!cancelled) setQrLoading(false);
+    }).catch((e) => {
+      if (!cancelled) {
+        setQrLoading(false);
+        // Team members cannot sign the seller agreement (backend: owner_only).
+        if (e?.code === "owner_only") setError(lt(locale, "Only the account owner can sign the seller agreement.", "Satıcı sözleşmesini yalnızca hesap sahibi imzalayabilir.", "Seul le titulaire du compte peut signer le contrat vendeur.", "Solo el titular de la cuenta puede firmar el contrato de vendedor.", "Solo il titolare dell'account può firmare il contratto venditore.", "Nur der Kontoinhaber kann den Verkäufervertrag unterzeichnen."));
+      }
     });
     return () => { cancelled = true; };
   }, [agreementAccepted]); // intentionally omits client/locale/signed/qrDataUrl to run only on checkbox toggle

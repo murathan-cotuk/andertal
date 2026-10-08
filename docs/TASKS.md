@@ -89,7 +89,7 @@ Her alan tek tek ve uçtan uca ele alınır: önce denetim raporu, sonra kod, ve
 
 - [x] **A. Ürün oluşturma ve yayınlama:** ürün ekleme, varyantlar, Eigenschaften, marka, kategori, GPSR/yasal alanlar, kaydetme (taslak), yayına alma, mevcut katalog ürününe teklif ekleme, toplu yükleme.
 - [x] **B. Sipariş yaşam döngüsü:** sipariş, hazırlama, kargo etiketi ve takip, teslim onayı (ödeme saati), iptal, iade ve Widerruf. (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: izinli production düzeltmeleri; olay geçmişi paket bazlı değil; kısmi iptalde bonus orantısı; iptal e-postası → F.)
-- [ ] **C. Satıcı kaydı ve onboarding:** kayıt, onay, sözleşme, hukuki ve vergi bilgileri, ödeme hesabı.
+- [x] **C. Satıcı kaydı ve onboarding:** kayıt, onay, sözleşme, hukuki ve vergi bilgileri, ödeme hesabı. (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: eksik bilgili 2 onaylı satıcı — kullanıcı kararı; satıcı e-posta doğrulaması; IBAN değişikliği bildirimi → F.)
 - [ ] **D. Kategori ağacı ve import:** Excel import, kategori atama, filtreler, uyumluluk profilleri.
 - [ ] **E. Shop vitrini:** ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi. A'dan devreden: Grundpreis ürün kartlarında da gösterilmeli; Google Merchant feed'e `unit_pricing_measure` eklenmeli.
 - [ ] **F. Bildirimler ve e-postalar:** müşteriye ve satıcıya ne, ne zaman gider; zil paneli; flow otomasyonu.

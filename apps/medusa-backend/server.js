@@ -375,6 +375,7 @@ async function start() {
 
     app.use(generalLimiter)
     app.use('/admin-hub/auth/login',           authLimiter)
+    app.use('/seller/sign',                    authLimiter)   // agreement signing re-checks the password
     app.use('/admin-hub/auth/register',        registerLimiter)
     app.use('/admin-hub/auth/2fa/setup',       totpLimiter)
     app.use('/admin-hub/auth/2fa/verify',      totpLimiter)
