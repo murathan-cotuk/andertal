@@ -122,5 +122,10 @@ desktop.ini
 telegram_activity.log
 .telegram_session
 
-# Large local data exports (not for git)
-docs/imt/
+# Large IMT source CSVs (not for git) — Zusammenfassung xlsx/script may be committed
+docs/imt/*.csv
+docs/imt/**/*.csv
+
+# Excel lock / temp files
+**/~$*.xlsx
+docs/imtZusammenfassung/
