@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — Bekleyen işler 6: Resend bounce/şikâyet webhook'u (kod bitti; panel kurulumu kullanıcıda)
+
+- `POST /webhooks/resend` (`routes/resend-webhook.js`): Svix imzası (`RESEND_WEBHOOK_SECRET`, 5 dk tolerans, sabit zamanlı karşılaştırma); `email.bounced` (kalıcı) → `email_suppressions` (bounce), `email.complained` → şikâyet kaydı + bülten aboneliğinden çıkış.
+- `sendFlowOutboundEmail` bounce listesindeki adrese göndermez (flow'lar, şifre sıfırlama). Şema boot'ta.
+- Test: `email-suppression.test.js` (imza: geçerli/değişmiş gövde/yanlış anahtar/eski zaman; gerçek PG: bounce engeller, şikâyet yalnız reklamdan çıkarır). `npm test` 235/0.
+- Kullanıcı: Resend panelinde webhook + `RESEND_WEBHOOK_SECRET` (TASKS.md §6b). Stripe canlı kurulum (§6) kullanıcının hesabında — gizli anahtar girişi bende değil.
+
 ## 2026-10-08 — Bekleyen işler 5: OSS bölümü (bitti, Steuerberater teyidi hâlâ önerilir)
 
 - "Plattformabrechnung" PDF'inin OSS bölümü: satıcı KDV no'su `store_orders.seller_id`'den (hep platform) okunduğu için hiç bulunamıyordu → her sipariş müşteri faturası gibi satıcılara bölünür (`invoice-split.js`), her parça kendi satıcısının KDV no'su ile hesaplanır. Başlık: "VERKÄUFER-UMSÄTZE NACH BESTIMMUNGSLAND (INFO — OSS-PFLICHT LIEGT BEIM JEWEILIGEN VERKÄUFER)", sütun "Lieferungen". PDF production'da salt-okunur oluşturuldu (çalışıyor).

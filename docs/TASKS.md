@@ -41,6 +41,13 @@ Engel: Her ürün, kategorisi ne olursa olsun üç GPSR alanı (üretici, üreti
 
 Engel: Gizli anahtar veritabanında (`store_platform_checkout`), webhook sırrı ortam değişkeninde. Biri test, biri canlı kalırsa kart çekilir ama sipariş onaylanmaz. İlk geçiş gerçek para hareketidir.
 
+## 6b. E-posta geri bildirimi (Resend) — kod hazır (2026-10-08)
+
+- [ ] Resend Dashboard → Webhooks: uç nokta `https://<backend>/webhooks/resend`, olaylar `email.bounced` + `email.complained`.
+- [ ] Verilen imza anahtarını (whsec_…) Render backend ortamına `RESEND_WEBHOOK_SECRET` olarak ekle. Anahtar yoksa uç nokta her çağrıyı reddeder.
+
+Sonuç: kalıcı bounce alan adrese bir daha e-posta gitmez; spam şikâyeti yapan alıcı pazarlama e-postalarından çıkarılır.
+
 ## 7. İlk gerçek sipariş
 
 - [ ] Küçük tutarlı bir siparişle ödemeyi, webhook’u ve satıcı hakediş kaydını doğrula.

@@ -44,6 +44,10 @@ async function resolveFlowMailProvider(client) {
  */
 async function sendFlowOutboundEmail(opts) {
   const { client, transport, from, to, subject, html, text, attachments } = opts
+  // Hard-bounced addresses (Resend webhook) get nothing further — protects sender reputation.
+  if (client && await require('./email-suppression').isSuppressed(client, to)) {
+    return { provider: 'suppressed', messageId: null }
+  }
   const provider = await resolveFlowMailProvider(client)
   if (provider === 'resend') {
     const key = await resolveResendApiKey(client)

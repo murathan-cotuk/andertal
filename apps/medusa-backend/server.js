@@ -2086,6 +2086,12 @@ async function start() {
         } catch (invErr) {
           console.error('[inventory] schema migration failed:', invErr && invErr.message)
         }
+        // Hard-bounce / complaint suppression list (src/email-suppression.js, Resend webhook).
+        try {
+          await require('./src/email-suppression').ensureSuppressionSchema(client)
+        } catch (supErr) {
+          console.error('[email-suppression] schema migration failed:', supErr && supErr.message)
+        }
         await client.end()
         log.info('Admin Hub and support-case tables ready')
       } catch (migErr) {
@@ -2402,6 +2408,7 @@ async function start() {
     // ── Seller Auth ───────────────────────────────────────────────────────────
     httpApp.use('/', createSellerAuthRouter())
     httpApp.use('/', require('./src/routes/password-reset')())
+    httpApp.use('/', require('./src/routes/resend-webhook')())
 
     // --- Platform Checkout + Store Public: extracted to src/routes/platform-checkout.js ---
     // platform-checkout.js's module.exports IS createPlatformCheckoutRouter itself (static props attached to it) —
