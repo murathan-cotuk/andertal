@@ -68,3 +68,19 @@ test('deduct once (never below 0) and restore cancelled lines once — real Post
     await c.end()
   }
 })
+
+test('minimum order quantity sums all lines of a product — real Postgres', { skip: !PG && 'SETTLEMENT_TEST_PG_URL not set' }, async () => {
+  const { Client } = require('pg')
+  const c = new Client({ connectionString: PG })
+  await c.connect()
+  try {
+    await c.query(`CREATE TEMP TABLE admin_hub_products (id uuid PRIMARY KEY, metadata jsonb)`)
+    const p = '00000000-0000-0000-0000-0000000000c1'
+    const q = '00000000-0000-0000-0000-0000000000c2'
+    await c.query(`INSERT INTO admin_hub_products VALUES ($1, '{"minimum_order_quantity": "3"}'), ($2, '{}')`, [p, q])
+    assert.deepEqual(await inv.findBelowMinimum(c, [{ product_id: p, quantity: 1 }, { product_id: q, quantity: 1 }]), [{ product_id: p, minimum: 3, requested: 1 }])
+    assert.deepEqual(await inv.findBelowMinimum(c, [{ product_id: p, quantity: 1 }, { product_id: p, quantity: 2 }]), [])
+  } finally {
+    await c.end()
+  }
+})

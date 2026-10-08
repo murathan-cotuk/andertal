@@ -168,7 +168,9 @@
     "removeBonusDiscount": "Quitar descuento bonus",
     "couponDiscount": "Descuento de cupón",
     "insufficientStock": "Algunos artículos ya no están disponibles en la cantidad solicitada. Ajusta tu carrito.",
-    "sellerUnavailable": "Algunos artículos no están disponibles en este momento. Elimínalos de tu carrito."
+    "sellerUnavailable": "Algunos artículos no están disponibles en este momento. Elimínalos de tu carrito.",
+    "couponLimitReached": "Ya has usado este cupón el número máximo de veces. Elimínalo.",
+    "belowMinimumQuantity": "Algunos artículos no alcanzan la cantidad mínima de pedido. Aumenta la cantidad."
   },
   "accountPanel": {
     "hello": "Hola, {name}",

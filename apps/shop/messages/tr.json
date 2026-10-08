@@ -185,7 +185,9 @@
     "removeBonusDiscount": "Bonus indirimini kaldır",
     "couponDiscount": "Kupon indirimi",
     "insufficientStock": "Bazı ürünler istenen miktarda artık mevcut değil. Lütfen sepetinizi güncelleyin.",
-    "sellerUnavailable": "Bazı ürünler şu anda satışta değil. Lütfen sepetinizden çıkarın."
+    "sellerUnavailable": "Bazı ürünler şu anda satışta değil. Lütfen sepetinizden çıkarın.",
+    "couponLimitReached": "Bu kuponu izin verilen sayıda zaten kullandınız. Lütfen kaldırın.",
+    "belowMinimumQuantity": "Bazı ürünlerde minimum sipariş adedine ulaşılmadı. Lütfen adedi artırın."
   },
   "accountPanel": {
     "hello": "Merhaba, {name}",

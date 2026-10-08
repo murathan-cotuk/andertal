@@ -158,3 +158,26 @@ async function ensureInventorySchema(client) {
 module.exports = {
   parseVariantIndex, resolveStockTarget, findShortages, checkCartStock, deductOrderStock, restoreOrderStock, ensureInventorySchema,
 }
+
+/**
+ * Minimum order quantity (metadata.minimum_order_quantity) — the PDP enforced it, but the cart
+ * could lower the quantity afterwards. Quantities of all lines of one product are summed.
+ */
+async function findBelowMinimum(client, lines) {
+  const pids = [...new Set(lines.map((l) => String(l.product_id || '')).filter(Boolean))]
+  if (!pids.length) return []
+  const rows = (await client.query(
+    `SELECT id::text AS id, (metadata->>'minimum_order_quantity') AS moq FROM admin_hub_products WHERE id::text = ANY($1::text[])`, [pids],
+  )).rows
+  const moq = new Map(rows.map((r) => [r.id, Math.max(1, parseInt(r.moq, 10) || 1)]))
+  const qty = new Map()
+  for (const l of lines) {
+    const k = String(l.product_id || '')
+    qty.set(k, (qty.get(k) || 0) + Math.max(1, Number(l.quantity) || 1))
+  }
+  return [...qty.entries()]
+    .filter(([pid, q]) => (moq.get(pid) || 1) > q)
+    .map(([pid, q]) => ({ product_id: pid, minimum: moq.get(pid), requested: q }))
+}
+
+module.exports.findBelowMinimum = findBelowMinimum

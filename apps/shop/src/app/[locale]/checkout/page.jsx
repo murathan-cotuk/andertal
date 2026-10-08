@@ -2153,6 +2153,8 @@ export default function CheckoutPage() {
           setPiError(
             data?.code === "insufficient_stock" ? t("insufficientStock")
               : data?.code === "seller_unavailable" ? t("sellerUnavailable")
+                : data?.code === "coupon_limit_reached" ? t("couponLimitReached")
+                  : data?.code === "below_minimum_quantity" ? t("belowMinimumQuantity")
                 : (data?.message || t("configError")),
           );
           setPayCents(null);

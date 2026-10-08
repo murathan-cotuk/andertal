@@ -365,7 +365,19 @@ const resolveCartCouponDiscountSync = async (client, items, rawCouponCode, custo
     nextCouponCode: normalizeCouponCode(couponRow.code),
     couponDiscountCents,
     invalid: false,
+    couponId: couponRow.id,
+    perCustomerLimit: couponRow.per_customer_limit == null ? null : Number(couponRow.per_customer_limit),
   }
+}
+
+/** Has this customer already used the coupon as often as allowed (per_customer_limit)? */
+const couponCustomerLimitReached = async (client, couponId, perCustomerLimit, customerId) => {
+  if (!couponId || perCustomerLimit == null || !customerId) return false
+  const n = Number((await client.query(
+    'SELECT COUNT(*)::int AS cnt FROM admin_hub_coupon_usage WHERE coupon_id = $1 AND customer_id = $2',
+    [couponId, customerId],
+  )).rows[0]?.cnt || 0)
+  return n >= perCustomerLimit
 }
 
 const bonusPointsEarnedFromOrderPaidCents = (paidCents) =>
@@ -1136,6 +1148,28 @@ const storePaymentIntentPOST = async (req, res) => {
       }
     }
 
+    // Per-customer coupon limit — checked here, before the customer is charged. It used to be
+    // checked only at order creation, i.e. after a successful payment, which then returned 400
+    // and created no order for money already taken.
+    if (cart.coupon_code) {
+      try {
+        const applied = await resolveCartCouponDiscountSync(client, items, cart.coupon_code, cart.email || null)
+        let limitCustomerId = null
+        const authTok = String(req.headers.authorization || '').startsWith('Bearer ') ? String(req.headers.authorization).slice(7).trim() : ''
+        const tokPayload = authTok ? verifyCustomerToken(authTok) : null
+        if (tokPayload?.id) limitCustomerId = customerIdForPg(tokPayload)
+        else if (cart.email) {
+          limitCustomerId = (await client.query('SELECT id FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1', [cart.email])).rows[0]?.id || null
+        }
+        if (await couponCustomerLimitReached(client, applied.couponId, applied.perCustomerLimit, limitCustomerId)) {
+          await client.end()
+          return res.status(409).json({ code: 'coupon_limit_reached', message: 'Dieser Gutschein wurde von Ihnen bereits so oft wie erlaubt verwendet.' })
+        }
+      } catch (cpErr) {
+        console.warn('[checkout] coupon limit check failed (not blocking):', cpErr?.message || cpErr)
+      }
+    }
+
     // Stock (src/inventory.js): the payment is only started when every line is in stock.
     try {
       const shortages = await require('../inventory').checkCartStock(client, items)
@@ -1149,6 +1183,15 @@ const storePaymentIntentPOST = async (req, res) => {
       }
     } catch (stockErr) {
       console.warn('[checkout] stock check failed (not blocking):', stockErr?.message || stockErr)
+    }
+    try {
+      const below = await require('../inventory').findBelowMinimum(client, items)
+      if (below.length) {
+        await client.end()
+        return res.status(409).json({ code: 'below_minimum_quantity', message: 'Mindestbestellmenge nicht erreicht.', items: below })
+      }
+    } catch (moqErr) {
+      console.warn('[checkout] minimum quantity check failed (not blocking):', moqErr?.message || moqErr)
     }
 
     // Shipping is quoted here per seller (own shipping groups + own free-shipping threshold) —
@@ -3900,22 +3943,15 @@ const storeOrdersPOST = async (req, res) => {
 
     const stripeApplicationFeeForDb = piAppFeeCents != null ? piAppFeeCents : platformFeeMerchandiseBasis
 
-    // Per-customer coupon limit check
-    if (cart.coupon_code && customerId) {
+    // Coupon actually applied to this cart (seller-specific before platform — same rule as the
+    // discount). The per-customer limit is enforced at /store/payment-intent, before charging:
+    // the payment here already succeeded, so the order is always created (only logged).
+    let appliedCoupon = null
+    if (cart.coupon_code) {
       try {
-        const cpnRow = (await client.query(
-          `SELECT id, per_customer_limit FROM admin_hub_coupons WHERE lower(code) = lower($1) AND active = true LIMIT 1`,
-          [cart.coupon_code]
-        )).rows[0]
-        if (cpnRow?.per_customer_limit != null) {
-          const usageCnt = Number((await client.query(
-            `SELECT COUNT(*) AS cnt FROM admin_hub_coupon_usage WHERE coupon_id = $1 AND customer_id = $2`,
-            [cpnRow.id, customerId]
-          )).rows[0]?.cnt || 0)
-          if (usageCnt >= cpnRow.per_customer_limit) {
-            await client.end()
-            return res.status(400).json({ message: 'Dieser Coupon wurde bereits zu oft verwendet' })
-          }
+        appliedCoupon = await resolveCartCouponDiscountSync(client, items, cart.coupon_code, email || null)
+        if (customerId && await couponCustomerLimitReached(client, appliedCoupon.couponId, appliedCoupon.perCustomerLimit, customerId)) {
+          console.warn('[checkout] coupon per-customer limit exceeded on a paid order', { coupon: cart.coupon_code, customerId })
         }
       } catch (_) {}
     }
@@ -4105,16 +4141,27 @@ const storeOrdersPOST = async (req, res) => {
     }
 
     // Increment coupon used_count + record per-customer usage
-    if (cart.coupon_code) {
+    // Only the applied coupon row counts the use (several sellers may share one code; the old
+    // WHERE lower(code) bumped all of them).
+    // Fallback (coupon no longer resolvable, e.g. this order used its last global use): the most
+    // specific row with that code.
+    if (cart.coupon_code && !appliedCoupon?.couponId) {
+      const fb = (await client.query(
+        `SELECT id FROM admin_hub_coupons WHERE lower(code) = lower($1)
+          ORDER BY (COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = 'default'), created_at LIMIT 1`,
+        [cart.coupon_code],
+      ).catch(() => ({ rows: [] }))).rows[0]
+      if (fb) appliedCoupon = { ...(appliedCoupon || {}), couponId: fb.id }
+    }
+    if (cart.coupon_code && appliedCoupon?.couponId) {
       await client.query(
-        `UPDATE admin_hub_coupons SET used_count = COALESCE(used_count, 0) + 1, updated_at = now() WHERE lower(code) = lower($1)`,
-        [cart.coupon_code]
+        `UPDATE admin_hub_coupons SET used_count = COALESCE(used_count, 0) + 1, updated_at = now() WHERE id = $1`,
+        [appliedCoupon.couponId]
       ).catch(() => {})
       if (customerId) {
         await client.query(
-          `INSERT INTO admin_hub_coupon_usage (coupon_id, customer_id, order_id)
-           SELECT id, $1, $2 FROM admin_hub_coupons WHERE lower(code) = lower($3) LIMIT 1`,
-          [customerId, orderId, cart.coupon_code]
+          `INSERT INTO admin_hub_coupon_usage (coupon_id, customer_id, order_id) VALUES ($1, $2, $3)`,
+          [appliedCoupon.couponId, customerId, orderId]
         ).catch(() => {})
       }
     }

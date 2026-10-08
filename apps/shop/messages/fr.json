@@ -168,7 +168,9 @@
     "removeBonusDiscount": "Retirer la réduction bonus",
     "couponDiscount": "Réduction coupon",
     "insufficientStock": "Certains articles ne sont plus disponibles dans la quantité demandée. Veuillez ajuster votre panier.",
-    "sellerUnavailable": "Certains articles sont actuellement indisponibles. Veuillez les retirer de votre panier."
+    "sellerUnavailable": "Certains articles sont actuellement indisponibles. Veuillez les retirer de votre panier.",
+    "couponLimitReached": "Vous avez déjà utilisé ce code autant de fois que possible. Veuillez le retirer.",
+    "belowMinimumQuantity": "Certains articles n'atteignent pas la quantité minimale de commande. Veuillez augmenter la quantité."
   },
   "accountPanel": {
     "hello": "Bonjour, {name}",

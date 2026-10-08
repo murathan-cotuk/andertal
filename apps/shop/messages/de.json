@@ -185,7 +185,9 @@
     "removeBonusDiscount": "Bonusrabatt entfernen",
     "couponDiscount": "Gutschein-Rabatt",
     "insufficientStock": "Einige Artikel sind nicht mehr in der gewünschten Menge verfügbar. Bitte passen Sie den Warenkorb an.",
-    "sellerUnavailable": "Einige Artikel sind derzeit nicht verfügbar. Bitte entfernen Sie sie aus dem Warenkorb."
+    "sellerUnavailable": "Einige Artikel sind derzeit nicht verfügbar. Bitte entfernen Sie sie aus dem Warenkorb.",
+    "couponLimitReached": "Sie haben diesen Gutschein bereits so oft wie erlaubt verwendet. Bitte entfernen Sie ihn.",
+    "belowMinimumQuantity": "Für einige Artikel ist die Mindestbestellmenge nicht erreicht. Bitte erhöhen Sie die Menge."
   },
   "accountPanel": {
     "hello": "Hallo, {name}",

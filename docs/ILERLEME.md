@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — E, 3. adım: kupon + minimum adet (bitti) — PARA DÜZELTMESİ
+
+- **Hata (para)**: kuponun müşteri başına limiti yalnız sipariş oluşturulurken, yani Stripe ödemesi BAŞARILI olduktan sonra kontrol ediliyordu; limit aşılınca 400 dönüp sipariş açılmıyordu → müşteri ödemiş, sipariş yok. Artık kontrol `/store/payment-intent`'te (tahsilattan önce; müşteri JWT'den veya sepet e-postasından), 409 `coupon_limit_reached`. Sipariş oluşturma ödenmiş siparişi asla reddetmez (yalnız loglar).
+- **Sayaç**: `used_count` aynı kodu taşıyan TÜM kuponları (farklı satıcıların aynı kodu) artırıyordu; kullanım kaydı da rastgele bir satıra bağlanıyordu. Artık indirimde uygulanan kupon satırı (`resolveCartCouponDiscountSync` → `couponId`); kupon bu siparişle son kullanımını doldurduysa yedek: en spesifik satır.
+- **Minimum sipariş adedi**: yalnız PDP'de uygulanıyordu; sepette adet düşürülüp altında sipariş verilebiliyordu. `findBelowMinimum` (`inventory.js`, ürünün tüm satırları toplanır) → ödeme başlatmada 409 `below_minimum_quantity`.
+- Shop checkout: `coupon_limit_reached`, `below_minimum_quantity` 6 dilde.
+- Test: `inventory.test.js` +1 (gerçek PG). `npm test` 228/0, shop esbuild OK.
+
 ## 2026-10-08 — E, 2. adım: checkout stok yönetimi (bitti) — kullanıcı kararı "Düşüm + kontrol"
 
 - **Bulgu**: sipariş akışında hiçbir yer stoğu okumuyor/yazmıyordu (yalnız shop'ta "Sepete ekle" düğmesi 0 stokta pasifti). Stok 1 olan ürün sınırsız satılabiliyor, stok hiç azalmıyordu.

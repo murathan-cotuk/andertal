@@ -185,7 +185,9 @@
     "removeBonusDiscount": "Remove bonus discount",
     "couponDiscount": "Coupon discount",
     "insufficientStock": "Some items are no longer available in the requested quantity. Please adjust your cart.",
-    "sellerUnavailable": "Some items are currently unavailable. Please remove them from your cart."
+    "sellerUnavailable": "Some items are currently unavailable. Please remove them from your cart.",
+    "couponLimitReached": "You have already used this coupon as often as allowed. Please remove it.",
+    "belowMinimumQuantity": "Some items are below their minimum order quantity. Please increase the quantity."
   },
   "accountPanel": {
     "hello": "Hello, {name}",
