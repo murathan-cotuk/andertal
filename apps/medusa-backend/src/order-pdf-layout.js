@@ -1552,10 +1552,10 @@ function renderPlatformFinanzamtDocument(doc, {
       rowY = 48
     }
     doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(11)
-      .text(t('OSS — UMSATZ NACH BESTIMMUNGSLAND'), left, rowY)
+      .text(t('VERKÄUFER-UMSÄTZE NACH BESTIMMUNGSLAND (INFO — OSS-PFLICHT LIEGT BEIM JEWEILIGEN VERKÄUFER)'), left, rowY)
     rowY += 16
     const cols = [0.18, 0.16, 0.22, 0.22, 0.22]
-    const headers = ['Land', 'Bestellungen', 'Warenwert', 'Netto (Ware)', 'USt Ware']
+    const headers = ['Land', 'Lieferungen', 'Warenwert', 'Netto (Ware)', 'USt Ware']
     doc.rect(left, rowY, contentWidth, 16).fill(PLATFORM_ACCENT)
     let hx = left
     headers.forEach((h, i) => {

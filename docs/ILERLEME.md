@@ -10,6 +10,11 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — Bekleyen işler 5: OSS bölümü (bitti, Steuerberater teyidi hâlâ önerilir)
+
+- "Plattformabrechnung" PDF'inin OSS bölümü: satıcı KDV no'su `store_orders.seller_id`'den (hep platform) okunduğu için hiç bulunamıyordu → her sipariş müşteri faturası gibi satıcılara bölünür (`invoice-split.js`), her parça kendi satıcısının KDV no'su ile hesaplanır. Başlık: "VERKÄUFER-UMSÄTZE NACH BESTIMMUNGSLAND (INFO — OSS-PFLICHT LIEGT BEIM JEWEILIGEN VERKÄUFER)", sütun "Lieferungen". PDF production'da salt-okunur oluşturuldu (çalışıyor).
+- Platformun kendi OSS/§25e durumu (AB dışı satıcı, ithalat) ayrı bir karar — Steuerberater.
+
 ## 2026-10-08 — Bekleyen işler (kullanıcı: "sırasıyla hepsini yap") — 1–4
 
 1. **3 eski "refunded + bezahlt" sipariş** (#100006, #100007, #100008): okuma ile doğrulandı — üçü de iadeyle tamamen geri ödenmiş, açık iade yok, payable yok → doğru durum `refunded/refunded`. Production UPDATE otomatik izin denetimince **reddedildi**; yapılmadı. Kullanıcı kendisi çalıştırmalı (aşağıdaki SQL) veya izin vermeli:

@@ -746,33 +746,54 @@ async function queryFinanzamtOss(pgClient, periodStart, periodEnd) {
   const ossParams = []
   if (periodStart) { ossParams.push(periodStart); ossWhere.push(`o.created_at >= $${ossParams.length}::date`) }
   if (periodEnd) { ossParams.push(periodEnd); ossWhere.push(`o.created_at < ($${ossParams.length}::date + interval '1 day')`) }
+  // Seller sales by destination country (information — the OSS return is each SELLER's duty,
+  // the platform is not the supplier). Orders are split per seller like the customer invoices
+  // (invoice-split.js) and each part uses its own seller's VAT ID. Previously the seller was read
+  // from store_orders.seller_id, which is always the platform → no seller VAT ID was ever found.
   const oRes = await pgClient.query(
-    `SELECT o.country, o.subtotal_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.total_cents,
-            o.customer_vat_id, s.vat_id
+    `SELECT o.id, o.country, o.subtotal_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.total_cents,
+            o.shipping_by_seller, o.bonus_points_redeemed, o.platform_bonus_funding_cents, o.coupon_code, o.customer_vat_id
        FROM store_orders o
-       LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id <> 'default' THEN o.seller_id ELSE NULL END
       WHERE ${ossWhere.join(' AND ')}
       LIMIT 20000`,
     ossParams,
   )
-  const byCountry = new Map()
-  for (const row of oRes.rows || []) {
-    const cc = row.country ? String(row.country).trim().toUpperCase().slice(0, 2) : 'DE'
-    const customerPaid = resolveOrderPaidTotalCents(row)
-    const bonus = orderBonusDiscountCents(row)
-    const orderValueCents = Math.max(0, customerPaid + bonus)
-    const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
-    const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
-    const vat = salesInvoiceVat({ country: cc }, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
-    if (vat.scheme === 'intra_b2b') continue
-    if (!byCountry.has(cc)) {
-      byCountry.set(cc, { country: cc, order_count: 0, gross_cents: 0, net_cents: 0, vat_cents: 0, rate_percent: vat.exempt ? 0 : vat.ratePercent })
+  const orderIds = (oRes.rows || []).map((r) => r.id)
+  const itemsByOrder = new Map()
+  if (orderIds.length) {
+    const it = await pgClient.query(
+      'SELECT order_id, seller_id, unit_price_cents, quantity FROM store_order_items WHERE order_id = ANY($1::uuid[])', [orderIds],
+    )
+    for (const r of it.rows || []) {
+      const k = String(r.order_id)
+      if (!itemsByOrder.has(k)) itemsByOrder.set(k, [])
+      itemsByOrder.get(k).push(r)
     }
-    const bucket = byCountry.get(cc)
-    bucket.order_count += 1
-    bucket.gross_cents += orderValueCents
-    bucket.net_cents += vat.netCents
-    bucket.vat_cents += vat.vatCents
+  }
+  const sellerVat = new Map((await pgClient.query(
+    `SELECT seller_id, vat_id FROM seller_users WHERE sub_of_seller_id IS NULL AND NULLIF(TRIM(COALESCE(vat_id, '')), '') IS NOT NULL`,
+  ).catch(() => ({ rows: [] }))).rows.map((r) => [String(r.seller_id), String(r.vat_id).trim()]))
+  const { splitOrderForInvoices } = require('./invoice-split')
+  const byCountry = new Map()
+  for (const order of oRes.rows || []) {
+    const cc = order.country ? String(order.country).trim().toUpperCase().slice(0, 2) : 'DE'
+    const customerVatId = order.customer_vat_id ? String(order.customer_vat_id).trim() : ''
+    const parts = splitOrderForInvoices(order, itemsByOrder.get(String(order.id)) || [])
+    for (const part of parts) {
+      const row = part.row
+      const orderValueCents = Math.max(0, resolveOrderPaidTotalCents(row) + orderBonusDiscountCents(row))
+      const sellerVatId = part.sellerId ? (sellerVat.get(String(part.sellerId)) || '') : ''
+      const vat = salesInvoiceVat({ country: cc }, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
+      if (vat.scheme === 'intra_b2b') continue
+      if (!byCountry.has(cc)) {
+        byCountry.set(cc, { country: cc, order_count: 0, gross_cents: 0, net_cents: 0, vat_cents: 0, rate_percent: vat.exempt ? 0 : vat.ratePercent })
+      }
+      const bucket = byCountry.get(cc)
+      bucket.order_count += 1
+      bucket.gross_cents += orderValueCents
+      bucket.net_cents += vat.netCents
+      bucket.vat_cents += vat.vatCents
+    }
   }
   return [...byCountry.values()].sort((a, b) => b.gross_cents - a.gross_cents)
 }
