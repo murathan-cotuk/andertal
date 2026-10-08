@@ -212,7 +212,23 @@ module.exports = function createShipmentTrackingRouter({
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerQ.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
-        const order = ownerQ.rows[0]
+        let order = ownerQ.rows[0]
+        // Multi-seller order: each seller's parcel has its own tracking number (order_shipments).
+        // A seller refreshes their own parcel; the superuser may name one via body.tracking_number.
+        // Without a match the order-level (last entered) tracking number is used as before.
+        try {
+          const wanted = String(req.body?.tracking_number || '').trim().toLowerCase()
+          const ships = (await client.query(
+            `SELECT seller_id, carrier_name, tracking_number FROM order_shipments
+              WHERE order_id = $1::uuid AND NULLIF(TRIM(tracking_number), '') IS NOT NULL ORDER BY updated_at DESC`,
+            [id],
+          )).rows
+          const mine = (s) => isSuperuser || String(s.seller_id) === String(callerSellerId || '')
+          const pick = wanted
+            ? ships.find((s) => String(s.tracking_number).trim().toLowerCase() === wanted && mine(s))
+            : (!isSuperuser ? ships.find(mine) : null)
+          if (pick) order = { ...order, seller_id: pick.seller_id, carrier_name: pick.carrier_name || order.carrier_name, tracking_number: pick.tracking_number }
+        } catch (_) { /* order_shipments missing on an old DB → order-level tracking */ }
         if (!order.tracking_number) { await client.end(); return res.json({ events: [], message: 'No tracking number' }) }
 
         // Look up carrier API key + tracking URL template from DB (env fallback so tracking works without per-carrier key).

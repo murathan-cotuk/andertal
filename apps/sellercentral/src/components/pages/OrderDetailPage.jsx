@@ -116,6 +116,7 @@ export default function OrderDetailPage() {
   const c = getOrderDetailCopy(locale);
 
   const [order, setOrder] = useState(null);
+  const [shipRefresh, setShipRefresh] = useState({ id: null, msg: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -529,6 +530,31 @@ export default function OrderDetailPage() {
                   {sh.delivery_confirmed_at && (
                     <div style={{ color: "#1f6b35", fontSize: 12, marginTop: 2 }}>
                       {lt(locale, "Delivery confirmed", "Teslim onaylandı", "Livraison confirmée", "Entrega confirmada", "Consegna confermata", "Zustellung bestätigt")}: {fmtDate(sh.delivery_confirmed_at)}
+                    </div>
+                  )}
+                  {sh.tracking_number && !sh.delivery_confirmed_at && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <button
+                        type="button"
+                        disabled={shipRefresh.id === sh.id}
+                        onClick={async () => {
+                          setShipRefresh({ id: sh.id, msg: "" });
+                          try {
+                            const data = await getMedusaAdminClient().refreshTracking(id, sh.tracking_number);
+                            const n = Number(data?.inserted) || 0;
+                            setShipRefresh({ id: null, msg: `${sh.id}:${n > 0 ? `+${n}` : (data?.message || "0")}` });
+                            await loadOrder();
+                          } catch (e) {
+                            setShipRefresh({ id: null, msg: `${sh.id}:${e?.message || "Error"}` });
+                          }
+                        }}
+                        style={{ border: "1px solid #d9d2c6", background: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 12, cursor: "pointer" }}
+                      >
+                        {shipRefresh.id === sh.id ? "…" : lt(locale, "Refresh tracking", "Takibi yenile", "Actualiser le suivi", "Actualizar seguimiento", "Aggiorna tracciamento", "Tracking aktualisieren")}
+                      </button>
+                      {shipRefresh.msg.startsWith(`${sh.id}:`) && (
+                        <span style={{ fontSize: 12, color: "#5e574e" }}>{shipRefresh.msg.slice(String(sh.id).length + 1)}</span>
+                      )}
                     </div>
                   )}
                 </div>

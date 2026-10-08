@@ -1096,8 +1096,12 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/shipment-events/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
   }
 
-  async refreshTracking(orderId) {
-    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/refresh-tracking`, { method: 'POST' })
+  /** trackingNumber: a specific parcel of a multi-seller order (order_shipments); omitted = own / order-level. */
+  async refreshTracking(orderId, trackingNumber = null) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/refresh-tracking`, {
+      method: 'POST',
+      ...(trackingNumber ? { body: JSON.stringify({ tracking_number: trackingNumber }) } : {}),
+    })
   }
 
   async getCustomers(params = {}) {

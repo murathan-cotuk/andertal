@@ -681,3 +681,26 @@ withDb('single-seller order without shipment rows keeps the order-level delivery
   await h.deliver(c, order.id, 20)
   assert.ok((await payablesOf(c, order.id)).every((p) => p.status === 'eligible'))
 })
+
+withDb('return refund: partial keeps the order paid + closes the return phase; full → refunded', async (c) => {
+  await h.addSeller(c, 'seller_a')
+  const { order, items } = await h.addPaidOrder(c, { items: [{ seller: 'seller_a', price: 3000 }, { seller: 'seller_a', price: 7000 }] })
+  await s.createPayablesForOrder(c, order.id)
+  await c.query(`UPDATE store_orders SET delivery_status = 'zugestellt', order_status = 'retoure' WHERE id = $1`, [order.id])
+  const stripe = h.fakeStripe()
+  const ret1 = (await c.query(`INSERT INTO store_returns (order_id, status, seller_id, refund_amount_cents) VALUES ($1, 'eingegangen', 'seller_a', 3000) RETURNING id`, [order.id])).rows[0]
+  // A second, still open return keeps the order in the return phase.
+  const ret2 = (await c.query(`INSERT INTO store_returns (order_id, status, seller_id, refund_amount_cents) VALUES ($1, 'offen', 'seller_a', 7000) RETURNING id`, [order.id])).rows[0]
+  await refundAndApply(c, stripe, { orderId: order.id, returnId: ret1.id, amountCents: 3000, lines: [{ order_item_id: items[0].id, quantity: 1 }], idempotencyKey: 'r1' })
+  let o = (await c.query('SELECT order_status, payment_status FROM store_orders WHERE id = $1', [order.id])).rows[0]
+  assert.deepEqual([o.order_status, o.payment_status], ['retoure', 'bezahlt'])
+  await c.query(`UPDATE store_returns SET status = 'abgelehnt' WHERE id = $1`, [ret2.id])
+  const { syncOrderStatusAfterReturnRefund } = require('../order-refund-status')
+  o = await syncOrderStatusAfterReturnRefund(c, order.id)
+  assert.deepEqual([o.order_status, o.payment_status], ['abgeschlossen', 'bezahlt'])
+  // Rest refunded → the whole order is refunded.
+  const ret3 = (await c.query(`INSERT INTO store_returns (order_id, status, seller_id, refund_amount_cents) VALUES ($1, 'eingegangen', 'seller_a', 7000) RETURNING id`, [order.id])).rows[0]
+  await refundAndApply(c, stripe, { orderId: order.id, returnId: ret3.id, amountCents: 7000, lines: [{ order_item_id: items[1].id, quantity: 1 }], idempotencyKey: 'r3' })
+  o = (await c.query('SELECT order_status, payment_status FROM store_orders WHERE id = $1', [order.id])).rows[0]
+  assert.deepEqual([o.order_status, o.payment_status], ['refunded', 'refunded'])
+})

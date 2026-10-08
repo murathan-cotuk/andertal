@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — B: kısmi iade sipariş durumu + paket bazlı takip yenileme (bitti)
+
+- **Hata**: iade parası Stripe'ta başarılı olunca `returns.js` siparişi her durumda `order_status = 'refunded'` yapıyordu; kısmi iadede `payment_status` doğru olarak `bezahlt` kalıyordu → "refunded + bezahlt" çelişkisi (canlıdaki 3 eski sipariş bu). SC işlemler sayfası bu siparişleri "hiç ödenmeyecek" sayıyordu, payouts raporu tüm sipariş tutarını iade sayıyordu.
+- Yeni `src/order-refund-status.js` `syncOrderStatusAfterReturnRefund`: yalnız **tam** iade → `refunded` (settlement siparişinde `payment_status='refunded'`; payable'sız eski siparişte iade edilen iade tutarları ≥ sipariş toplamı → ödeme durumu da `refunded`). Kısmi iade → başka açık iade yoksa ödenmiş + teslim edilmiş sipariş `abgeschlossen`, açık iade varsa durum aynen. `storniert` dokunulmaz. Hem senkron (`returns.js`) hem webhook ile sonradan onaylanan iade (`settlement/refunds.js` kısmi dal) çağırır.
+- Test: settlement +1 (kısmi + açık iade → retoure; kapanınca abgeschlossen/bezahlt; kalanı → refunded/refunded). Settlement 40/40 (gerçek PG), `npm test` 195/195.
+- **Canlı veri**: 3 eski sipariş hâlâ "refunded + bezahlt". Düzeltme production UPDATE ister → kullanıcı izni olmadan yapılmadı (`syncOrderStatusAfterReturnRefund` her biri için bir kez çalıştırılabilir).
+- **Paket bazlı takip yenileme** (önceki "bilinen sınır" kapandı): `POST /orders/:id/refresh-tracking` satıcı için kendi `order_shipments` paketini (kargo firması + takip no + o satıcının kargo API anahtarı) kullanır; superuser `body.tracking_number` ile paket seçer; eşleşme yoksa eski sipariş seviyesi davranış. SC "Sendungen" kartında teslim onaylanmamış her pakette "Tracking aktualisieren" düğmesi (6 dil); `refreshTracking(orderId, trackingNumber)`.
+- Bilinen sınır: `store_shipment_events` sipariş bazlı; çok satıcılı siparişte olay geçmişi paketler arasında karışık listelenir.
+
 ## 2026-10-08 — SC ürün düzenleme s34: dil hapları + pazar fiyat tablosu (bitti, karar 2)
 
 - `components/products/EditLanguagePills.jsx`: Titel kartının üstünde DE/EN/TR/FR/ES/IT hapları; nokta yeşil = başlık + açıklama var ve otomatik değil, turuncu = eksik veya `_auto` (tooltip açıklar). Düzenleme dili mevcut desende arayüz dili (`metadata.translations[locale]`), hap aynı sayfayı o dilde açar. Kaydedilmemiş değişiklik varken / yeni üründe kilitli (navigasyon değişiklikleri silerdi) — "Erst speichern".

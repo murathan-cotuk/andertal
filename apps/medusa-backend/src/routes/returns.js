@@ -1,4 +1,5 @@
 'use strict'
+const { syncOrderStatusAfterReturnRefund } = require('../order-refund-status')
 const { Router } = require('express')
 const { appendBonusLedger } = require('./store-checkout')
 const { sqlOrderOwnedBySeller } = require('../seller-scope')
@@ -301,10 +302,9 @@ const adminHubReturnPATCH = async (req, res) => {
     }
     // Refund confirmed by Stripe → order + affiliate + bonus follow-ups (each idempotent per return).
     if (refundSucceeded) {
-      await client.query(
-        `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
-        [id]
-      ).catch(() => {})
+      // Full refund → 'refunded'; partial → return phase closed (see order-refund-status.js).
+      const refundOrderRow = (await client.query(`SELECT order_id FROM store_returns WHERE id = $1::uuid`, [id]).catch(() => ({ rows: [] }))).rows[0]
+      await syncOrderStatusAfterReturnRefund(client, refundOrderRow?.order_id).catch((e) => console.warn('syncOrderStatusAfterReturnRefund:', e?.message || e))
       // docs/affiliate.md PR 4 — claw back any not-yet-paid affiliate commission on this order.
       try {
         const { clawbackAffiliateCommissionsForOrder } = require('../modules/affiliate-platform/workers/commission-clawback')

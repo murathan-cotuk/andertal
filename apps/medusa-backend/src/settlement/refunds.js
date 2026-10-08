@@ -1,5 +1,6 @@
 'use strict'
 
+const { syncOrderStatusAfterReturnRefund } = require('../order-refund-status')
 const { withTx, lockKey, appendLedgerEntry, auditFinance } = require('./ledger')
 const { allocateRefund } = require('./money')
 const { refreshEligibilityForOrder, realSellerId } = require('./payables')
@@ -235,6 +236,7 @@ async function applyRefundSucceeded(client, refundId, { stripeRefundId = null, a
       )
     } else if (Number(totals.refunded) > 0) {
       await client.query(`UPDATE order_payments SET status = 'partially_refunded', updated_at = now() WHERE order_id = $1::uuid`, [refund.order_id])
+      if (refund.return_id) await syncOrderStatusAfterReturnRefund(client, refund.order_id)
     }
     await auditFinance(client, { actor, action: 'refund_succeeded', entityType: 'refund', entityId: refundId, details: { stripe_refund_id: stripeRefundId } })
     await refreshEligibilityForOrder(client, refund.order_id)
