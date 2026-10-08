@@ -837,6 +837,75 @@ const storeCartPATCH = async (req, res) => {
   }
 }
 
+/**
+ * Unit price of a cart line, server-side: another seller's listing price, else the variant's /
+ * product's own (per destination country), then the seller's campaign. Used when the line is
+ * added AND again when the payment starts (prices can change while the cart sits; the
+ * destination country can differ from the one at add time).
+ */
+async function priceCartLineCents(client, { product, variantId, lineSellerId, destCountry }) {
+  const meta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+  const priceCents = product.price_cents != null ? Number(product.price_cents) : Math.round(Number(product.price || 0) * 100)
+  const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
+  const resolvedVar = resolveVariantFromCartId(product, variantId)
+  const variantIndex = resolvedVar.index
+  const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
+  let unitPriceCents = null
+  // The owning seller's price lives on the product (and metadata.prices). Their listing
+  // row is a shadow and must not replace that price with a stale 0.
+  const lineIsOwner = !!(productSellerId && lineSellerId && productSellerId === lineSellerId)
+  if (lineSellerId && !lineIsOwner) {
+    const listingRow = await client.query(
+      `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status IN ('active', 'published') LIMIT 1`,
+      [String(product.id), lineSellerId]
+    )
+    if (listingRow.rows[0] && Number(listingRow.rows[0].price_cents) > 0) unitPriceCents = Number(listingRow.rows[0].price_cents)
+  }
+  // A second seller's listing price stands; otherwise the variant's own price wins over the
+  // parent's (src/line-unit-price.js). The parent's per-country price used to overwrite both.
+  if (unitPriceCents == null) {
+    unitPriceCents = resolveCatalogUnitPriceCents({
+      variant: resolvedVar.variant || (variantIndex >= 0 ? rawVariants[variantIndex] : null),
+      meta,
+      productPriceCents: priceCents,
+      country: destCountry,
+    })
+  }
+  if (lineSellerId) {
+    try {
+      const campRow = await findBestSellerCampaignDiscountRow(client, {
+        productId: String(product.id),
+        variantId,
+        sellerId: lineSellerId,
+      })
+      if (campRow) unitPriceCents = applySellerCampaignToPriceCents(unitPriceCents, campRow)
+    } catch (_) {}
+  }
+  return unitPriceCents
+}
+
+/** Re-prices every cart line for the destination country; returns how many lines changed. */
+async function repriceCartLines(client, cart, destCountry) {
+  let changed = 0
+  for (const it of Array.isArray(cart.items) ? cart.items : []) {
+    try {
+      const product = await getAdminHubProductByIdOrHandleDb(String(it.product_id || ''))
+      if (!product) continue
+      const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
+      const lineSellerId = (it.seller_id && String(it.seller_id).trim() !== 'default' ? String(it.seller_id).trim() : null)
+        || (productSellerId && productSellerId !== 'default' ? productSellerId : null)
+      const cents = await priceCartLineCents(client, { product, variantId: it.variant_id, lineSellerId, destCountry })
+      if (Number.isFinite(cents) && cents > 0 && cents !== Number(it.unit_price_cents)) {
+        await client.query('UPDATE store_cart_items SET unit_price_cents = $1, updated_at = now() WHERE id = $2', [cents, it.id])
+        changed++
+      }
+    } catch (e) {
+      console.warn('[checkout] reprice line failed:', it?.id, e?.message || e)
+    }
+  }
+  return changed
+}
+
 const storeCartLineItemsPOST = async (req, res) => {
   const cartId = (req.params.id || req.params.cartId || '').toString().trim()
   if (!cartId) return res.status(400).json({ message: 'Cart id required' })
@@ -889,41 +958,7 @@ const storeCartLineItemsPOST = async (req, res) => {
     // If a specific seller is chosen (Andere Verkäufer / buybox), their listing price wins.
     const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
     const lineSellerId = chosenSellerId || (productSellerId && productSellerId !== 'default' ? productSellerId : null) || null
-    let listingApplied = false
-    // The owning seller's price lives on the product (and metadata.prices). Their listing
-    // row is a shadow and must not replace that price with a stale 0.
-    const lineIsOwner = !!(productSellerId && lineSellerId && productSellerId === lineSellerId)
-    if (lineSellerId && !lineIsOwner) {
-      const listingRow = await client.query(
-        `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status IN ('active', 'published') LIMIT 1`,
-        [String(product.id || productId), lineSellerId]
-      )
-      if (listingRow.rows[0] && Number(listingRow.rows[0].price_cents) > 0) {
-        unitPriceCents = Number(listingRow.rows[0].price_cents)
-        listingApplied = true
-      }
-    }
-    // A second seller's listing price stands; otherwise the variant's own price wins over the
-    // parent's (src/line-unit-price.js). The parent's per-country price used to overwrite both.
-    if (!listingApplied) {
-      unitPriceCents = resolveCatalogUnitPriceCents({
-        variant: resolvedVar.variant || (variantIndex >= 0 ? rawVariants[variantIndex] : null),
-        meta,
-        productPriceCents: priceCents,
-        country: destCountry,
-      })
-    }
-    const sellerForCamp = lineSellerId || ''
-    if (sellerForCamp) {
-      try {
-        const campRow = await findBestSellerCampaignDiscountRow(client, {
-          productId: String(product.id || productId),
-          variantId,
-          sellerId: sellerForCamp,
-        })
-        if (campRow) unitPriceCents = applySellerCampaignToPriceCents(unitPriceCents, campRow)
-      } catch (_) {}
-    }
+    unitPriceCents = await priceCartLineCents(client, { product: { ...product, id: product.id || productId }, variantId, lineSellerId, destCountry })
     const title = (product.title || 'Product') + (variantLabel ? ` (${variantLabel})` : '')
     const handle = product.handle || product.id
     const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
@@ -1118,6 +1153,15 @@ const storePaymentIntentPOST = async (req, res) => {
       return res.status(404).json({ message: 'Cart not found' })
     }
     cart = (await syncCartCouponDiscountFromLines(client, cartId, cart)) || cart
+    // Current prices for the destination country (a price can change while the cart sits, or
+    // the customer ships to a market with its own price) — never charge the add-time snapshot.
+    const pricesUpdated = await repriceCartLines(
+      client, cart, normalizeShippingCountry(body.shipping_country || body.country) || 'DE',
+    ).catch(() => 0)
+    if (pricesUpdated > 0) {
+      cart = (await getCartWithItems(client, cartId)) || cart
+      cart = (await syncCartCouponDiscountFromLines(client, cartId, cart)) || cart
+    }
 
     const items = Array.isArray(cart.items) ? cart.items : []
     if (!items.length) {
@@ -1212,6 +1256,7 @@ const storePaymentIntentPOST = async (req, res) => {
       await client.end()
       return res.status(200).json({
         zero_checkout: true,
+        prices_updated: pricesUpdated > 0,
         amount_cents: 0,
         pay_total_cents: 0,
         subtotal_cents: subtotalCents,
@@ -1391,6 +1436,7 @@ const storePaymentIntentPOST = async (req, res) => {
       payment_intent_id: paymentIntent.id,
       customer_session_secret: customerSessionSecret,
       amount_cents: payCents,
+      prices_updated: pricesUpdated > 0,
       subtotal_cents: subtotalCents,
       shipping_cents: shippingCents,
       shipping_country: shippingCountry,

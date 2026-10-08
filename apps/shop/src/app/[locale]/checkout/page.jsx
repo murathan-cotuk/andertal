@@ -1832,7 +1832,7 @@ export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const locale = useLocale();
   const router = useRouter();
-  const { cart, subtotalCents, setCart, clearBonusPoints, bonusDiscountCents, shippingGroups } = useCart();
+  const { cart, subtotalCents, setCart, clearBonusPoints, bonusDiscountCents, shippingGroups, fetchCart } = useCart();
   const items = cart?.items || [];
   const cartBySeller = useMemo(() => groupCartItemsBySeller(items), [items]);
 
@@ -2130,6 +2130,8 @@ export default function CheckoutPage() {
     })
       .then((r) => r.json())
       .then((data) => {
+        // Backend re-priced the cart (price change / destination market) — show the current line prices.
+        if (data?.prices_updated && cart?.id && typeof fetchCart === "function") fetchCart(cart.id);
         if (data?.zero_checkout) {
           setZeroCheckoutMode(true);
           setClientSecret(null);

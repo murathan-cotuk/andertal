@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — E, 4. adım: sepet fiyatı ödemede yeniden hesaplanır (bitti) — PARA DÜZELTMESİ
+
+- **Hata**: sepet satırının fiyatı yalnız sepete eklenirken sunucuda hesaplanıp satıra yazılıyordu; ödeme bu anlık görüntüden alınıyordu. Satıcı fiyatı artırınca, kampanya bitince veya müşteri farklı fiyatlı bir pazara (AT/FR/IT/ES, E/s34 pazar fiyatları) teslimat seçince eski fiyat tahsil ediliyordu.
+- `priceCartLineCents` (store-checkout.js): satır fiyatının tek kaynağı (başka satıcının listing fiyatı → yoksa varyant/ürün ülke fiyatı → satıcı kampanyası). Sepete ekleme bunu kullanır; `repriceCartLines` ödeme başlatmada (`/store/payment-intent`) her satırı teslimat ülkesine göre yeniden fiyatlar, farkı sepete yazar, kupon indirimini yeniden hesaplar — tutar, kargo ve kupon güncel fiyattan.
+- Yanıtta `prices_updated`; shop checkout bu durumda sepeti yeniden yükler (satır fiyatları görünür güncellenir).
+- Bilinen sınır (kayıt): kategori sayfaları (`AutoCatalogHub`) tüm ürünleri tek istekte (≤1200) alıp tarayıcıda süzüyor — 9 ürünlük katalogda sorun yok, büyüyünce sunucu tarafı sayfalama gerekir.
+- `npm test` 228/0, shop esbuild OK.
+
 ## 2026-10-08 — E, 3. adım: kupon + minimum adet (bitti) — PARA DÜZELTMESİ
 
 - **Hata (para)**: kuponun müşteri başına limiti yalnız sipariş oluşturulurken, yani Stripe ödemesi BAŞARILI olduktan sonra kontrol ediliyordu; limit aşılınca 400 dönüp sipariş açılmıyordu → müşteri ödemiş, sipariş yok. Artık kontrol `/store/payment-intent`'te (tahsilattan önce; müşteri JWT'den veya sepet e-postasından), 409 `coupon_limit_reached`. Sipariş oluşturma ödenmiş siparişi asla reddetmez (yalnız loglar).
