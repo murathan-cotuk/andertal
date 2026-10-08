@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — G. Faturalar, 1. adım: satıcı başına müşteri faturası (bitti) — VERGİ DÜZELTMESİ
+
+- **Hata (§14 UStG)**: çok satıcılı siparişte müşteri faturası (shop indirme, SC indirme, sipariş e-postası eki) ilk satıcının kimliğiyle ve TÜM satıcıların kalemleri + toplamlarıyla tek belge olarak düzenleniyordu — satıcı A, B'nin malını faturalıyor görünüyordu.
+- Yeni `src/invoice-split.js` `splitOrderForInvoices`: satıcı başına kalemler, ara toplam, kendi kargosu (`shipping_by_seller`), satıcıya özel kupon tamamen o satıcıya, platform kuponu + bonus indirimi mal payına göre; tüm tutarlar siparişe birebir toplanır (yuvarlama farkı son parçada). Tek satıcılı sipariş birebir eskisi gibi.
+- `order-pdf-buffers.js`: `prepareInvoiceParts` (kupon satıcısı DB'den, satıcı kimliği her parça için) + `renderInvoiceParts` (parça başına sayfa). Müşteri ve superuser tüm parçaları, satıcı yalnız kendi parçasını alır. Fatura no. aynı (`R-<sipariş no>`) — satıcı bazında benzersiz (§14 Abs. 4 Nr. 4; boşluk serbest).
+- Test: `invoice-split.test.js` (4) + iki satıcılı örnek PDF üretimi (2 sayfa). `npm test` geçti.
+
 ## 2026-10-08 — F, 4. adım: pazarlama e-postalarında abonelikten çıkma uygulanıyor (bitti) — F ALANI KAPANDI
 
 - **Hata (UWG §7)**: abonelikten çıkma (newsletter linki) kaydediliyordu ama pazarlama flow'ları gönderimden önce buna bakmıyordu — çıkan müşteri terk edilmiş sepet, win-back, doğum günü, favori stok/fiyat ve değerlendirme isteği e-postalarını almaya devam ediyordu. `sendImmediateStepsForFlow` artık bu tetikleyicilerde (`MARKETING_FLOW_TRIGGERS`) `store_newsletter_subscribers.status = 'unsubscribed'` alıcıyı atlar. İşlem e-postaları (sipariş, iade, hesap) etkilenmez. Sorgu prod'da EXPLAIN ile doğrulandı; şu an 5 aktif abone, 0 çıkmış.

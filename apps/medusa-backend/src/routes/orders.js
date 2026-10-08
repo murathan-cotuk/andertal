@@ -282,10 +282,13 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const preparedInv = await prepareRetailPdfContext(client, row, iRes.rows || [])
         const itemRows = preparedInv.itemRows
         const orderRow = preparedInv.row
-        let sellerInfoHub = null
+        // One invoice per seller: a seller downloads only its own part, the superuser all parts.
+        const invIsSuper = req.sellerUser?.is_superuser === true
+        const invSellerScope = invIsSuper ? null : (String(req.sellerUser?.seller_id || '').trim() || null)
+        const { prepareInvoiceParts, renderInvoiceParts } = require('../order-pdf-buffers')
+        const invoiceParts = await prepareInvoiceParts(client, orderRow, itemRows, { sellerScope: invSellerScope })
         let shopLogoUrl = ''
         try {
-          sellerInfoHub = await querySellerInfoForOrderDocuments(client, orderRow, itemRows)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           shopLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -311,13 +314,10 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('invoice', on, pdfLocale)}"`)
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
-        renderInvoicePdfDocument(doc, {
-          row: orderRow,
-          itemRows,
+        renderInvoiceParts(doc, invoiceParts, {
           orderId: id,
           invoiceNumber: on,
           shopName,
-          sellerInfo: sellerInfoHub,
           shopLogoBuffer,
           locale: pdfLocale,
         })

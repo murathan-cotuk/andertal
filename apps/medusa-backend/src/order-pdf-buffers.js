@@ -419,6 +419,42 @@ async function _querySellerInfo(pgClient, sellerId) {
   }
 }
 
+/**
+ * Invoice parts per seller (src/invoice-split.js): each with that seller's lines, totals and
+ * issuer data. sellerScope = only that seller's part (Sellercentral seller download).
+ * itemRows must be enriched (prepareRetailPdfContext) so every line carries its seller.
+ */
+async function prepareInvoiceParts(pgClient, orderRow, itemRows, { sellerScope = null } = {}) {
+  const { splitOrderForInvoices } = require('./invoice-split')
+  const sellers = [...new Set((itemRows || []).map((it) => realSellerKey(it.seller_id)).filter(Boolean))]
+  let couponSellerId = null
+  if (orderRow.coupon_code && sellers.length > 1) {
+    const cr = await pgClient.query(
+      `SELECT seller_id FROM admin_hub_coupons WHERE lower(code) = lower($1) AND seller_id = ANY($2::text[]) LIMIT 1`,
+      [orderRow.coupon_code, sellers],
+    ).catch(() => ({ rows: [] }))
+    couponSellerId = cr.rows[0]?.seller_id || null
+  }
+  let parts = splitOrderForInvoices(orderRow, itemRows, { couponSellerId })
+  if (sellerScope) parts = parts.filter((p) => !p.sellerId || p.sellerId === sellerScope)
+  const out = []
+  for (const p of parts) {
+    const sellerInfo = parts.length === 1 && !sellerScope
+      ? await querySellerInfoForOrderDocuments(pgClient, orderRow, itemRows)
+      : await _querySellerInfo(pgClient, p.sellerId || 'default')
+    out.push({ row: p.row, itemRows: p.items, sellerInfo, sellerId: p.sellerId })
+  }
+  return out
+}
+
+/** Renders every part on its own page(s). */
+function renderInvoiceParts(doc, parts, common) {
+  parts.forEach((p, i) => {
+    if (i > 0) doc.addPage()
+    renderInvoicePdfDocument(doc, { ...common, row: p.row, itemRows: p.itemRows, sellerInfo: p.sellerInfo })
+  })
+}
+
 async function buildInvoicePdfBuffer(pgClient, orderId, locale) {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
@@ -430,20 +466,17 @@ async function buildInvoicePdfBuffer(pgClient, orderId, locale) {
   const prepared = await prepareRetailPdfContext(pgClient, row, iRes.rows || [])
   const itemRows = prepared.itemRows
   const orderRow = prepared.row
-  const sellerInfo = await querySellerInfoForOrderDocuments(pgClient, orderRow, itemRows)
+  const parts = await prepareInvoiceParts(pgClient, orderRow, itemRows)
   const on = orderRow.order_number != null ? String(orderRow.order_number) : String(id).slice(0, 8)
   const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
   const logoUrl = await pgClient.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
     .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
   const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await pdfDocToBuffer((doc) =>
-    renderInvoicePdfDocument(doc, {
-      row: orderRow,
-      itemRows,
+    renderInvoiceParts(doc, parts, {
       orderId: id,
       invoiceNumber: on,
       shopName,
-      sellerInfo,
       shopLogoBuffer,
       locale: resolvedLocale,
     }),
@@ -769,6 +802,8 @@ module.exports = {
   buildSellerPayoutPdfBuffer,
   buildPlatformFinanzamtPdfBuffer,
   renderInvoicePdfDocument,
+  prepareInvoiceParts,
+  renderInvoiceParts,
   renderLieferscheinPdfDocument,
   renderRetourenscheinPdfDocument,
   renderVersandlabelPdfDocument,

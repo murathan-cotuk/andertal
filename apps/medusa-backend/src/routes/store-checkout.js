@@ -2521,11 +2521,10 @@ const storeOrderInvoicePdfGET = async (req, res) => {
     const customerDocUrl = await require('./order-documents').resolveCustomerSuppliedDocumentUrl(client, orderId, row.seller_id, 'invoice')
     if (customerDocUrl) { await client.end(); return res.redirect(302, customerDocUrl) }
     const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
-    const itemRows = iRes.rows || []
-    let sellerInfo = null
-    try {
-      sellerInfo = await querySellerInfoForOrderDocuments(client, row, itemRows)
-    } catch (_) {}
+    // One invoice per seller (§14 UStG) — a multi-seller order gets one page set per seller.
+    const { prepareRetailPdfContext, prepareInvoiceParts, renderInvoiceParts } = require('../order-pdf-buffers')
+    const prepared = await prepareRetailPdfContext(client, row, iRes.rows || [])
+    const invoiceParts = await prepareInvoiceParts(client, prepared.row, prepared.itemRows)
     await client.end(); client = null
     const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
     const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
@@ -2533,13 +2532,10 @@ const storeOrderInvoicePdfGET = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${on}.pdf"`)
     const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
     doc.pipe(res)
-    renderInvoicePdfDocument(doc, {
-      row,
-      itemRows,
+    renderInvoiceParts(doc, invoiceParts, {
       orderId,
       invoiceNumber: on,
       shopName,
-      sellerInfo,
       // Invoices are always issued in German regardless of the shipping/billing country.
       locale: 'de',
     })
