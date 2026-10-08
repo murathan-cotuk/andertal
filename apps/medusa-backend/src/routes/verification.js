@@ -50,7 +50,9 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
 
         // Map pipeline decision to existing approval_status values
         const statusMap = { approved: 'approved', pending_review: 'pending_approval', rejected: 'rejected' }
-        const newStatus = statusMap[result.decision] || 'pending_approval'
+        let newStatus = statusMap[result.decision] || 'pending_approval'
+        // Risk score alone is not enough: tax number, LUCID, address, agreement must be on file.
+        if (newStatus === 'approved' && !require('../seller-approval-readiness').approvalReadiness(seller).ready) newStatus = 'pending_approval'
 
         // Only auto-advance status if currently in early stages (don't downgrade approved sellers)
         const currentStatus = String(seller.approval_status || 'registered').toLowerCase()
@@ -197,6 +199,17 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
+        if (newStatus === 'approved') {
+          // Same rule as PATCH /sellers/:id/approve (seller-approval-readiness.js).
+          const { approvalReadiness } = require('../seller-approval-readiness')
+          const cur = (await client.query('SELECT * FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL LIMIT 1', [seller_id])).rows[0]
+          const readiness = approvalReadiness(cur)
+          const overrideReason = String(req.body?.override_reason || '').trim()
+          if (cur && String(cur.approval_status || '') !== 'approved' && !readiness.ready && overrideReason.length < 10) {
+            await client.end()
+            return res.status(422).json({ code: 'approval_blocked', message: 'Pflichtangaben fehlen', blockers: readiness.blockers, warnings: readiness.warnings })
+          }
+        }
         const r = await client.query(
           `UPDATE seller_users
            SET approval_status = $1,

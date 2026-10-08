@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from "react";
+import { approvalBlockedText } from "@/lib/seller-approval-blockers";
 import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
   Button, Badge, Banner, Box, TextField, Modal, Checkbox,
@@ -330,7 +331,7 @@ function KybReviewModal({ user, onClose, onApproved, copy, ui, locale }) {
       onApproved(user.id, status);
       onClose();
     } catch (e) {
-      setErr(e?.message || copy.genericError);
+      setErr(approvalBlockedText(e, locale) || e?.message || copy.genericError);
       setSaving(false);
     }
   };

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { approvalBlockedText } from "@/lib/seller-approval-blockers";
 import {
   Page, Card, Text, BlockStack, InlineStack, Badge, Button, Banner,
   TextField, Select, Box, Spinner, Divider, Modal, Tabs,
@@ -463,7 +464,7 @@ export default function SellerDetailPage({ sellerId }) {
       setApproveModal(false);
       setRejectReason("");
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
+      setMsg({ tone: "critical", text: approvalBlockedText(e, locale) || e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
     } finally {
       setApproving(false);
     }

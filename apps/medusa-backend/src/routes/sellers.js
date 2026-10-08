@@ -246,6 +246,18 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        if (status === 'approved') {
+          const { approvalReadiness } = require('../seller-approval-readiness')
+          const cur = (await client.query('SELECT * FROM seller_users WHERE id = $1', [id])).rows[0]
+          if (!cur) { await client.end(); return res.status(404).json({ message: 'Seller not found' }) }
+          const readiness = approvalReadiness(cur)
+          const overrideReason = String(req.body?.override_reason || '').trim()
+          if (String(cur.approval_status || '') !== 'approved' && !readiness.ready && overrideReason.length < 10) {
+            await client.end()
+            return res.status(422).json({ code: 'approval_blocked', message: 'Pflichtangaben fehlen', blockers: readiness.blockers, warnings: readiness.warnings })
+          }
+          if (!readiness.ready) console.warn('[seller-approval] override', { seller: cur.seller_id, by: req.sellerUser?.email, reason: overrideReason, blockers: readiness.blockers })
+        }
         const extraSets = []
         const extraParams = []
         if (status === 'approved') {

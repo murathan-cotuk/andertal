@@ -79,7 +79,11 @@ const getApprovedSellerIdsSet = async () => {
   try {
     await client.connect()
     const res = await client.query(
-      `SELECT seller_id FROM seller_users WHERE seller_id IS NOT NULL AND LENGTH(TRIM(seller_id)) > 0 AND LOWER(COALESCE(approval_status, '')) NOT IN ('rejected', 'suspended')`
+      // Only approved sellers sell (Marktplatzhaftung: tax + LUCID checked at approval —
+      // seller-approval-readiness.js). Previously every not-rejected account was listed,
+      // including freshly registered, unverified ones.
+      `SELECT seller_id FROM seller_users WHERE seller_id IS NOT NULL AND LENGTH(TRIM(seller_id)) > 0
+         AND (LOWER(COALESCE(approval_status, '')) IN ('approved', 'active') OR is_superuser = true)`
     )
     await client.end()
     return new Set((res.rows || []).map((r) => String(r.seller_id || '').trim()).filter(Boolean))

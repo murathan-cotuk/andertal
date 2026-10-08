@@ -335,12 +335,12 @@ const sellerAuthRegisterPOST = async (req, res) => {
       )
       if (invRes.rows.length > 0) invite = invRes.rows[0]
     }
-    if (!invite) {
-      const invByEmail = await client.query(
-        `SELECT * FROM seller_invitations WHERE LOWER(email) = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1`,
-        [email]
-      )
-      if (invByEmail.rows.length > 0) invite = invByEmail.rows[0]
+    // Invitations are accepted only with their token (from the invite link). The former
+    // fallback "any open invitation for this email" let anyone who knew an invited address join
+    // the inviting seller's account — seller e-mail addresses are not verified at signup.
+    if (!invite && !body.agreement_accepted) {
+      await client.end()
+      return res.status(400).json({ code: 'agreement_required', message: 'Bitte akzeptieren Sie den Verkäufervertrag.' })
     }
     if (store_name && !invite) {
       const storeCheck = await client.query(`SELECT id FROM seller_users WHERE LOWER(store_name) = LOWER($1)`, [store_name])

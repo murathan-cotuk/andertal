@@ -1113,6 +1113,29 @@ const storePaymentIntentPOST = async (req, res) => {
       return res.status(400).json({ message: 'Cart is empty' })
     }
 
+    // Lines of sellers that are not approved (registered, suspended, rejected) cannot be paid —
+    // the product list hides them, this also covers carts filled before a suspension.
+    {
+      const lineSellers = [...new Set(items.map((it) => cartLineSellerKey(it)).filter((sid) => sid && sid !== 'default'))]
+      if (lineSellers.length) {
+        const { isSellingStatus } = require('../seller-approval-readiness')
+        const st = (await client.query(
+          'SELECT seller_id, approval_status, is_superuser FROM seller_users WHERE seller_id = ANY($1::text[]) AND sub_of_seller_id IS NULL',
+          [lineSellers],
+        )).rows
+        const ok = new Set(st.filter((r) => r.is_superuser === true || isSellingStatus(r.approval_status)).map((r) => String(r.seller_id)))
+        const blocked = items.filter((it) => { const sid = cartLineSellerKey(it); return sid && sid !== 'default' && !ok.has(String(sid)) })
+        if (blocked.length) {
+          await client.end()
+          return res.status(409).json({
+            code: 'seller_unavailable',
+            message: 'Einige Artikel sind derzeit nicht verfügbar. Bitte entfernen Sie sie aus dem Warenkorb.',
+            line_item_ids: blocked.map((it) => it.id).filter(Boolean),
+          })
+        }
+      }
+    }
+
     // Shipping is quoted here per seller (own shipping groups + own free-shipping threshold) —
     // never taken from the client's body.shipping_cents, which a customer could set to 0.
     const shippingCountry = normalizeShippingCountry(body.shipping_country || body.country) || 'DE'

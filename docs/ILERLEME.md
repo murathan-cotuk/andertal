@@ -10,6 +10,17 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — C. Satıcı kaydı ve onay, 1. adım: kabul kapısı (bitti)
+
+Denetim bulguları ve düzeltmeler:
+- **Onaysız satıcı satış yapabiliyordu**: mağaza, `rejected`/`suspended` olmayan HER satıcıyı listeliyordu (yeni kayıt, hiç bilgi girmemiş `registered` dahil); checkout satıcı durumuna hiç bakmıyordu. Artık mağaza yalnız `approved`/`active` (+ platform superuser) satıcıları gösterir (`getApprovedSellerIdsSet`); ödeme başlatma (`/store/payment-intent`) onaysız satıcının kalemi varsa 409 `seller_unavailable` (askıya alma öncesi doldurulmuş sepetler dahil). Canlı etki yok: yayındaki 8 ürünün hepsi onaylı satıcılarda (okuma sorgusu 2026-10-08).
+- **Onayda zorunlu bilgi kontrolü yoktu**: yeni `src/seller-approval-readiness.js` — engelleyiciler: Verkäufervertrag kabulü, firma/yasal ad, tam işletme adresi, USt-IdNr veya Steuernummer (§§22f, 25e UStG), LUCID no (VerpackG); uyarılar: ödeme hesabı, DAC7 doğum tarihi (gerçek kişi), VIES onayı. `PATCH /sellers/:id/approve` ve `/verification/review` eksikte 422 `approval_blocked` (+ liste); `override_reason` (≥10 karakter) ile superuser bilinçli geçebilir (loglanır). Otomatik risk skoru (`/verification/start`) eksik bilgide artık `approved` değil `pending_approval`. Zaten onaylı satıcılar etkilenmez (yalnız geçişte kontrol).
+- **Sözleşme kabulü backend'de isteğe bağlıydı**: kendi hesabını açan satıcı için `agreement_accepted` zorunlu (400 `agreement_required`).
+- **Davet açığı**: davet linki olmadan, yalnız e-posta eşleşmesiyle açık davet kabul ediliyordu (satıcı e-postaları doğrulanmıyor → davet edilen adresi bilen herkes davet eden hesabın alt kullanıcısı olabiliyordu). Artık davet yalnız token ile.
+- SC: onay engellenince eksikler 6 dilde listelenir (`lib/seller-approval-blockers.js`; satıcı detay + Kullanıcılar/KYB penceresi).
+- Test: `seller-approval-readiness.test.js` (4). `npm test` 216/216, SC esbuild OK.
+- **Canlı durum (okuma, 2026-10-08)**: 3 onaylı satıcıdan 2'sinde eksik var — biri: sözleşme kabulü + LUCID; diğeri: ad, adres, vergi no, LUCID. 2 `registered` satıcının bilgileri boş. Onayı geri almak kullanıcı kararı (önerilmedi; satıcılardan tamamlamaları istenebilir).
+
 ## 2026-10-08 — B: paketleme + satıcı görünümü (bitti) — B ALANI KAPANDI
 
 - **Hata (çok satıcılı)**: SC sipariş listesi / paketleme sayfası sipariş başlığındaki `delivery_status`'a bakıyordu. Satıcı A gönderince sipariş "versendet" oluyor, satıcı B kendi paketini "Zu versenden" sekmesinde ve paketleme kuyruğunda artık görmüyordu; B ayrıca A'nın takip no'su ve Sendcloud etiket linkini görüyordu.
