@@ -39,10 +39,13 @@ export function findAncestors(nodes, slug, path = []) {
   return null;
 }
 
-export function visibleSubcats(children) {
-  return (children || []).filter(
-    (c) => c && c.active !== false && c.is_visible !== false && c.has_products !== false,
-  );
+export function visibleSubcats(children, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const label = (c) => String(c?.name || c?.title || c?.slug || "").trim();
+  return (children || [])
+    .filter((c) => c && c.active !== false && c.is_visible !== false && c.has_products !== false)
+    .slice()
+    .sort((a, b) => label(a).localeCompare(label(b), loc, { sensitivity: "base" }));
 }
 
 export function collectCategorySubtreeIds(node) {

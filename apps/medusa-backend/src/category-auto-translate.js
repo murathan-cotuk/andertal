@@ -186,14 +186,29 @@ function queueBackgroundWarmup(texts, sourceLang, targetLang) {
 
 /**
  * Apply localized names to category tree/list in place. Returns same reference.
+ * Always honors metadata.translations[locale].name (incl. when locale === source EN).
  */
 async function applyCategoryLocale(categories, targetLocale, opts = {}) {
   const locale = normalizeLocale(targetLocale)
-  const sourceLang = normalizeLocale(opts.sourceLocale || SOURCE_LOCALE) || 'en'
-  if (!locale || locale === sourceLang) return categories
-  if (!Array.isArray(categories) || categories.length === 0) return categories
+  if (!locale || !Array.isArray(categories) || categories.length === 0) return categories
 
+  const sourceLang = normalizeLocale(opts.sourceLocale || SOURCE_LOCALE) || 'en'
   const nodes = collectCategoryNodes(categories)
+
+  // Persisted translation for this locale wins even when locale === source (EN).
+  let missingManual = 0
+  for (const node of nodes) {
+    const manual = manualCategoryName(node, locale)
+    if (manual) {
+      node.name = manual
+      if (node.title != null) node.title = manual
+    } else {
+      missingManual += 1
+    }
+  }
+  // Same as source language: no machine-translate pass needed after manual fill.
+  if (locale === sourceLang || missingManual === 0) return categories
+
   const sourceTexts = []
   for (const node of nodes) {
     if (manualCategoryName(node, locale)) continue
@@ -227,8 +242,9 @@ async function applyCategoryLocale(categories, targetLocale, opts = {}) {
 
   for (const node of nodes) {
     const manual = manualCategoryName(node, locale)
+    if (manual) continue
     const src = canonicalCategoryName(node, sourceLang)
-    const localized = manual || cacheMap.get(src) || node.name
+    const localized = cacheMap.get(src) || node.name
     if (localized) {
       node.name = localized
       if (node.title != null) node.title = localized

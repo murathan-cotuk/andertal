@@ -8,10 +8,10 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { userError } from "@/lib/api-error-messages";
 import { getCategoriesSettingsCopy } from "@/lib/settings-pages-i18n";
-import { categoryDisplayName } from "@/lib/category-locale";
+import { categoryDisplayName, sortCategoryTreeByLocale } from "@/lib/category-locale";
 
 /** Build nested tree from flat array using parent_id */
-function buildTree(flat) {
+function buildTree(flat, locale) {
   const map = {};
   flat.forEach(c => { map[c.id] = { ...c, children: [] }; });
   const roots = [];
@@ -22,7 +22,7 @@ function buildTree(flat) {
       roots.push(map[c.id]);
     }
   });
-  return roots;
+  return sortCategoryTreeByLocale(roots, locale);
 }
 
 function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy, locale }) {
@@ -522,7 +522,7 @@ export default function AdminCategoriesPage() {
           </div>
         ) : (
           <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
-            {buildTree(categories).map(node => (
+            {buildTree(categories, locale).map(node => (
               <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} copy={copy} locale={locale} />
             ))}
           </div>

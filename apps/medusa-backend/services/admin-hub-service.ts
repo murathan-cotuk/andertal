@@ -83,22 +83,37 @@ export default class AdminHubService {
     return savedCategory
   }
 
-  /** Generate URL-safe slug from hierarchical key (e.g. "Appliances|Dishwashers" -> "appliances-dishwashers"). Max 255 chars. */
-  private slugFromKey_(key: string): string {
-    const slug = key
-      .toLowerCase()
+  /**
+   * Leaf niche slug from category label/name — never concatenate path keys.
+   * Max 100 chars (same policy as category-excel-upsert-helpers).
+   */
+  private slugFromLabel_(label: string): string {
+    let s = String(label || "").toLowerCase()
+    const map: Record<string, string> = {
+      ü: "ue", ö: "oe", ä: "ae", ß: "ss", ç: "c", ğ: "g", ı: "i", ş: "s",
+      é: "e", è: "e", ê: "e", à: "a", ù: "u", ò: "o", ì: "i",
+    }
+    for (const [from, to] of Object.entries(map)) s = s.split(from).join(to)
+    let slug = s
       .trim()
       .replace(/\|/g, "-")
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "") || "category"
-    return slug.slice(0, 255)
+    if (slug.length > 100) {
+      slug = slug.slice(0, 100)
+      const lastDash = slug.lastIndexOf("-")
+      if (lastDash >= 50) slug = slug.slice(0, lastDash)
+      slug = slug.replace(/-$/g, "") || "category"
+    }
+    return slug
   }
 
   /**
    * Bulk import categories from a flat list with parent_key.
    * Each item: { key, label, parentKey, sortOrder }. Creates in order so parent exists before child.
+   * Slug = leaf from label (path key is only for parent resolution).
    */
   async importCategories(
     items: Array<{ key: string; label: string; parentKey: string; sortOrder: number }>
@@ -110,11 +125,11 @@ export default class AdminHubService {
     const ensureUniqueSlug = (baseSlug: string): string => {
       const count = slugCount.get(baseSlug) ?? 0
       slugCount.set(baseSlug, count + 1)
-      return count === 0 ? baseSlug : `${baseSlug}-${count}`
+      return count === 0 ? baseSlug : `${baseSlug}-${count + 1}`
     }
 
     for (const item of items) {
-      const baseSlug = this.slugFromKey_(item.key)
+      const baseSlug = this.slugFromLabel_(item.label || item.key)
       const slug = ensureUniqueSlug(baseSlug)
       const parent_id = item.parentKey === "" ? null : idByKey.get(item.parentKey) ?? null
 

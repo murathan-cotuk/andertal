@@ -21,15 +21,22 @@ function shouldFillName(existing, sourceName, force) {
 }
 
 function applyCategoryLocaleNames(category, nameByLocale, opts = {}) {
-  const sourceName = normalizeName(opts.sourceName || category?.name)
   const meta =
     category?.metadata && typeof category.metadata === 'object' ? { ...category.metadata } : {}
   const tr = { ...(meta.translations && typeof meta.translations === 'object' ? meta.translations : {}) }
+  // English is source of truth for machine translation — never overwrite en with canonical DE `name`.
+  const existingEn = normalizeName(tr.en?.name)
+  const sourceName = normalizeName(opts.sourceName || existingEn || category?.name)
   let changed = false
 
   if (sourceName) {
     const enBlock = { ...(tr.en || {}) }
-    if (enBlock.name !== sourceName) {
+    // Only fill missing EN; do not replace a distinct English label with DE canonical name.
+    if (!normalizeName(enBlock.name)) {
+      enBlock.name = sourceName
+      tr.en = enBlock
+      changed = true
+    } else if (opts.force && enBlock.name !== sourceName && opts.sourceName) {
       enBlock.name = sourceName
       tr.en = enBlock
       changed = true

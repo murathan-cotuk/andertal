@@ -1,6 +1,6 @@
 /**
  * Persist localized category names into metadata.translations for de/tr/fr/es/it.
- * Canonical English stays in admin_hub_categories.name (and translations.en.name).
+ * Source text = translations.en.name (fallback: name). Does NOT copy DE canonical name into EN.
  *
  * Usage (from apps/medusa-backend):
  *   node scripts/persist-category-translations.js --dry-run
@@ -220,9 +220,11 @@ async function main() {
   await client.connect()
   await ensureCacheTable(client)
   const rows = await client.query(`SELECT id, name, metadata FROM admin_hub_categories`)
-  const names = [...new Set((rows.rows || []).map((r) => normalizeName(r.name)).filter(Boolean))]
+  const sourceOf = (r) =>
+    normalizeName(r?.metadata?.translations?.en?.name) || normalizeName(r.name)
+  const names = [...new Set((rows.rows || []).map(sourceOf).filter(Boolean))]
   console.log(
-    `Categories: ${rows.rows.length}, unique names: ${names.length}, deepl: ${useDeepL ? 'yes' : 'gtx fallback'}, dryRun: ${dryRun}, force: ${force}`,
+    `Categories: ${rows.rows.length}, unique EN sources: ${names.length}, deepl: ${useDeepL ? 'yes' : 'gtx fallback'}, dryRun: ${dryRun}, force: ${force}`,
   )
 
   const maps = {}
@@ -242,7 +244,7 @@ async function main() {
   if (!dryRun) await client.query('BEGIN')
   try {
     for (const row of rows.rows) {
-      const sourceName = normalizeName(row.name)
+      const sourceName = sourceOf(row)
       const nameByLocale = {}
       for (const loc of TARGET_LOCALES) nameByLocale[loc] = maps[loc].get(sourceName) || ''
       const next = applyCategoryLocaleNames(row, nameByLocale, { sourceName, force })

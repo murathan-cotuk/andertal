@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import {
   Page,
   Layout,
@@ -26,7 +26,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
-import { categoryDisplayName, categoryFieldsForEditForm, mergeCategoryLocaleIntoMetadata, normalizeCategoryLocale } from "@/lib/category-locale";
+import { categoryDisplayName, categoryFieldsForEditForm, mergeCategoryLocaleIntoMetadata, normalizeCategoryLocale, sortCategoryTreeByLocale } from "@/lib/category-locale";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { lt } from "@/lib/locale-text";
 
@@ -81,7 +81,7 @@ function parseCategoriesCsvToCreateList(csvText) {
   return createList;
 }
 
-function buildTree(flatList) {
+function buildTree(flatList, locale) {
   const byId = new Map(flatList.map((c) => [c.id, { ...c, children: [] }]));
   const roots = [];
   for (const c of flatList) {
@@ -94,16 +94,13 @@ function buildTree(flatList) {
       else roots.push(node);
     }
   }
-  const sort = (arr) => arr.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.name || "").localeCompare(b.name || ""));
-  sort(roots);
-  roots.forEach((r) => sort(r.children));
-  return roots;
+  return sortCategoryTreeByLocale(roots, locale);
 }
 
 function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }) {
   const [open, setOpen] = useState(false);
   const hasKids = node.children && node.children.length > 0;
-  const router = useRouter();
+  const editHref = `/content/categories/${node.id}`;
 
   return (
     <div>
@@ -136,17 +133,16 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }
           label=""
         />
 
-        {/* name */}
+        {/* name — real <a> so middle-click / open-in-new-tab work */}
         <div style={{ flex: "0 0 240px", minWidth: 0 }}>
-          <button
-            type="button"
-            onClick={() => router.push(`/content/categories/${node.id}`)}
-            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+          <Link
+            href={editHref}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", textDecoration: "none", display: "inline" }}
           >
             <Text as="span" variant="bodyMd" fontWeight={depth === 0 ? "semibold" : "regular"} tone="magic">
               {categoryDisplayName(node, locale)}
             </Text>
-          </button>
+          </Link>
           {hasKids && (
             <Text as="span" variant="bodySm" tone="subdued"> ({node.children.length})</Text>
           )}
@@ -170,7 +166,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }
 
         {/* actions */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => router.push(`/content/categories/${node.id}`)} />
+          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} url={editHref} />
           <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => onDelete(node.id)} />
         </div>
       </div>
@@ -349,10 +345,15 @@ export default function ContentCategoriesPage() {
   }, []);
 
   const handleNameChange = (value) => {
+    // Slugs are always English — only auto-fill from the name when UI locale is EN.
+    const loc = normalizeCategoryLocale(locale);
     setForm((prev) => ({
       ...prev,
       name: value,
-      slug: slugManuallyEdited ? prev.slug : slugFromName(value),
+      slug:
+        slugManuallyEdited || loc !== "en"
+          ? prev.slug
+          : slugFromName(value),
     }));
   };
 
@@ -430,9 +431,20 @@ export default function ContentCategoriesPage() {
 
   const handleSubmit = async () => {
     const name = (form.name || "").trim();
-    const slug = (form.slug || slugFromName(name)).trim();
+    const loc0 = normalizeCategoryLocale(locale);
+    // Never derive slug from a non-English UI name (would produce German URLs).
+    const slug = (
+      form.slug ||
+      (loc0 === "en" ? slugFromName(name) : "") ||
+      (editId ? categories.find((c) => c.id === editId)?.slug : "") ||
+      ""
+    ).trim();
     if (!name || !slug) {
-      setError("Name and slug are required.");
+      setError(
+        loc0 === "en"
+          ? "Name and slug are required."
+          : "Name is required. Set an English slug (or switch UI to English to auto-fill).",
+      );
       return;
     }
     const loc = normalizeCategoryLocale(locale);
@@ -593,7 +605,7 @@ export default function ContentCategoriesPage() {
     }
   };
 
-  const tree = buildTree(categories);
+  const tree = buildTree(categories, locale);
   const parentOptions = [
     { label: "— None (top level) —", value: "" },
     ...categories

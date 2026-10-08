@@ -5,6 +5,7 @@ const {
   resolveAdminHub,
   resolveCategoryRequestLocale,
   localizeCategoriesForRequest,
+  sortCategoryTreeByLocalizedName,
   localizeSingleCategoryForRequest,
   mapAdminHubCategoryPgRow,
   buildAdminHubCategoryTreeFromFlat,
@@ -14,10 +15,25 @@ const {
 const {
   normalizeListLocale,
   wantsFullCategoryPayload,
+  wantsExcelExportPayload,
   mapLightCategoryRow,
   lightCategorySelectSql,
+  excelExportCategorySelectSql,
+  mapExcelExportCategoryRow,
   mergeCategoryMetadata,
 } = require('../category-list-light')
+const {
+  EXCEL_LANGS,
+  isUuid,
+  slugFromCategoryName,
+  normalizeExcelSlug,
+  resolveStoredCategorySlug,
+  allocateUniqueLeafSlug,
+  resolveExcelUpsertTarget,
+  nextSlugForExcelUpsert,
+  looksGermanSlug,
+  isPathLikeSlug,
+} = require('../category-excel-upsert-helpers')
 const { updateAdminHubCollectionDb } = require('../collections-db')
 const { invalidateCategoryTreeCache } = require('../category-tree-cache')
 
@@ -37,18 +53,6 @@ const normalizeUrlOrNull = (v) => {
   const s = String(v).trim()
   if (!s || s === 'null' || s === 'undefined' || s === '[object Object]') return null
   return s
-}
-
-const slugFromImportKeyPg = (key) =>
-  (String(key || '').toLowerCase().trim()
-    .replace(/\|/g, '-').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-').replace(/^-|-$/g, '') || 'category').slice(0, 255)
-
-function slugFromCategoryName(name) {
-  let s = String(name || '').toLowerCase()
-  const map = { ü: 'ue', ö: 'oe', ä: 'ae', ß: 'ss', ç: 'c', ğ: 'g', ı: 'i', ş: 's', é: 'e', è: 'e', ê: 'e', à: 'a', ù: 'u', ò: 'o', ì: 'i' }
-  for (const [from, to] of Object.entries(map)) s = s.split(from).join(to)
-  return slugFromImportKeyPg(s)
 }
 
 async function syncCategoryCmsToCollectionFromBody(body) {
@@ -105,6 +109,7 @@ const adminHubCategoriesGET_fallbackPg = async (req, res) => {
           filtered = filtered.filter((c) => c.is_visible === vis)
         }
         const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
+        sortCategoryTreeByLocalizedName(categoryTree, loc)
         return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
       }
       const r = await client.query(
@@ -118,6 +123,22 @@ const adminHubCategoriesGET_fallbackPg = async (req, res) => {
       const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
       await localizeCategoriesForRequest(categoryTree, req, client)
       return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
+    }
+
+    if (wantsExcelExportPayload(req.query)) {
+      let sql = `SELECT ${excelExportCategorySelectSql()} FROM admin_hub_categories WHERE 1=1`
+      const params = []
+      let i = 1
+      if (active !== undefined) { sql += ` AND active = $${i++}`; params.push(active === 'true') }
+      if (parent_id !== undefined) {
+        if (parent_id === 'null' || parent_id === '') { sql += ` AND parent_id IS NULL` }
+        else { sql += ` AND parent_id = $${i++}`; params.push(parent_id) }
+      }
+      if (is_visible !== undefined) { sql += ` AND is_visible = $${i++}`; params.push(is_visible === 'true') }
+      sql += ` ORDER BY sort_order ASC, name ASC`
+      const r = await client.query(sql, params)
+      const categories = (r.rows || []).map(mapExcelExportCategoryRow)
+      return res.json({ categories, count: categories.length, excel: true })
     }
 
     if (!full) {
@@ -371,10 +392,11 @@ const adminHubCategoriesImportPOST_fallbackPg = async (req, res) => {
       const key = String(item.key || '').trim()
       const label = String(item.label || '').trim()
       if (!key || !label) continue
-      let baseSlug = slugFromImportKeyPg(key)
+      // Leaf niche slug from label — never concatenate the path key.
+      let baseSlug = slugFromCategoryName(label) || 'category'
       const sc = (slugCount.get(baseSlug) || 0) + 1
       slugCount.set(baseSlug, sc)
-      const slug = sc === 1 ? baseSlug : `${baseSlug}-${sc - 1}`
+      const slug = sc === 1 ? baseSlug : `${baseSlug}-${sc}`
       const parent_id = item.parentKey === '' || item.parentKey == null ? null : idByKey.get(String(item.parentKey).trim()) || null
       const sort_order = Number(item.sortOrder) || 0
       const ir = await client.query(
@@ -398,31 +420,12 @@ const adminHubCategoriesImportPOST_fallbackPg = async (req, res) => {
   }
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const EXCEL_LANGS = ['de', 'en', 'tr', 'fr', 'it', 'es']
-
-function isUuid(v) {
-  return UUID_RE.test(String(v || '').trim())
-}
-
 function parseExcelBool(v) {
   if (v === true || v === false) return v
   const s = String(v || '').trim().toLowerCase()
   if (['1', 'true', 'yes', 'ja', 'evet', 'oui', 'si', 'sí'].includes(s)) return true
   if (['0', 'false', 'no', 'nein', 'hayir', 'hayır', 'non'].includes(s)) return false
   return null
-}
-
-function uniqueSlug(base, taken, excludeId) {
-  let slug = slugFromCategoryName(base)
-  if (!slug) slug = 'category'
-  let n = 0
-  while (true) {
-    const candidate = n === 0 ? slug : `${slug}-${n}`.slice(0, 255)
-    const owner = taken.get(candidate)
-    if (!owner || (excludeId && String(owner) === String(excludeId))) return candidate
-    n += 1
-  }
 }
 
 function applyExcelLocalePatch(tr, seoI18n, loc, patch) {
@@ -530,17 +533,27 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
     const prepared = items.map((raw, i) => {
       const translations = raw?.translations && typeof raw.translations === 'object' ? raw.translations : {}
       const deName = String(translations.de?.name || '').trim()
-      const anyName = deName || EXCEL_LANGS.map((l) => String(translations[l]?.name || '').trim()).find(Boolean) || ''
+      const enName = String(translations.en?.name || '').trim()
+      const anyName = deName || enName || EXCEL_LANGS.map((l) => String(translations[l]?.name || '').trim()).find(Boolean) || ''
       const requestedSlug = raw.slug != null ? String(raw.slug).trim() : ''
       const id = raw.id != null && isUuid(raw.id) ? String(raw.id).trim() : ''
+      // Lookup may still use long Amazon path slugs; stored slug is always English leaf.
+      const lookupSlug = normalizeExcelSlug(requestedSlug, enName || anyName)
+      const storedSlug = resolveStoredCategorySlug({
+        rawSlug: requestedSlug,
+        nameEn: enName,
+        nameFallback: anyName,
+      })
       return {
         ...raw,
         id: id || undefined,
         translations,
         parent_id: raw.parent_id != null ? String(raw.parent_id).trim() : undefined,
         _nameSeed: anyName,
-        _slug: requestedSlug || (anyName ? slugFromCategoryName(anyName) : ''),
-        _key: id || requestedSlug || anyName || `row-${raw.row || i + 1}`,
+        _nameEn: enName,
+        _slug: lookupSlug || storedSlug,
+        _storedSlug: storedSlug,
+        _key: id || storedSlug || lookupSlug || anyName || `row-${raw.row || i + 1}`,
         _row: raw.row || i + 1,
       }
     })
@@ -548,10 +561,12 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
     const ordered = topoSortExcelItems(prepared)
     const idsNeedingMeta = []
     for (const item of ordered) {
-      const hit =
-        (item.id && byId.get(String(item.id).toLowerCase())) ||
-        (item._slug && bySlug.get(String(item._slug).toLowerCase())) ||
-        null
+      const { existing: hit } = resolveExcelUpsertTarget({
+        id: item.id,
+        slug: item._slug,
+        byId,
+        bySlug,
+      })
       if (hit?.id) idsNeedingMeta.push(hit.id)
     }
     if (idsNeedingMeta.length) {
@@ -577,7 +592,7 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
         const hit = byId.get(pref.toLowerCase()) || createdById.get(pref.toLowerCase())
         return hit ? hit.id : null
       }
-      const slugKey = pref.toLowerCase()
+      const slugKey = normalizeExcelSlug(pref) || String(pref).toLowerCase()
       const hit = bySlug.get(slugKey) || createdBySlug.get(slugKey)
       return hit ? hit.id : null
     }
@@ -585,13 +600,15 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
     for (const item of ordered) {
       try {
         const translationsIn = item.translations || {}
-        const existingRow =
-          (item.id && byId.get(String(item.id).toLowerCase())) ||
-          (item._slug && bySlug.get(String(item._slug).toLowerCase())) ||
-          null
-
-        if (item.id && !existingRow) {
-          // create with provided uuid
+        let { existing: existingRow } = resolveExcelUpsertTarget({
+          id: item.id,
+          slug: item._slug,
+          byId,
+          bySlug,
+        })
+        // Also match rows created earlier in this same batch
+        if (!existingRow && item._slug) {
+          existingRow = createdBySlug.get(String(item._slug).toLowerCase()) || null
         }
 
         const parentPref = item.parent_id
@@ -653,10 +670,40 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
           ? normalizeUrlOrNull(item.banner_image_url)
           : (existingRow ? existingRow.banner_image_url : null)
 
+        // Slug conflict → UPDATE owner. Never invent -1 / -2 suffixes.
+        if (!existingRow && item._slug) {
+          const ownerId = takenSlugs.get(String(item._slug).toLowerCase())
+          if (ownerId) {
+            existingRow = byId.get(String(ownerId).toLowerCase())
+              || createdById.get(String(ownerId).toLowerCase())
+              || null
+          }
+        }
+
+        // Slugs stay English regardless of UI/export locale (name_en drives storage).
+        const desiredSlug = resolveStoredCategorySlug({
+          rawSlug: item.slug != null ? String(item.slug) : item._slug,
+          nameEn: String(tr.en?.name || item._nameEn || '').trim(),
+          nameFallback: String(canon.name || item._nameSeed || '').trim(),
+        })
         if (existingRow) {
-          const nextSlug = item._slug && String(item._slug).toLowerCase() !== String(existingRow.slug || '').toLowerCase()
-            ? uniqueSlug(item._slug, takenSlugs, existingRow.id)
-            : existingRow.slug
+          let nextSlug = nextSlugForExcelUpsert({
+            desiredSlug,
+            existingRow,
+            takenSlugs,
+          })
+          // Migrate leftover German/path slugs to English even if the exact leaf is taken.
+          const curSlug = String(existingRow.slug || '')
+          if (
+            nextSlug === existingRow.slug &&
+            desiredSlug &&
+            desiredSlug !== String(curSlug).toLowerCase() &&
+            (looksGermanSlug(curSlug) || isPathLikeSlug(curSlug))
+          ) {
+            const takenSet = new Set(takenSlugs.keys())
+            takenSet.delete(String(curSlug).toLowerCase())
+            nextSlug = allocateUniqueLeafSlug(desiredSlug, takenSet, [])
+          }
           const nextParent = parentId !== undefined ? parentId : existingRow.parent_id
           if (nextParent && String(nextParent) === String(existingRow.id)) {
             results.failed++
@@ -687,12 +734,24 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
           takenSlugs.delete(String(existingRow.slug || '').toLowerCase())
           takenSlugs.set(String(row.slug).toLowerCase(), row.id)
           byId.set(String(row.id).toLowerCase(), row)
+          if (existingRow.slug) bySlug.delete(String(existingRow.slug).toLowerCase())
           bySlug.set(String(row.slug).toLowerCase(), row)
           createdById.set(String(row.id).toLowerCase(), row)
           createdBySlug.set(String(row.slug).toLowerCase(), row)
           results.updated++
         } else {
-          const slug = uniqueSlug(item._slug || canon.name, takenSlugs, null)
+          let slug = desiredSlug || 'category'
+          // If English leaf collides, allocate unique English variant (never German -1 path).
+          if (takenSlugs.has(String(slug).toLowerCase())) {
+            const takenSet = new Set(takenSlugs.keys())
+            slug = allocateUniqueLeafSlug(slug, takenSet, [])
+          }
+          const ownerId = takenSlugs.get(String(slug).toLowerCase())
+          if (ownerId) {
+            results.failed++
+            results.errors.push({ row: item._row, error: `Slug already exists (refusing -N suffix): ${slug}` })
+            continue
+          }
           const insertId = item.id && isUuid(item.id) ? String(item.id).trim() : null
           const ir = insertId
             ? await client.query(

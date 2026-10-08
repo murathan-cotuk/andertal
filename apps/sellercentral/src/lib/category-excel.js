@@ -103,12 +103,12 @@ export function buildCategoryExcelColumns(locale) {
       group: "core",
       width: 28,
       note: x(
-        "URL slug. Empty → generated from German name.",
-        "URL slug. Boşsa Almanca isimden üretilir.",
-        "Slug URL. Vide → généré depuis le nom allemand.",
-        "Slug URL. Vacío → se genera del nombre alemán.",
-        "Slug URL. Vuoto → generato dal nome tedesco.",
-        "URL-Slug. Leer → aus dem deutschen Namen erzeugt.",
+        "URL slug (always English). Empty → generated from name_en.",
+        "URL slug (her zaman İngilizce). Boşsa name_en’den üretilir.",
+        "Slug URL (toujours en anglais). Vide → généré depuis name_en.",
+        "Slug URL (siempre en inglés). Vacío → se genera de name_en.",
+        "Slug URL (sempre in inglese). Vuoto → generato da name_en.",
+        "URL-Slug (immer Englisch). Leer → aus name_en erzeugt.",
       ),
     },
     {
@@ -480,8 +480,8 @@ export function categoryToExcelRow(cat) {
     const loc = tr[lang] && typeof tr[lang] === "object" ? tr[lang] : {};
     const seo = seoI18n[lang] && typeof seoI18n[lang] === "object" ? seoI18n[lang] : {};
     const isDe = lang === "de";
-    const isEn = lang === "en";
-    row[`name_${lang}`] = loc.name || (isEn ? cat.name : "") || "";
+    // Canonical `cat.name` is German only — never fall back EN/others to DE.
+    row[`name_${lang}`] = loc.name || (isDe ? cat.name || "" : "") || "";
     row[`description_${lang}`] =
       loc.long_content || loc.description || (isDe ? cat.long_content || meta.richtext : "") || "";
     row[`seo_title_${lang}`] =

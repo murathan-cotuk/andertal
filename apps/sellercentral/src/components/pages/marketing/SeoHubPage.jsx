@@ -125,10 +125,10 @@ function buildCategoryTree(flat) {
     else roots.push(node);
   }
   const sortDeep = (arr) => {
-    arr.sort(
-      (a, b) =>
-        (a.sort_order || 0) - (b.sort_order || 0) ||
-        String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity: "base" }),
+    arr.sort((a, b) =>
+      String(a.label || a.name || "").localeCompare(String(b.label || b.name || ""), undefined, {
+        sensitivity: "base",
+      }),
     );
     arr.forEach((n) => n.children?.length && sortDeep(n.children));
   };

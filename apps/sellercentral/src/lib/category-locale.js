@@ -47,6 +47,22 @@ export function categoryDisplayName(category, locale) {
   return name || category?.slug || String(category?.id || "");
 }
 
+/** Deep A–Z by localized display name for the active UI locale (ignores sort_order). */
+export function sortCategoryTreeByLocale(nodes, locale) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return nodes || [];
+  const loc = normalizeCategoryLocale(locale);
+  const cmp = (a, b) =>
+    categoryDisplayName(a, loc).localeCompare(categoryDisplayName(b, loc), loc, { sensitivity: "base" });
+  const walk = (arr) => {
+    arr.sort(cmp);
+    for (const n of arr) {
+      if (Array.isArray(n.children) && n.children.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return nodes;
+}
+
 /** Name shown in the edit form for the active UI locale. */
 export function categoryNameForEditForm(category, locale) {
   const loc = normalizeCategoryLocale(locale);

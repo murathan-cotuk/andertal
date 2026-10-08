@@ -611,7 +611,7 @@ export default function SearchTemplate() {
     }
     const chain = pathInfo.ancestors || [];
     const directParent = chain.length > 0 ? chain[chain.length - 1] : null;
-    const subs = visibleSubcats(pathInfo.children).filter((s) => s && normCatId(s.id));
+    const subs = visibleSubcats(pathInfo.children, locale).filter((s) => s && normCatId(s.id));
     if (subs.length > 0) {
       return {
         parentCategory: directParent,
@@ -623,13 +623,13 @@ export default function SearchTemplate() {
     if (directParent) {
       return {
         parentCategory: directParent,
-        subcategories: visibleSubcats(parentSiblings).filter((s) => s && normCatId(s.id)),
+        subcategories: visibleSubcats(parentSiblings, locale).filter((s) => s && normCatId(s.id)),
         hasSubcategories: false,
         branchNav: false,
       };
     }
     return { parentCategory: null, subcategories: [], hasSubcategories: false, branchNav: true };
-  }, [pathInfo, currentNode, currentSlug, parentSiblings]);
+  }, [pathInfo, currentNode, currentSlug, parentSiblings, locale]);
 
   /* Leaf category: load siblings from parent for the branch nav. */
   useEffect(() => {

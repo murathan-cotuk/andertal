@@ -727,8 +727,13 @@ function findAncestors(nodes, slug, path = [], seen = new WeakSet()) {
   return null;
 }
 
-function visibleSubcats(children) {
-  return (children || []).filter((c) => c && c.active !== false && c.is_visible !== false && c.has_products !== false);
+function visibleSubcats(children, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const label = (c) => String(c?.name || c?.title || c?.slug || "").trim();
+  return (children || [])
+    .filter((c) => c && c.active !== false && c.is_visible !== false && c.has_products !== false)
+    .slice()
+    .sort((a, b) => label(a).localeCompare(label(b), loc, { sensitivity: "base" }));
 }
 
 export default function CategoryTemplate() {
@@ -841,7 +846,7 @@ export default function CategoryTemplate() {
         const directParent = ancestorChain.length > 0 ? ancestorChain[ancestorChain.length - 1] : null;
         setParentCategory(directParent);
 
-        const subs = visibleSubcats(catResBySlug?.children).filter((s) => s && normCatId(s.id));
+        const subs = visibleSubcats(catResBySlug?.children, locale).filter((s) => s && normCatId(s.id));
         setSubcategories(subs);
 
         setProducts(productRes?.products ?? []);
@@ -1202,7 +1207,7 @@ export default function CategoryTemplate() {
                         >
                           Alle
                         </SubcategoryLink>
-                        {visibleSubcats(parentCategory.children || []).map((sibling) => {
+                        {visibleSubcats(parentCategory.children || [], locale).map((sibling) => {
                           const sibSlug = String(sibling.slug || "").replace(/^\//, "");
                           const isCurrent = sibSlug === slug;
                           return (
@@ -1239,7 +1244,7 @@ export default function CategoryTemplate() {
                           ‹ {parentCategory.name || parentCategory.slug}
                         </Link>
                       ) : null}
-                      {(hasSubcategories ? subcategories : visibleSubcats(parentCategory?.children || [])).map((sub) => {
+                      {(hasSubcategories ? subcategories : visibleSubcats(parentCategory?.children || [], locale)).map((sub) => {
                         const subSlug = String(sub.slug || "").replace(/^\//, "");
                         const isCurrent = subSlug === slug;
                         return (

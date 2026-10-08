@@ -3,22 +3,32 @@
 import React, { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import { lt } from "@/lib/locale-text";
-import { categoryDisplayName } from "@/lib/category-locale";
+import { categoryDisplayName, sortCategoryTreeByLocale } from "@/lib/category-locale";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 
 /* Build tree from flat list using parent_id */
-function buildTree(flat) {
+function buildTree(flat, locale) {
   const map = {};
-  flat.forEach(c => (map[c.id] = { ...c, _children: [] }));
+  flat.forEach(c => (map[c.id] = { ...c, children: [], _children: [] }));
   const roots = [];
   flat.forEach(c => {
     if (c.parent_id && map[c.parent_id]) {
       map[c.parent_id]._children.push(map[c.id]);
+      map[c.parent_id].children.push(map[c.id]);
     } else {
       roots.push(map[c.id]);
     }
   });
+  sortCategoryTreeByLocale(roots, locale);
+  // Keep legacy _children in sync with sorted children
+  const sync = (nodes) => {
+    for (const n of nodes) {
+      n._children = n.children || [];
+      if (n._children.length) sync(n._children);
+    }
+  };
+  sync(roots);
   return roots;
 }
 
@@ -93,14 +103,14 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     getMedusaAdminClient()
-      .getAdminHubCategories({ all: true })
+      .getAdminHubCategories({ all: true, locale })
       .then(d => {
         const list = d.categories || [];
         setFlat(list);
-        setRoots(buildTree(list));
+        setRoots(buildTree(list, locale));
       })
       .catch(e => setError(String(e)));
-  }, []);
+  }, [locale]);
 
   const toggle = (open) => { setAllOpen(open); setKey(k => k + 1); };
 

@@ -16,11 +16,31 @@ function resolveCategoryRequestLocale(req) {
   return categoryAutoTranslate.normalizeCategoryLocale(req.query.locale || req.headers['x-shop-locale'] || '')
 }
 
+/**
+ * Deep A–Z by the name already applied for the request locale (after applyCategoryLocale).
+ * Ignores sort_order so DE "Haushaltsgeräte" is not forced first via EN "Appliances".
+ */
+function sortCategoryTreeByLocalizedName(categories, locale) {
+  if (!Array.isArray(categories) || categories.length === 0) return categories
+  const loc = String(locale || 'de').slice(0, 2).toLowerCase()
+  const label = (c) =>
+    String(c?.localized_name || c?.name || c?.title || c?.slug || '').trim()
+  const sortDeep = (arr) => {
+    arr.sort((a, b) => label(a).localeCompare(label(b), loc, { sensitivity: 'base' }))
+    for (const n of arr) {
+      if (Array.isArray(n.children) && n.children.length) sortDeep(n.children)
+    }
+  }
+  sortDeep(categories)
+  return categories
+}
+
 async function localizeCategoriesForRequest(categories, req, pgClient) {
   const locale = resolveCategoryRequestLocale(req)
   if (!locale || !Array.isArray(categories) || categories.length === 0) return categories
   try {
     await categoryAutoTranslate.applyCategoryLocale(categories, locale, { pgClient })
+    sortCategoryTreeByLocalizedName(categories, locale)
   } catch (e) {
     console.warn('localizeCategoriesForRequest:', e?.message || e)
   }
@@ -64,9 +84,14 @@ const buildAdminHubCategoryTreeFromFlat = (flat) => {
       roots.push(node)
     }
   })
+  // Provisional order by canonical name; request locale re-sorts after localization.
   const sortCategories = (cats) =>
     cats
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .sort((a, b) =>
+        String(a.name || a.slug || '').localeCompare(String(b.name || b.slug || ''), 'de', {
+          sensitivity: 'base',
+        }),
+      )
       .map((cat) => ({
         ...cat,
         children: cat.children && cat.children.length ? sortCategories(cat.children) : [],
@@ -99,6 +124,7 @@ module.exports = {
   lightCategorySelectSql,
   localizeCategoriesForRequest,
   localizeSingleCategoryForRequest,
+  sortCategoryTreeByLocalizedName,
   mapAdminHubCategoryPgRow,
   buildAdminHubCategoryTreeFromFlat,
   getCategoriesPgClient,

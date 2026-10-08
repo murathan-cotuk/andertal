@@ -23,13 +23,11 @@ const fs = require("fs");
 const DATABASE_URL =
   process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/medusa";
 
+const { slugFromCategoryName } = require("../src/category-excel-upsert-helpers");
+
 function slugify(text) {
-  return String(text)
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "category";
+  // Leaf niche from segment/label — never the full path key.
+  return slugFromCategoryName(text) || "category";
 }
 
 function parseCsvToItems(csvPath) {
@@ -105,12 +103,13 @@ async function main() {
   function uniqueSlug(baseSlug) {
     const n = slugCount.get(baseSlug) ?? 0;
     slugCount.set(baseSlug, n + 1);
-    return n === 0 ? baseSlug : `${baseSlug}-${n}`;
+    // First keeps base; collisions use -2, -3, ... (never path suffix)
+    return n === 0 ? baseSlug : `${baseSlug}-${n + 1}`;
   }
 
   let inserted = 0;
   for (const item of items) {
-    const baseSlug = slugify(item.key || item.label);
+    const baseSlug = slugify(item.label || item.key);
     const slug = uniqueSlug(baseSlug);
     const parentId = item.parentKey ? idByKey.get(item.parentKey) : null;
 

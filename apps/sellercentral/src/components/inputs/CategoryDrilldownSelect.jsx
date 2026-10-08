@@ -63,11 +63,8 @@ function buildTree(list, locale) {
     if (pid && byId.has(pid) && pid !== node.id) byId.get(pid).children.push(node);
     else roots.push(node);
   }
-  const cmp = (a, b) => {
-    const sa = Number(a.sort_order), sb = Number(b.sort_order);
-    if (Number.isFinite(sa) && Number.isFinite(sb) && sa !== sb) return sa - sb;
-    return a._label.localeCompare(b._label, undefined, { sensitivity: "base" });
-  };
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const cmp = (a, b) => a._label.localeCompare(b._label, loc, { sensitivity: "base" });
   const sortDeep = (arr) => {
     arr.sort(cmp);
     for (const n of arr) if (n.children.length) sortDeep(n.children);

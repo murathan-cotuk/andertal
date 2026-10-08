@@ -4,8 +4,11 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const {
   wantsFullCategoryPayload,
+  wantsExcelExportPayload,
   mapLightCategoryRow,
+  mapExcelExportCategoryRow,
   lightCategorySelectSql,
+  excelExportCategorySelectSql,
   normalizeListLocale,
   mergeCategoryMetadata,
 } = require('./category-list-light')
@@ -63,5 +66,27 @@ describe('admin category list light payload', () => {
   it('binds locale as $1 in the slim select', () => {
     assert.match(lightCategorySelectSql(), /ARRAY\['translations', \$1, 'name'\]/)
     assert.equal(normalizeListLocale('FR-be'), 'fr')
+  })
+
+  it('excel export payload is opt-in and keeps all language names separate', () => {
+    assert.equal(wantsExcelExportPayload({}), false)
+    assert.equal(wantsExcelExportPayload({ excel: '1' }), true)
+    assert.match(excelExportCategorySelectSql(), /name_en/)
+    assert.match(excelExportCategorySelectSql(), /name_de/)
+    const mapped = mapExcelExportCategoryRow({
+      id: 'c1',
+      name: 'Klebefolien',
+      slug: 'adhesive-sheets',
+      parent_id: null,
+      active: true,
+      is_visible: true,
+      has_collection: false,
+      sort_order: 0,
+      name_de: 'Klebefolien',
+      name_en: 'Adhesive Sheets',
+    })
+    assert.equal(mapped.metadata.translations.de.name, 'Klebefolien')
+    assert.equal(mapped.metadata.translations.en.name, 'Adhesive Sheets')
+    assert.equal(mapped.name, 'Klebefolien')
   })
 })

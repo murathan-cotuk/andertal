@@ -34,6 +34,7 @@ import { useLocale } from "next-intl";
 import { getContentMenusCopy, linkTypesForLocale, apiFunctionOptionsForLocale } from "@/lib/content-menus-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { showToast } from "@/lib/toast";
+import { sortCategoryTreeByLocale } from "@/lib/category-locale";
 
 /** Read a translatable field: DE lives on the plain column, other languages under the *_i18n jsonb column. */
 function giI18n(obj, field, i18nKey, lang) {
@@ -87,34 +88,25 @@ function flattenMenuTree(nodes, level = 0) {
 }
 
 /** Normalizes API categories (flat parent_id list or tree with children) to root nodes with nested children. */
-function normalizeCategoryTree(list) {
+function normalizeCategoryTree(list, locale) {
   if (!Array.isArray(list) || !list.length) return [];
-  if (list.some((c) => Array.isArray(c.children) && c.children.length)) return list;
-  const byId = new Map(list.map((c) => [c.id, { ...c, children: [] }]));
-  const roots = [];
-  for (const c of list) {
-    const node = byId.get(c.id);
-    if (!c.parent_id) roots.push(node);
-    else {
-      const parent = byId.get(c.parent_id);
-      if (parent) parent.children.push(node);
-      else roots.push(node);
+  let roots;
+  if (list.some((c) => Array.isArray(c.children) && c.children.length)) {
+    roots = list;
+  } else {
+    const byId = new Map(list.map((c) => [c.id, { ...c, children: [] }]));
+    roots = [];
+    for (const c of list) {
+      const node = byId.get(c.id);
+      if (!c.parent_id) roots.push(node);
+      else {
+        const parent = byId.get(c.parent_id);
+        if (parent) parent.children.push(node);
+        else roots.push(node);
+      }
     }
   }
-  const sort = (arr) =>
-    arr.sort(
-      (a, b) =>
-        (a.sort_order || 0) - (b.sort_order || 0) ||
-        String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""))
-    );
-  const sortDeep = (arr) => {
-    sort(arr);
-    arr.forEach((r) => {
-      if (r.children?.length) sortDeep(r.children);
-    });
-  };
-  sortDeep(roots);
-  return roots;
+  return sortCategoryTreeByLocale(roots, locale);
 }
 
 function collectCategoriesDepthFirst(roots) {
@@ -129,9 +121,9 @@ function collectCategoriesDepthFirst(roots) {
   return acc;
 }
 
-function findCategoryById(list, id) {
+function findCategoryById(list, id, locale) {
   if (!id || !Array.isArray(list)) return null;
-  const roots = normalizeCategoryTree(list);
+  const roots = normalizeCategoryTree(list, locale);
   const all = collectCategoriesDepthFirst(roots);
   return all.find((c) => String(c.id) === String(id)) || null;
 }
@@ -1288,7 +1280,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     if (!menuId) return;
     let link_value = itemForm.link_value;
     if (itemForm.link_type === "category" && itemForm.category_id) {
-      const cat = findCategoryById(categories, itemForm.category_id);
+      const cat = findCategoryById(categories, itemForm.category_id, locale);
       const slug = (cat?.slug || "").trim();
       link_value = JSON.stringify({
         id: cat?.id,

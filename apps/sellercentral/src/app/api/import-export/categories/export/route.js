@@ -11,9 +11,10 @@ function getBackendBase() {
 
 async function loadCategories(backendUrl, sellerToken) {
   const headers = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
+  // excel=1 returns all language names via JSON-path columns (no full metadata dump / OOM).
   const urls = [
-    `${backendUrl}/admin-hub/v1/categories`,
-    `${backendUrl}/admin-hub/categories`,
+    `${backendUrl}/admin-hub/v1/categories?excel=1`,
+    `${backendUrl}/admin-hub/categories?excel=1`,
   ];
   for (const u of urls) {
     try {
