@@ -83,7 +83,7 @@ function buildFeedEntry(row, categoryMap, baseUrl) {
   const title = firstDefined(deTranslation.title, row.title)
   const ean = firstDefined(meta.ean)
   const handle = firstDefined(deTranslation.handle, row.handle)
-  const image = Array.isArray(meta.media) && meta.media.length ? meta.media[0] : null
+  const image = require('../feed-fields').firstImageUrl(meta)
   const categoryId = firstDefined(meta.category_id, meta.admin_category_id)
   const idealoCategory = categoryId ? categoryMap.get(String(categoryId)) : null
   const priceCents = firstDefined(meta.prices?.DE?.brutto_cents, row.price_cents)

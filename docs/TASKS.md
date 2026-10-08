@@ -91,7 +91,7 @@ Her alan tek tek ve uçtan uca ele alınır: önce denetim raporu, sonra kod, ve
 - [x] **B. Sipariş yaşam döngüsü:** sipariş, hazırlama, kargo etiketi ve takip, teslim onayı (ödeme saati), iptal, iade ve Widerruf. (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: izinli production düzeltmeleri; olay geçmişi paket bazlı değil; kısmi iptalde bonus orantısı; iptal e-postası → F.)
 - [x] **C. Satıcı kaydı ve onboarding:** kayıt, onay, sözleşme, hukuki ve vergi bilgileri, ödeme hesabı. (2026-10-08 kapandı; ayrıntı ILERLEME.md. Açık: eksik bilgili 2 onaylı satıcı — kullanıcı kararı; satıcı e-posta doğrulaması; IBAN değişikliği bildirimi → F.)
 - [x] **D. Kategori ağacı ve import:** Excel import, kategori atama, filtreler, uyumluluk profilleri. (2026-10-08 kapandı; ayrıntı ILERLEME.md.)
-- [ ] **E. Shop vitrini:** ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi. A'dan devreden: Grundpreis ürün kartlarında da gösterilmeli; Google Merchant feed'e `unit_pricing_measure` eklenmeli.
+- [ ] **E. Shop vitrini:** ana sayfa, kategori sayfaları, ürün sayfası, arama, sepet ve checkout deneyimi. A'dan devreden: ~~Grundpreis ürün kartlarında~~ ✅ 2026-10-08; ~~Merchant feed `unit_pricing_measure`~~ ✅ 2026-10-08.
 - [ ] **F. Bildirimler ve e-postalar:** müşteriye ve satıcıya ne, ne zaman gider; zil paneli; flow otomasyonu.
 - [ ] **G. Faturalar ve vergi:** müşteri faturası, Provisionsrechnung, OSS, DAC7 raporu.
 

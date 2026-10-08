@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — E. Shop vitrini, 1. adım: Grundpreis listelerde + Merchant feed (bitti)
+
+- **Grundpreis ürün kartlarında** (PAngV §4: fiyatın gösterildiği her yerde): yeni `components/product/CardGrundpreis.jsx` (PDP ile aynı `computeGrundpreis`; varyantın kendi içeriği önce; indirimli fiyat gösteriliyorsa ona göre). Fiyatın altında küçük gri satır: ürün kartı (grid + liste), kategori satırı, landing ürün döşemesi (beyaz yazı), arama sonuç döşemesi. Satıcı içerik miktarı girmediyse hiçbir şey çizilmez → diğer kartların görünümü aynı. Canlıda 7 yayındaki üründe içerik miktarı var; bunlarda satır görünür.
+- **Merchant feed** (`google-merchant-feed.js`): `g:unit_pricing_measure` / `g:unit_pricing_base_measure` (g/kg → 1kg, ml/l → 1l, Stück → ct) — `src/feed-fields.js` `unitPricing`.
+- **Feed görsel hatası (önleyici)**: iki feed de `metadata.media[0]`'ı doğrudan yazıyordu; toplu import görseli `{ url, type }` nesnesi olarak kaydettiği için bu ürünler feed'e `[object Object]` ile giderdi (Google/idealo reddeder). `firstImageUrl` iki biçimi + thumbnail'i okur (Google + idealo). Canlıdaki 7 ürün şu an metin biçiminde (okuma kontrolü).
+- Test: `feed-fields.test.js` (3). `npm test` geçti (0 fail), shop esbuild OK.
+
 ## 2026-10-08 — D, 2. adım: ürün-kategori ataması + import/filtre denetimi (bitti) — D ALANI KAPANDI
 
 - **Geçersiz kategoriyle yayın**: yayın hazırlık kapısı yalnız "kategori id'si dolu mu" bakıyordu; silinmiş veya pasif kategoriye bağlı ürün yayına çıkabiliyordu (hiçbir kategori sayfasında görünmez, uyumluluk profili gelmez). `productCategoryValid` (`product-readiness.js`) yayına alırken kategorinin var ve aktif olduğunu kontrol eder; değilse diğer eksikler gibi taslakta kalır ("category"). Zaten yayındaki ürünler etkilenmez. Test +1.

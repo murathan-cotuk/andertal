@@ -11,6 +11,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
 import { isDiscountedProduct, getProductBasePriceCents, isWithinNewWindow, loadNewProductWindowDays, loadCatalogBadgeRules } from "@/lib/catalog-listing";
 import { formatPriceCents, getLocalizedCategory } from "@/lib/format";
+import CardGrundpreis from "@/components/product/CardGrundpreis";
 import { shallowCategoriesQuery, storeCategoriesQuery } from "@/lib/store-categories-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
@@ -1761,6 +1762,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
             {product.title}
           </div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{formatPriceCents(priceCents)} €</div>
+          <CardGrundpreis productMeta={product?.metadata} variantMeta={product?.variants?.[0]?.metadata} cents={priceCents} style={{ color: "rgba(255,255,255,0.85)" }} />
         </div>
       </div>
     );

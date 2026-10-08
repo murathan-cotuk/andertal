@@ -13,6 +13,7 @@ import styled from "styled-components";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getLocalizedProduct, getLocalizedCategory, formatPriceCents } from "@/lib/format";
+import CardGrundpreis from "@/components/product/CardGrundpreis";
 import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { usePopularSearches, loadPopularSearches } from "@/lib/store-search";
@@ -675,6 +676,7 @@ function ResultProducts({ items, query, onNavigate }) {
                 {compare ? <s>{formatPriceCents(compare)} €</s> : null}
               </span>
             ) : null}
+            {price > 0 ? <CardGrundpreis productMeta={p?.metadata} variantMeta={p?.variants?.[0]?.metadata} cents={price} /> : null}
           </ResultTile>
         );
       })}

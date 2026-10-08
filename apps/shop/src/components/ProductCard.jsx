@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format";
+import CardGrundpreis from "@/components/product/CardGrundpreis";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { colorSwatchFallback } from "@/lib/color-swatch";
@@ -929,6 +930,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         </CurrentPrice>
         {hasSale && <OriginalPrice>{formatPriceCents(priceCents)} €</OriginalPrice>}
       </PriceBlock>
+      <CardGrundpreis productMeta={product?.metadata} variantMeta={variant?.metadata} cents={hasSale ? saleCents : priceCents} />
 
       {cartNotice.text ? <CardNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CardNotice> : null}
 
@@ -1188,6 +1190,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: _is
           {hasSale && <ListPriceOld>{formatPriceCents(priceCents)} €</ListPriceOld>}
           <ListPriceMain $sale={hasSale}>{formatPriceCents(hasSale ? saleCents : priceCents)} €</ListPriceMain>
         </ListPriceRow>
+        <CardGrundpreis productMeta={product?.metadata} variantMeta={variant?.metadata} cents={hasSale ? saleCents : priceCents} />
         {hasShippingGroup && shippingPriceCents != null && (
           <ListShippingLine>
             {shippingPriceCents === 0 ? tp("freeShipping") : `${tp("shipping")}: ${formatPriceCents(shippingPriceCents)} €`}

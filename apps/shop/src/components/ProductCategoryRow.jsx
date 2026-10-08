@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
+import CardGrundpreis from "@/components/product/CardGrundpreis";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { resolveProductListingImage } from "@/lib/product-locale-media";
@@ -403,6 +404,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
           {hasSale && <Old>{formatPriceCents(priceCents)} €</Old>}
           <Cur $sale={hasSale}>{formatPriceCents(hasSale ? saleCents : priceCents)} €</Cur>
         </Prices>
+        <CardGrundpreis productMeta={product?.metadata} variantMeta={variant?.metadata} cents={hasSale ? saleCents : priceCents} />
 
         {shipText ? <ShipLine>{shipText}</ShipLine> : null}
 

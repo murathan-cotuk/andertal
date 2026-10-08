@@ -1,4 +1,5 @@
 'use strict'
+const { firstImageUrl, unitPricing } = require('../feed-fields')
 const { Router } = require('express')
 
 // Google Merchant Center product feed (RSS 2.0 + Google Shopping <g:*> namespace per
@@ -97,7 +98,7 @@ function buildFeedEntry(row, baseUrl) {
 
   const title = firstDefined(deTranslation.title, row.title)
   const handle = firstDefined(deTranslation.handle, row.handle)
-  const image = Array.isArray(meta.media) && meta.media.length ? meta.media[0] : null
+  const image = firstImageUrl(meta)
   const priceCents = firstDefined(meta.prices?.DE?.brutto_cents, row.price_cents)
 
   // Required by Google (id, title, link, image_link, price, availability) — skip rather than
@@ -118,6 +119,7 @@ function buildFeedEntry(row, baseUrl) {
     url: productUrl(baseUrl, handle),
     image,
     availability: Number(row.inventory) > 0 ? 'in_stock' : 'out_of_stock',
+    unitPricing: unitPricing(meta),
   }
 }
 
@@ -131,6 +133,9 @@ function renderFeedXml(entries) {
       <g:availability>${xmlEscape(e.availability)}</g:availability>
       <g:price>${(e.priceCents / 100).toFixed(2)} EUR</g:price>
       <g:condition>new</g:condition>
+      ${e.unitPricing ? `<g:unit_pricing_measure>${xmlEscape(e.unitPricing.measure)}</g:unit_pricing_measure>
+      <g:unit_pricing_base_measure>${xmlEscape(e.unitPricing.base)}</g:unit_pricing_base_measure>
+      ` : ''}
       ${e.brand ? `<g:brand>${cdata(e.brand)}</g:brand>\n      ` : ''}${e.gtin ? `<g:gtin>${xmlEscape(e.gtin)}</g:gtin>\n      ` : ''}${!e.brand && !e.gtin ? '<g:identifier_exists>false</g:identifier_exists>\n      ' : ''}<g:item_group_id>${xmlEscape(e.id)}</g:item_group_id>
     </item>`).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
