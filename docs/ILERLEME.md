@@ -10,6 +10,13 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-08 — F, 2. adım: zil paneli + iade erişimi satıcıya göre (bitti) — GÜVENLİK DÜZELTMESİ
+
+- **Sızıntı**: iade kayıtları satıcı başına tutuluyor (`store_returns.seller_id`, çok satıcılı siparişte satıcı başına bir iade), ama zil paneli (akış, okunmamış sayısı, tümünü okundu say), SC iade listesi ve iade PATCH "satıcının siparişte kalemi var mı" ile süzüyordu → satıcı A, B'nin iadesini görüyor ve durumunu (genehmigt/abgelehnt/eingegangen) değiştirebiliyordu (para iadesi settlement satır kontrolüyle zaten engelliydi).
+- Artık: iade yalnız kendi satıcısına (superuser hepsi); satıcısı olmayan eski iadeler eskisi gibi sipariş sahipliğiyle. Bildirimlerde 5 sorgu, `returns.js` liste + PATCH.
+- **Sahiplik yoktu**: `POST /admin-hub/v1/returns` (elle iade) hiçbir kontrol yapmıyordu — her satıcı herhangi bir sipariş id'sine iade açabiliyordu. Artık satıcı yalnız kendi kalemi olan siparişe, iade onun adına (`seller_id`).
+- Değişen SQL'ler production'da yalnız `EXPLAIN` ile doğrulandı (okuma). `npm test` 228/0.
+
 ## 2026-10-08 — F. Bildirimler, 1. adım: eksik tetikleyiciler + IBAN güvenlik bildirimi (bitti)
 
 - **Denetim (okuma)**: canlıda 27 aktif flow var (sipariş onayı, işleme, kargo, teslim, iade talebi, mesajlar, destek, satıcı yaşam döngüsü, pazarlama). Kodda hiç tetiklenmeyen müşteri olayları: sipariş iptali, para iadesi, iade onayı/reddi.

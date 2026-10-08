@@ -117,7 +117,7 @@ const adminHubReturnsGET = async (req, res) => {
       const n = params.length
       where = `WHERE (
         NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $${n}
-        OR ${sqlOrderOwnedBySeller('o', `$${n}`)}
+        OR (NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL AND ${sqlOrderOwnedBySeller('o', `$${n}`)})
       )`
     }
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
@@ -152,7 +152,17 @@ const adminHubReturnsPOST = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const r = await client.query('INSERT INTO store_returns (order_id, reason, notes, items) VALUES ($1::uuid, $2, $3, $4) RETURNING *', [order_id, reason || null, notes || null, items ? JSON.stringify(items) : null])
+    // A seller may only open a return on an order that contains its lines, and the return is
+    // its own (seller_id) — previously any seller could create one on any order id.
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+    let returnSellerId = isSuperuser ? (String(req.body?.seller_id || '').trim() || null) : jwtSellerId
+    if (!isSuperuser) {
+      if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+      const own = await client.query(`SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND ${sqlOrderOwnedBySeller('o', '$2')}`, [order_id, jwtSellerId])
+      if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+    }
+    const r = await client.query('INSERT INTO store_returns (order_id, reason, notes, items, seller_id) VALUES ($1::uuid, $2, $3, $4, $5) RETURNING *', [order_id, reason || null, notes || null, items ? JSON.stringify(items) : null, returnSellerId])
     const row = r.rows && r.rows[0]
     await client.end()
     res.status(201).json({ return: { ...row, return_number: row?.return_number ? Number(row.return_number) : null } })
@@ -261,7 +271,7 @@ const adminHubReturnPATCH = async (req, res) => {
          LEFT JOIN store_orders o ON o.id = r.order_id
          WHERE r.id = $1::uuid AND (
            NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $2
-           OR ${sqlOrderOwnedBySeller('o', '$2')}
+           OR (NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL AND ${sqlOrderOwnedBySeller('o', '$2')})
          )`,
         [id, jwtSellerId],
       )

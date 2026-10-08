@@ -31,7 +31,7 @@ module.exports = function createNotificationsRouter() {
         `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
          SELECT $1::varchar, 'return', r.id, now()
          FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
-         WHERE ${orderScopeSql('$2', '$3')}
+         WHERE ${orderScopeSql('$2', '$3')} AND ($2::boolean OR NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL OR r.seller_id = $3)
          ON CONFLICT (recipient_key, source_type, source_id)
          DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
         [recipientKey, sup, sid],
@@ -190,7 +190,7 @@ module.exports = function createNotificationsRouter() {
           INNER JOIN store_orders o ON o.id = r.order_id
           LEFT JOIN seller_hub_notification_state s
             ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-          WHERE ${orderScopeSql('$2', '$3')}
+          WHERE ${orderScopeSql('$2', '$3')} AND ($2::boolean OR NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL OR r.seller_id = $3)
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
         const verificationsUnreadQ = sup
@@ -339,7 +339,7 @@ module.exports = function createNotificationsRouter() {
            INNER JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-           WHERE ${orderScopeSql('$2', '$3')}
+           WHERE ${orderScopeSql('$2', '$3')} AND ($2::boolean OR NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL OR r.seller_id = $3)
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY r.created_at DESC LIMIT 8`,
           [rk, sup, sid],
@@ -649,7 +649,7 @@ module.exports = function createNotificationsRouter() {
            INNER JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-           WHERE ${orderScopeSql('$2', '$3')}
+           WHERE ${orderScopeSql('$2', '$3')} AND ($2::boolean OR NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL OR r.seller_id = $3)
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY r.created_at DESC LIMIT 500`,
           [rk, sup, sid],
@@ -1219,7 +1219,7 @@ module.exports = function createNotificationsRouter() {
             `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
              SELECT $1::varchar, 'return', r.id, now()
              FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
-             WHERE ${orderScopeSql('$2', '$3')}
+             WHERE ${orderScopeSql('$2', '$3')} AND ($2::boolean OR NULLIF(TRIM(COALESCE(r.seller_id, '')), '') IS NULL OR r.seller_id = $3)
              ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
             [rk, sup, sid],
           )
