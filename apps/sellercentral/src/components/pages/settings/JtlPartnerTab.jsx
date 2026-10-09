@@ -46,6 +46,8 @@ export default function JtlPartnerTab() {
   const [attrExternal, setAttrExternal] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [cc, setCc] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,6 +61,11 @@ export default function JtlPartnerTab() {
     }
   }, [client, period]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!data) return;
+    setRecipient(data.recipient || "");
+    setCc(data.cc || "");
+  }, [data]);
   useEffect(() => {
     client.getSellers().then((r) => setSellers(r?.sellers || [])).catch(() => setSellers([]));
   }, [client]);
@@ -218,8 +225,29 @@ export default function JtlPartnerTab() {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{t("Send quarterly report", "Çeyrek raporunu gönder", "Envoyer le rapport trimestriel", "Enviar informe trimestral", "Invia report trimestrale", "Quartals-Reporting senden")}</Text>
+          <InlineStack gap="300" blockAlign="end" wrap>
+            <div style={{ minWidth: 260, flex: 1 }}>
+              <TextField label={t("Recipient (JTL)", "Alıcı (JTL)", "Destinataire (JTL)", "Destinatario (JTL)", "Destinatario (JTL)", "Empfänger (JTL)")} type="email" value={recipient} onChange={setRecipient} autoComplete="off" />
+            </div>
+            <div style={{ minWidth: 260, flex: 1 }}>
+              <TextField label={t("CC (comma-separated)", "CC (virgülle ayrılmış)", "CC (séparés par des virgules)", "CC (separados por comas)", "CC (separati da virgole)", "CC (kommagetrennt)")} value={cc} onChange={setCc} autoComplete="off" />
+            </div>
+            <Button
+              loading={busy === "settings"}
+              onClick={() => run("settings", () => client.request("/admin-hub/v1/billing/jtl/settings", { method: "PUT", body: JSON.stringify({ recipient, cc }) }),
+                t("Saved.", "Kaydedildi.", "Enregistré.", "Guardado.", "Salvato.", "Gespeichert."))}
+            >
+              {t("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
+            </Button>
+          </InlineStack>
           <Text as="p" variant="bodySm" tone="subdued">
-            {t("Recipient", "Alıcı", "Destinataire", "Destinatario", "Destinatario", "Empfänger")}: {data?.recipient || "—"} · {t("Auto send (4th–5th)", "Otomatik gönderim (4–5'i)", "Envoi auto (4–5)", "Envío auto (4–5)", "Invio auto (4–5)", "Automatischer Versand (4.–5.)")}: {data?.auto_send ? t("on", "açık", "activé", "activado", "attivo", "an") : t("off (JTL_REPORT_AUTO_SEND)", "kapalı (JTL_REPORT_AUTO_SEND)", "désactivé (JTL_REPORT_AUTO_SEND)", "desactivado (JTL_REPORT_AUTO_SEND)", "disattivo (JTL_REPORT_AUTO_SEND)", "aus (JTL_REPORT_AUTO_SEND)")}
+            {t("Automatic send (4th–10th after each quarter, deadline 5th)", "Otomatik gönderim (her çeyrek sonrası 4–10'u, son gün 5'i)", "Envoi automatique (du 4 au 10 après chaque trimestre, échéance le 5)", "Envío automático (del 4 al 10 tras cada trimestre, plazo el 5)", "Invio automatico (dal 4 al 10 dopo ogni trimestre, scadenza il 5)", "Automatischer Versand (4.–10. nach Quartalsende, Frist 5.)")}:{" "}
+            {data?.auto_send
+              ? <Badge tone="success">{t("on", "açık", "activé", "activado", "attivo", "an")}</Badge>
+              : <Badge>{t("off", "kapalı", "désactivé", "desactivado", "disattivo", "aus")}</Badge>}{" "}
+            {data?.auto_send_env === "false"
+              ? t("(forced off on this server: JTL_REPORT_AUTO_SEND=false)", "(bu sunucuda kapatılmış: JTL_REPORT_AUTO_SEND=false)", "(désactivé sur ce serveur : JTL_REPORT_AUTO_SEND=false)", "(desactivado en este servidor: JTL_REPORT_AUTO_SEND=false)", "(disattivato su questo server: JTL_REPORT_AUTO_SEND=false)", "(auf diesem Server abgeschaltet: JTL_REPORT_AUTO_SEND=false)")
+              : t("— switch on/off and edit the e-mail text in Content → Flows → “JTL-Partner-Reporting”.", "— aç/kapat ve e-posta metni: İçerik → Flows → “JTL-Partner-Reporting”.", "— activer/désactiver et modifier le texte : Contenu → Flows → « JTL-Partner-Reporting ».", "— activar/desactivar y editar el texto: Contenido → Flows → «JTL-Partner-Reporting».", "— attiva/disattiva e modifica il testo: Contenuti → Flows → «JTL-Partner-Reporting».", "— an/aus und E-Mail-Text: Inhalte → Flows → „JTL-Partner-Reporting“.")}
           </Text>
           <Checkbox
             label={t(

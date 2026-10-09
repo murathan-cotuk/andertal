@@ -10,6 +10,15 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-09 — JTL çeyrek raporu Flows'ta + düzeltmeler
+
+- SC → İçerik → Flows'ta yeni grup "Partner": **JTL-Partner-Reporting — an JTL** (`jtl_partner_quarterly_report`, 6 dil etiket + yer tutucu yardımı). Flow **aktif = otomatik gönderim**; e-posta metni orada düzenlenir (yer tutucular {PERIOD}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {SELLER_COUNT}, {DECLARATION} …). § 3.3 ii beyanı şablondan silinse bile e-postaya eklenir; CSV eki her zaman.
+- Alıcı + CC artık Ayarlar → Faturalandırma → JTL'de kaydedilir (`jtl_partner_settings`; varsayılan `technologiepartner@jtl-software.de`). Env yalnız zorlama: `JTL_REPORT_AUTO_SEND=false` kapatır, `=true` açar.
+- Zamanlama: çeyrek sonrası ayın 4'ünden itibaren (son gün 5'i); kaçarsa/başarısızsa 10'una kadar yeniden dener; advisory lock ile tek gönderici. Flow pencere içinde oluşturulduysa (ilk deploy, bugün 9 Ekim) o çeyrek otomatik gitmez → ilk otomatik gönderim 4 Ocak 2027 (Q4 2026). Q3 2026 raporu gerekiyorsa Billing → JTL'den elle.
+- Düzeltme: Flows'ta "Admin" kitleli bir flow düzenlenip kaydedilince sessizce "Müşteri"ye dönüyordu.
+- Not: 4 sipariş olayı (iptal ×2, iade, iade onay/ret) e-posta metinleri 2026-10-08'de yazıldı ve boot'ta seed ediliyor — kullanıcı işi değil (önceki özet yanlışlıkla "kullanıcıda" diyordu).
+- Test: `jtl-partner.test.js` (yeni: flow/ayar/şablon/pencere senaryosu) + flow testleri 13/13.
+
 ## 2026-10-09 — JTL Faz E: SCX connector (JTL-Wawi ↔ Andertal)
 
 - Backend `src/connectors/`: SCX istemcisi, eşleyici, servis (olaylar / sipariş aktarımı / stok imleci / signup-update / kanal kurulumu), runtime (60 sn poller, advisory lock, yalnız `JTL_SCX_CHANNEL_REFRESH_TOKEN` varsa), şema tabloları. Route `src/routes/erp-connectors.js`; `server.js`'te şema + router + poller. `createAdminHubProductDb` ve `resolveMediaSegForSellerId` dışa açıldı.

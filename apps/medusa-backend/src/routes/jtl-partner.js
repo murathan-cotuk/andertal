@@ -34,7 +34,17 @@ module.exports = function createJtlPartnerRouter() {
   // Summary + per-seller rows + attributed sellers for one quarter (default: last quarter).
   router.get('/admin-hub/v1/billing/jtl', superOnly(async (req, res, client) => {
     const report = await jtl.jtlQuarterReport(client, periodOrDefault(req))
-    res.json({ ...report, recipient: jtl.reportRecipient(), auto_send: String(process.env.JTL_REPORT_AUTO_SEND || '').toLowerCase() === 'true' })
+    const settings = await jtl.getReportSettings(client)
+    const flow = await jtl.loadReportFlow(client)
+    const env = String(process.env.JTL_REPORT_AUTO_SEND || '').toLowerCase()
+    res.json({
+      ...report,
+      recipient: settings.recipient,
+      cc: settings.cc,
+      flow: flow ? { id: flow.id, status: flow.status } : null,
+      auto_send: env === 'false' ? false : env === 'true' ? true : flow?.status === 'active',
+      auto_send_env: env || null,
+    })
   }))
 
   router.get('/admin-hub/v1/billing/jtl/export.csv', superOnly(async (req, res, client) => {
@@ -59,6 +69,11 @@ module.exports = function createJtlPartnerRouter() {
     res.json({ ended: await jtl.endJtlAttribution(client, { sellerId: req.body?.seller_id, actor: actorOf(req) }) })
   }))
 
+  // Report recipient / CC (default: contract address technologiepartner@jtl-software.de).
+  router.put('/admin-hub/v1/billing/jtl/settings', superOnly(async (req, res, client) => {
+    res.json(await jtl.saveReportSettings(client, { recipient: req.body?.recipient, cc: req.body?.cc, actor: actorOf(req) }))
+  }))
+
   // Send the quarterly report: confirm_accuracy required; dry_run sends only to the caller.
   router.post('/admin-hub/v1/billing/jtl/send-report', superOnly(async (req, res, client) => {
     const dryRun = req.body?.dry_run === true
@@ -68,7 +83,7 @@ module.exports = function createJtlPartnerRouter() {
       actor: actorOf(req),
       dryRun,
       recipient: dryRun ? (req.body?.recipient || req.sellerUser?.email || null) : null,
-      cc: dryRun ? null : (process.env.JTL_REPORT_CC || req.sellerUser?.email || null),
+      cc: dryRun ? null : ((await jtl.getReportSettings(client)).cc || req.sellerUser?.email || null),
       sendEmail,
     })
     res.json({ send: out.send, totals: out.report.totals })

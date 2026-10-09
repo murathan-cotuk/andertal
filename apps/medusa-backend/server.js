@@ -1227,6 +1227,13 @@ async function start() {
           console.warn('[seed-order-outcome-flows]', e?.message || e)
         }
         try {
+          // JTL partner quarterly report (Flows template; active = automatic send on the 4th–10th).
+          await require('./src/jtl-partner').ensureJtlPartnerSchema(client)
+          await require('./src/jtl-partner').seedJtlReportFlow(client)
+        } catch (e) {
+          console.warn('[seed-jtl-report-flow]', e?.message || e)
+        }
+        try {
           const { dedupeAndNormalizeFlows } = require('./src/flow-catalog')
           await dedupeAndNormalizeFlows(client)
         } catch (e) {

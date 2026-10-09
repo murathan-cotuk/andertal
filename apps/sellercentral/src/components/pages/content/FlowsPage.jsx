@@ -141,6 +141,8 @@ const T = {
     triggerGroupSellerAccount: "Seller account",
     triggerGroupCustomers: "Customers",
     triggerGroupMarketing: "Marketing",
+    triggerGroupPartner: "Partners",
+    triggerHelpJtlReport: "Sent automatically on the 4th–5th of the month after each quarter (deadline: 5th) while this flow is active; recipient and CC under Settings → Billing → JTL. The CSV breakdown is attached. Placeholders: {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Customers & marketing",
     triggerGroupOther: "Other",
     triggerHelpOrderPlaced: "Fires once when checkout completes. Use this only for order confirmation — never for support tickets.",
@@ -178,6 +180,7 @@ const T = {
       customer_support_case_updated: "Support case updated (customer)",
       seller_support_case_updated: "Support case updated (seller)",
       admin_support_case_updated: "Support case updated (support team)",
+      jtl_partner_quarterly_report: "JTL partner report (quarterly, to JTL)",
     },
     audienceLabel: "Recipients",
     audienceCustomer: "Customers",
@@ -305,6 +308,8 @@ const T = {
     triggerGroupSellerAccount: "Seller-Konto",
     triggerGroupCustomers: "Kunden",
     triggerGroupMarketing: "Marketing",
+    triggerGroupPartner: "Partner",
+    triggerHelpJtlReport: "Wird automatisch am 4.–5. des Monats nach Quartalsende versendet (Frist: 5.), solange dieser Flow aktiv ist; Empfänger und CC unter Einstellungen → Abrechnung → JTL. Die CSV-Aufschlüsselung wird angehängt. Platzhalter: {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Kunden & Marketing",
     triggerGroupOther: "Weitere",
     triggerHelpOrderPlaced: "Einmalig nach Abschluss der Bestellung. Nur für die Bestellbestätigung — nicht für Support-Tickets.",
@@ -342,6 +347,7 @@ const T = {
       customer_support_case_updated: "Supportfall aktualisiert (Kunde)",
       seller_support_case_updated: "Supportfall aktualisiert (Seller)",
       admin_support_case_updated: "Supportfall aktualisiert (Support-Team)",
+      jtl_partner_quarterly_report: "JTL-Partner-Reporting (quartalsweise an JTL)",
     },
     audienceLabel: "Empfänger",
     audienceCustomer: "Kundinnen & Kunden",
@@ -469,6 +475,8 @@ const T = {
     triggerGroupSellerAccount: "Satıcı hesabı",
     triggerGroupCustomers: "Müşteriler",
     triggerGroupMarketing: "Pazarlama",
+    triggerGroupPartner: "Ortaklar",
+    triggerHelpJtlReport: "Bu flow aktifken her çeyrek sonrası ayın 4–5'inde otomatik gönderilir (son gün: 5'i); alıcı ve CC Ayarlar → Faturalandırma → JTL'de. CSV dökümü eklenir. Yer tutucular: {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Müşteriler ve pazarlama",
     triggerGroupOther: "Diğer",
     triggerHelpOrderPlaced: "Ödeme tamamlanınca bir kez çalışır. Yalnızca sipariş onayı için — destek talebi için değil.",
@@ -506,6 +514,7 @@ const T = {
       customer_support_case_updated: "Destek talebi güncellendi (müşteri)",
       seller_support_case_updated: "Destek talebi güncellendi (satıcı)",
       admin_support_case_updated: "Destek talebi güncellendi (destek ekibi)",
+      jtl_partner_quarterly_report: "JTL ortaklık raporu (çeyreklik, JTL'e)",
     },
     audienceLabel: "Alıcılar",
     audienceCustomer: "Müşteriler",
@@ -633,6 +642,8 @@ const T = {
     triggerGroupSellerAccount: "Compte vendeur",
     triggerGroupCustomers: "Clients",
     triggerGroupMarketing: "Marketing",
+    triggerGroupPartner: "Partenaires",
+    triggerHelpJtlReport: "Envoyé automatiquement le 4–5 du mois suivant chaque trimestre (échéance : le 5) tant que ce flow est actif ; destinataire et CC dans Paramètres → Facturation → JTL. Le détail CSV est joint. Variables : {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Clients et marketing",
     triggerGroupOther: "Autres",
     triggerHelpOrderPlaced: "Une fois le paiement terminé. Uniquement pour la confirmation de commande — pas pour les tickets support.",
@@ -670,6 +681,7 @@ const T = {
       customer_support_case_updated: "Dossier support mis à jour (client)",
       seller_support_case_updated: "Dossier support mis à jour (vendeur)",
       admin_support_case_updated: "Dossier support mis à jour (équipe support)",
+      jtl_partner_quarterly_report: "Reporting partenaire JTL (trimestriel, à JTL)",
     },
     audienceLabel: "Destinataires",
     audienceCustomer: "Clients",
@@ -797,6 +809,8 @@ const T = {
     triggerGroupSellerAccount: "Account seller",
     triggerGroupCustomers: "Clienti",
     triggerGroupMarketing: "Marketing",
+    triggerGroupPartner: "Partner",
+    triggerHelpJtlReport: "Inviato automaticamente il 4–5 del mese successivo a ogni trimestre (scadenza: il 5) finché questo flow è attivo; destinatario e CC in Impostazioni → Fatturazione → JTL. Il dettaglio CSV è allegato. Segnaposto: {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Clienti e marketing",
     triggerGroupOther: "Altri",
     triggerHelpOrderPlaced: "Una volta completato il checkout. Solo per la conferma d'ordine — non per i ticket di supporto.",
@@ -834,6 +848,7 @@ const T = {
       customer_support_case_updated: "Caso di supporto aggiornato (cliente)",
       seller_support_case_updated: "Caso di supporto aggiornato (seller)",
       admin_support_case_updated: "Caso di supporto aggiornato (team supporto)",
+      jtl_partner_quarterly_report: "Report partner JTL (trimestrale, a JTL)",
     },
     audienceLabel: "Destinatari",
     audienceCustomer: "Clienti",
@@ -960,6 +975,8 @@ const T = {
     triggerGroupSellerAccount: "Cuenta de vendedor",
     triggerGroupCustomers: "Clientes",
     triggerGroupMarketing: "Marketing",
+    triggerGroupPartner: "Socios",
+    triggerHelpJtlReport: "Se envía automáticamente el 4–5 del mes siguiente a cada trimestre (plazo: el 5) mientras este flow esté activo; destinatario y CC en Ajustes → Facturación → JTL. Se adjunta el desglose CSV. Marcadores: {PERIOD}, {DEADLINE}, {MONTH_TABLE}, {GROSS_GMV}, {PROVISION}, {VAT_ESTIMATE}, {SELLER_COUNT}, {ORDER_COUNT}, {DECLARATION}, {CONFIRMED_BY}, {CONFIRMED_AT}.",
     triggerGroupCustomer: "Clientes y marketing",
     triggerGroupOther: "Otros",
     triggerHelpOrderPlaced: "Una vez al completar el pago. Solo para la confirmación del pedido — no para tickets de soporte.",
@@ -997,6 +1014,7 @@ const T = {
       customer_support_case_updated: "Caso de soporte actualizado (cliente)",
       seller_support_case_updated: "Caso de soporte actualizado (vendedor)",
       admin_support_case_updated: "Caso de soporte actualizado (equipo de soporte)",
+      jtl_partner_quarterly_report: "Informe de socio JTL (trimestral, a JTL)",
     },
     audienceLabel: "Destinatarios",
     audienceCustomer: "Clientes",
@@ -1195,6 +1213,7 @@ const TRIGGER_GROUPS = [
   { id: "sellerAccount", keys: ["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required"] },
   { id: "customers", keys: ["customer_signup", "new_subscriber"] },
   { id: "marketing", keys: ["abandoned_cart", "review_request", "win_back", "customer_birthday", "favorite_low_stock", "favorite_price_drop"] },
+  { id: "partner", keys: ["jtl_partner_quarterly_report"] },
 ];
 
 const AUDIENCE_GROUP_IDS = ["customer", "seller", "admin"];
@@ -1221,6 +1240,7 @@ function triggerHelpFor(t, key) {
   if (key === "order_placed") return t.triggerHelpOrderPlaced;
   if (key === "seller_support_ticket_sent") return t.triggerHelpSupportSent;
   if (key === "seller_support_ticket_replied") return t.triggerHelpSupportReplied;
+  if (key === "jtl_partner_quarterly_report") return t.triggerHelpJtlReport;
   return t.howTrigger;
 }
 
@@ -1243,6 +1263,7 @@ export default function FlowsPage() {
     sellerAccount: t.triggerGroupSellerAccount,
     customers: t.triggerGroupCustomers,
     marketing: t.triggerGroupMarketing,
+    partner: t.triggerGroupPartner,
     customer: t.triggerGroupCustomer,
     other: t.triggerGroupOther,
   }), [t]);
@@ -1585,7 +1606,7 @@ export default function FlowsPage() {
       const d = await client.getFlow(flow.id);
       const f = d?.flow;
       setEditName(f?.name || "");
-      setEditAudience(String(f?.audience || "customer") === "seller" ? "seller" : "customer");
+      setEditAudience(["seller", "admin"].includes(String(f?.audience || "")) ? String(f.audience) : "customer");
       setEditTrigger(f?.trigger || "abandoned_cart");
       setEditStatus(f?.status || "draft");
       setEditSteps(

@@ -99,16 +99,61 @@ test('a seller active within the last 12 months is recorded but not eligible (no
   }
 })
 
-test('auto send is opt-in and only due on the 4th–5th after a quarter', async () => {
+test('auto send: JTL_REPORT_AUTO_SEND=false forces it off; only due from the 4th to the 10th after a quarter', async () => {
   const prev = process.env.JTL_REPORT_AUTO_SEND
   try {
-    delete process.env.JTL_REPORT_AUTO_SEND
+    process.env.JTL_REPORT_AUTO_SEND = 'false'
     assert.deepEqual(await jtl.autoSendDueJtlReport(null, { now: new Date('2026-04-04T08:00:00Z'), sendEmail: () => {} }), { skipped: 'disabled' })
     process.env.JTL_REPORT_AUTO_SEND = 'true'
     assert.deepEqual(await jtl.autoSendDueJtlReport(null, { now: new Date('2026-05-04T08:00:00Z'), sendEmail: () => {} }), { skipped: 'not_due' })
-    assert.deepEqual(await jtl.autoSendDueJtlReport(null, { now: new Date('2026-04-06T08:00:00Z'), sendEmail: () => {} }), { skipped: 'not_due' })
+    assert.deepEqual(await jtl.autoSendDueJtlReport(null, { now: new Date('2026-04-11T08:00:00Z'), sendEmail: () => {} }), { skipped: 'not_due' })
+    assert.deepEqual(await jtl.autoSendDueJtlReport(null, { now: new Date('2026-04-03T08:00:00Z'), sendEmail: () => {} }), { skipped: 'not_due' })
   } finally {
     if (prev === undefined) delete process.env.JTL_REPORT_AUTO_SEND; else process.env.JTL_REPORT_AUTO_SEND = prev
+  }
+})
+
+test('report flow: active Flows entry turns auto send on; template, recipient and CC from settings; declaration always included', { skip }, async () => {
+  const c = await h.freshDatabase()
+  const prev = process.env.JTL_REPORT_AUTO_SEND
+  try {
+    delete process.env.JTL_REPORT_AUTO_SEND
+    await jtl.ensureJtlPartnerSchema(c)
+    await c.query(`CREATE TABLE admin_hub_flows (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text, trigger_key text, status text, audience text, created_at timestamptz DEFAULT now())`)
+    await c.query(`CREATE TABLE admin_hub_flow_steps (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), flow_id uuid, step_order int, step_type text, email_subject text, email_body text, email_i18n jsonb, email_attachments jsonb)`)
+    const now = new Date('2026-04-04T08:00:00Z')
+    const mails = []
+    const sendEmail = async (m) => { mails.push(m); return { id: `msg_${mails.length}` } }
+
+    assert.deepEqual(await jtl.autoSendDueJtlReport(c, { now, sendEmail }), { skipped: 'disabled' }) // no flow yet
+    assert.equal((await jtl.seedJtlReportFlow(c)).created, true)
+    assert.equal((await jtl.seedJtlReportFlow(c)).created, false)
+    // created inside the window → no surprise send this quarter
+    assert.deepEqual(await jtl.autoSendDueJtlReport(c, { now: new Date(), sendEmail }).then((r) => r.skipped === 'flow_created_in_window' || r.skipped === 'not_due'), true)
+    await c.query(`UPDATE admin_hub_flows SET created_at = '2026-01-01T00:00:00Z'`)
+    await assert.rejects(jtl.saveReportSettings(c, { recipient: 'not-an-email', cc: '' }), /Invalid recipient/)
+    await jtl.saveReportSettings(c, { recipient: 'reporting@jtl.example', cc: 'su@andertal.example', actor: 'su' })
+    // superuser edits the template in Flows and drops the declaration placeholder
+    await c.query(`UPDATE admin_hub_flow_steps SET email_i18n = $1::jsonb`, [JSON.stringify({ de: { subject: 'Reporting {PERIOD} — Andertal', body: '<p>Zeitraum {PERIOD}: {GROSS_GMV} / {PROVISION}</p>{MONTH_TABLE}' } })])
+
+    const r = await jtl.autoSendDueJtlReport(c, { now, sendEmail })
+    assert.equal(r.sent, true)
+    assert.equal(r.period, '2026-Q1')
+    assert.equal(mails[0].to, 'reporting@jtl.example')
+    assert.equal(mails[0].cc, 'su@andertal.example')
+    assert.equal(mails[0].subject, 'Reporting 2026-Q1 — Andertal')
+    assert.match(mails[0].html, /Zeitraum 2026-Q1: 0,00/)
+    assert.match(mails[0].html, /vollständig und richtig/)
+    assert.match(mails[0].text, /vollständig und richtig/)
+    assert.equal(mails[0].attachments.length, 1)
+    assert.deepEqual(await jtl.autoSendDueJtlReport(c, { now: new Date('2026-04-05T08:00:00Z'), sendEmail }), { skipped: 'already_sent', period: '2026-Q1' })
+
+    await c.query(`UPDATE admin_hub_flows SET status = 'paused'`)
+    assert.deepEqual(await jtl.autoSendDueJtlReport(c, { now: new Date('2026-07-04T08:00:00Z'), sendEmail }), { skipped: 'disabled' })
+    assert.equal(mails.length, 1)
+  } finally {
+    if (prev === undefined) delete process.env.JTL_REPORT_AUTO_SEND; else process.env.JTL_REPORT_AUTO_SEND = prev
+    await c.end()
   }
 })
 

@@ -74,6 +74,13 @@ const SCHEMA = [
      sent_at timestamptz,
      created_at timestamptz NOT NULL DEFAULT now()
    )`,
+  // Report recipient / CC set in Billing → JTL (env JTL_REPORTING_EMAIL / JTL_REPORT_CC are the defaults).
+  `CREATE TABLE IF NOT EXISTS jtl_partner_settings (
+     key text PRIMARY KEY,
+     value text,
+     updated_by text,
+     updated_at timestamptz NOT NULL DEFAULT now()
+   )`,
 ]
 
 async function ensureJtlPartnerSchema(client) {
@@ -292,6 +299,125 @@ const DECLARATION = 'Wir versichern, dass die Angaben in diesem Reporting vollst
 const eur = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const escHtml = (v) => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]))
 
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
+const REPORT_TRIGGER = 'jtl_partner_quarterly_report'
+
+/** Recipient + CC: Billing → JTL settings, else env, else the contract address (§3.3). */
+async function getReportSettings(client) {
+  const rows = (await client.query(`SELECT key, value FROM jtl_partner_settings WHERE key IN ('report_recipient', 'report_cc')`).catch(() => ({ rows: [] }))).rows
+  const v = Object.fromEntries(rows.map((r) => [r.key, String(r.value || '').trim()]))
+  return {
+    recipient: v.report_recipient || reportRecipient(),
+    cc: v.report_cc !== undefined ? (v.report_cc || null) : (String(process.env.JTL_REPORT_CC || '').trim() || null),
+  }
+}
+
+async function saveReportSettings(client, { recipient, cc, actor }) {
+  const to = String(recipient || '').trim()
+  const ccs = String(cc || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean)
+  if (!EMAIL_RE.test(to)) throw Object.assign(new Error('Invalid recipient e-mail'), { status: 400 })
+  if (ccs.some((x) => !EMAIL_RE.test(x))) throw Object.assign(new Error('Invalid CC e-mail'), { status: 400 })
+  for (const [key, value] of [['report_recipient', to], ['report_cc', ccs.join(', ')]]) {
+    await client.query(
+      `INSERT INTO jtl_partner_settings (key, value, updated_by, updated_at) VALUES ($1, $2, $3, now())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [key, value, actor || null],
+    )
+  }
+  return getReportSettings(client)
+}
+
+/** The Flows entry for the report (SC → Content → Flows): status = auto send on/off, step = template. */
+async function loadReportFlow(client) {
+  const f = (await client.query(
+    `SELECT id, status, created_at FROM admin_hub_flows WHERE trigger_key = $1 ORDER BY (status = 'active') DESC, created_at LIMIT 1`, [REPORT_TRIGGER],
+  ).catch(() => ({ rows: [] }))).rows[0]
+  if (!f) return null
+  const step = (await client.query(
+    `SELECT email_subject, email_body, email_i18n FROM admin_hub_flow_steps WHERE flow_id = $1 AND step_type = 'send_email' ORDER BY step_order LIMIT 1`, [f.id],
+  ).catch(() => ({ rows: [] }))).rows[0] || null
+  return { id: f.id, status: f.status, created_at: f.created_at, step }
+}
+
+function monthTableHtml(report) {
+  const td = 'style="text-align:right;padding:6px;border:1px solid #ddd"'
+  const monthRows = report.by_month
+    .map((m) => `<tr><td style="padding:6px;border:1px solid #ddd">${m.month}</td><td ${td}>${eur(m.gross_gmv_cents)}</td><td ${td}>${eur(m.provision_1pct_cents)}</td><td ${td}>${m.order_count}</td></tr>`)
+    .join('')
+  return [
+    '<table style="border-collapse:collapse"><thead><tr><th>Monat</th><th>Bruttoumsatz (provisionsrelevant)</th><th>Provision 1 % (netto)</th><th>Bestellungen</th></tr></thead>',
+    `<tbody>${monthRows}</tbody>`,
+    `<tfoot><tr><th>Summe</th><th ${td}>${eur(report.totals.gross_gmv_cents)}</th><th ${td}>${eur(report.totals.provision_1pct_cents)}</th><th></th></tr></tfoot></table>`,
+  ].join('\n')
+}
+
+/**
+ * Report e-mail from the Flows template. Placeholders are filled from the report; the accuracy
+ * declaration (§ 3.3 ii) is appended when the template does not contain {DECLARATION}.
+ */
+function renderReportFromTemplate(report, step, { confirmedBy, confirmedAt }) {
+  const tpl = (step?.email_i18n && step.email_i18n.de) || {}
+  const subjectTpl = String(tpl.subject || step?.email_subject || '').trim()
+  const bodyTpl = String(tpl.body || step?.email_body || '').trim()
+  if (!subjectTpl || !bodyTpl) return null
+  const at = new Date(confirmedAt).toISOString()
+  const vars = {
+    PERIOD: report.period,
+    DEADLINE: report.deadline || '',
+    GROSS_GMV: eur(report.totals.gross_gmv_cents),
+    PROVISION: eur(report.totals.provision_1pct_cents),
+    VAT_ESTIMATE: eur(report.totals.vat_estimate_cents),
+    SELLER_COUNT: String(report.totals.seller_count),
+    ORDER_COUNT: String(report.by_month.reduce((x, m) => x + m.order_count, 0)),
+    DECLARATION,
+    CONFIRMED_BY: confirmedBy,
+    CONFIRMED_AT: at,
+  }
+  const monthText = () => report.by_month.map((m) => `${m.month}: Brutto ${eur(m.gross_gmv_cents)} · Provision 1 % ${eur(m.provision_1pct_cents)} · Bestellungen ${m.order_count}`).join('\n')
+  const fill = (str, html) => str.replace(/\{([A-Z_]+)\}/g, (all, k) => {
+    if (k === 'MONTH_TABLE') return html ? monthTableHtml(report) : monthText()
+    if (!(k in vars)) return all
+    return html ? escHtml(vars[k]) : vars[k]
+  })
+  const hasDecl = bodyTpl.includes('{DECLARATION}')
+  let html = fill(bodyTpl, true)
+  if (!hasDecl) html += `\n<p>${escHtml(DECLARATION)}<br/>Bestätigt von: ${escHtml(confirmedBy)} am ${escHtml(at)}</p>`
+  let text = fill(bodyTpl, false)
+    .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|tr|table|div|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim()
+  if (!hasDecl) text += `\n${DECLARATION}\nBestätigt von: ${confirmedBy} am ${at}`
+  return { subject: fill(subjectTpl, false), html, text }
+}
+
+/** Default template (seeded into Flows; editable there). */
+const REPORT_FLOW_TEMPLATE = {
+  subject: 'Andertal JTL Partner Reporting {PERIOD}',
+  body: [
+    '<p>Sehr geehrte Damen und Herren,</p>',
+    '<p>anbei das Reporting gemäß § 3.3 Marktplatzpartnervertrag für den Zeitraum <strong>{PERIOD}</strong>.</p>',
+    '{MONTH_TABLE}',
+    '<p>Provisionsrelevante Händler: {SELLER_COUNT}. Die Provision versteht sich zzgl. Umsatzsteuer (§ 3.2). Die Aufschlüsselung je Händler und Monat liegt als CSV bei.</p>',
+    '<p>{DECLARATION}<br/>Bestätigt von: {CONFIRMED_BY} am {CONFIRMED_AT}</p>',
+    '<p>Mit freundlichen Grüßen<br/>Andertal</p>',
+  ].join('\n'),
+}
+
+/** Creates the Flows entry once (active = automatic quarterly send). Superuser edits win. */
+async function seedJtlReportFlow(client) {
+  const ex = await client.query(`SELECT id FROM admin_hub_flows WHERE trigger_key = $1 LIMIT 1`, [REPORT_TRIGGER])
+  if (ex.rows[0]) return { created: false }
+  const fr = await client.query(
+    `INSERT INTO admin_hub_flows (name, trigger_key, status, audience) VALUES ($1, $2, 'active', 'admin') RETURNING id`,
+    ['JTL-Partner-Reporting — an JTL', REPORT_TRIGGER],
+  )
+  await client.query(
+    `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, email_subject, email_body, email_i18n, email_attachments)
+     VALUES ($1, 0, 'send_email', $2, $3, $4::jsonb, '[]'::jsonb)`,
+    [fr.rows[0].id, REPORT_FLOW_TEMPLATE.subject, REPORT_FLOW_TEMPLATE.body, JSON.stringify({ de: REPORT_FLOW_TEMPLATE })],
+  )
+  return { created: true, flow_id: fr.rows[0].id }
+}
+
 function reportEmail(report, { confirmedBy, confirmedAt }) {
   const subject = `Andertal JTL Partner Reporting ${report.period}`
   const at = new Date(confirmedAt).toISOString()
@@ -327,7 +453,9 @@ function reportEmail(report, { confirmedBy, confirmedAt }) {
 async function sendJtlReport(client, { period, confirmAccuracy, actor, dryRun = false, recipient = null, trigger = 'manual', cc = null, sendEmail }) {
   if (confirmAccuracy !== true) throw Object.assign(new Error('Accuracy declaration (§ 3.3 ii) required'), { status: 400 })
   if (typeof sendEmail !== 'function') throw new Error('sendEmail missing')
-  const to = dryRun ? String(recipient || '').trim() : reportRecipient()
+  const settings = await getReportSettings(client)
+  const to = dryRun ? String(recipient || '').trim() : settings.recipient
+  if (!dryRun && cc == null) cc = settings.cc
   if (!to) throw Object.assign(new Error('Recipient required for a dry run'), { status: 400 })
   const report = await jtlQuarterReport(client, period)
   const confirmedAt = new Date()
@@ -336,7 +464,9 @@ async function sendJtlReport(client, { period, confirmAccuracy, actor, dryRun = 
      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING *`,
     [report.period, to, dryRun, trigger, actor, confirmedAt, JSON.stringify(report.totals)],
   )).rows[0]
-  const mail = reportEmail(report, { confirmedBy: actor, confirmedAt })
+  const flow = await loadReportFlow(client)
+  const mail = renderReportFromTemplate(report, flow?.step, { confirmedBy: actor, confirmedAt })
+    || reportEmail(report, { confirmedBy: actor, confirmedAt })
   try {
     const sent = await sendEmail({
       to,
@@ -363,26 +493,49 @@ async function sendJtlReport(client, { period, confirmAccuracy, actor, dryRun = 
 }
 
 /**
- * Auto job (daily): on the 4th–5th of the month after a quarter (Europe/Berlin) sends the previous
- * quarter's report if it was not sent yet. Opt-in via JTL_REPORT_AUTO_SEND=true so dev / test
- * environments never e-mail JTL. Copy to JTL_REPORT_CC (superuser).
+ * Auto job (every 6 h): from the 4th of the month after a quarter (Europe/Berlin; §3.3 deadline is
+ * the 5th) the previous quarter's report is sent once to the recipient from Billing → JTL. On while
+ * the Flows entry "JTL-Partner-Reporting" is active; JTL_REPORT_AUTO_SEND=false forces it off
+ * (e.g. local dev on a shared DB), =true forces it on. Missed or failed sends are retried until the
+ * 10th. One sender at a time (advisory lock).
  */
 async function autoSendDueJtlReport(client, { now = new Date(), sendEmail }) {
-  if (String(process.env.JTL_REPORT_AUTO_SEND || '').toLowerCase() !== 'true') return { skipped: 'disabled' }
-  const { m, d } = berlinParts(now)
-  if (![1, 4, 7, 10].includes(m) || d < 4 || d > 5) return { skipped: 'not_due' }
+  const env = String(process.env.JTL_REPORT_AUTO_SEND || '').toLowerCase()
+  if (env === 'false') return { skipped: 'disabled' }
+  let flow = null
+  if (env !== 'true') {
+    flow = await loadReportFlow(client)
+    if (!flow || flow.status !== 'active') return { skipped: 'disabled' }
+  }
+  const { y, m, d } = berlinParts(now)
+  if (![1, 4, 7, 10].includes(m) || d < 4 || d > 10) return { skipped: 'not_due' }
+  // A flow created inside the window (e.g. the first deploy) must not e-mail JTL by surprise:
+  // that quarter is sent manually from Billing → JTL; automation starts with the next one.
+  if (flow?.created_at && new Date(flow.created_at) > new Date(Date.UTC(y, m - 1, 3, 22))) return { skipped: 'flow_created_in_window' }
   const period = previousQuarter(now)
-  const done = (await client.query(
-    `SELECT 1 FROM jtl_report_sends WHERE period_quarter = $1 AND NOT dry_run AND status = 'sent' LIMIT 1`, [period],
-  )).rows.length
-  if (done) return { skipped: 'already_sent', period }
-  const res = await sendJtlReport(client, {
-    period, confirmAccuracy: true, actor: 'system:auto (Andertal)', trigger: 'auto', cc: process.env.JTL_REPORT_CC || null, sendEmail,
-  })
-  return { sent: true, period, send_id: res.send.id }
+  const lock = (await client.query('SELECT pg_try_advisory_lock(74211302) AS ok')).rows[0]
+  if (!lock?.ok) return { skipped: 'locked' }
+  try {
+    const done = (await client.query(
+      `SELECT 1 FROM jtl_report_sends WHERE period_quarter = $1 AND NOT dry_run AND status = 'sent' LIMIT 1`, [period],
+    )).rows.length
+    if (done) return { skipped: 'already_sent', period }
+    const res = await sendJtlReport(client, {
+      period, confirmAccuracy: true, actor: 'system:auto (Andertal)', trigger: 'auto', sendEmail,
+    })
+    return { sent: true, period, send_id: res.send.id }
+  } finally {
+    await client.query('SELECT pg_advisory_unlock(74211302)').catch(() => {})
+  }
 }
 
 module.exports = {
+  getReportSettings,
+  saveReportSettings,
+  loadReportFlow,
+  renderReportFromTemplate,
+  seedJtlReportFlow,
+  REPORT_FLOW_TEMPLATE,
   sendJtlReport,
   autoSendDueJtlReport,
   reportEmail,

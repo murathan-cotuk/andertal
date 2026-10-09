@@ -266,6 +266,8 @@ Connector olmadan da manuel attributed satıcılar için reporting çalışabilm
 | `JTL_SCX_API_BASE` | sandbox | canlı: `https://scx.api.jtl-software.com` |
 | `JTL_SCX_POLL` | açık | `off` = arka plan döngüsü kapalı |
 
+**Rapor e-postası (2026-10-09 güncel)**: Flows → "JTL-Partner-Reporting — an JTL" (aktif = otomatik, metin orada); alıcı/CC Billing → JTL'de; `JTL_REPORT_AUTO_SEND` yalnız zorlama (`false`/`true`). Pencere: ayın 4–10'u (Frist 5'i). §9b'deki env tablosunun `JTL_REPORT_AUTO_SEND` / `JTL_REPORTING_EMAIL` / `JTL_REPORT_CC` satırları artık yalnız varsayılan/zorlama.
+
 ## 10. Claude’a son emir
 
 1. Bu dosyayı ve `docs/CONNECTOR.md` + `docs/JTL/JTL Contract.pdf` (Marktplatzpartnervertrag §3–4) oku.  

@@ -52,6 +52,11 @@ const CUSTOMER_ACCOUNT_TRIGGERS = [
   'favorite_price_drop',
 ]
 
+/** Scheduled platform reports (not order/customer events): run by their own job, template from Flows. */
+const PARTNER_TRIGGERS = [
+  'jtl_partner_quarterly_report',
+]
+
 const ORDER_SET = new Set(ORDER_TRIGGERS)
 const MESSAGE_SET = new Set(MESSAGE_TRIGGERS)
 const SUPPORT_CASE_SET = new Set(SUPPORT_CASE_TRIGGERS)
@@ -64,6 +69,7 @@ const ALL_FLOW_TRIGGER_KEYS = new Set([
   ...SUPPORT_CASE_TRIGGERS,
   ...SELLER_LIFECYCLE_TRIGGERS,
   ...CUSTOMER_ACCOUNT_TRIGGERS,
+  ...PARTNER_TRIGGERS,
 ])
 
 /** Distinctive copy from inbox / seller-support templates — must never send on checkout. */
@@ -129,6 +135,7 @@ module.exports = {
   SUPPORT_CASE_TRIGGERS,
   SELLER_LIFECYCLE_TRIGGERS,
   CUSTOMER_ACCOUNT_TRIGGERS,
+  PARTNER_TRIGGERS,
   ALL_FLOW_TRIGGER_KEYS,
   ORDER_SET,
   MESSAGE_SET,

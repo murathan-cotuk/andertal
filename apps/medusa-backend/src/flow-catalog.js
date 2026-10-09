@@ -44,9 +44,11 @@ const FLOW_DEFINITIONS = [
   { trigger_key: 'customer_birthday', audience: 'customer', category: 'marketing', name: 'Kunden-Geburtstag' },
   { trigger_key: 'favorite_low_stock', audience: 'customer', category: 'marketing', name: 'Merkzettel — wenig Bestand' },
   { trigger_key: 'favorite_price_drop', audience: 'customer', category: 'marketing', name: 'Merkzettel — Preis gesenkt' },
+
+  { trigger_key: 'jtl_partner_quarterly_report', audience: 'admin', category: 'partner', name: 'JTL-Partner-Reporting — an JTL' },
 ]
 
-const CATEGORY_ORDER = ['orders', 'returns', 'inbox', 'sellerSupport', 'supportCases', 'sellerAccount', 'customers', 'marketing']
+const CATEGORY_ORDER = ['orders', 'returns', 'inbox', 'sellerSupport', 'supportCases', 'sellerAccount', 'customers', 'marketing', 'partner']
 
 function defKey(triggerKey, audience) {
   return `${String(triggerKey || '').trim()}::${String(audience || 'customer').trim() || 'customer'}`
