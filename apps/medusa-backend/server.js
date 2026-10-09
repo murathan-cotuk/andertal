@@ -27,6 +27,29 @@ if (process.env.SENTRY_DSN) {
   })
 }
 
+// ── Crash guards ────────────────────────────────────────────────────────────
+// Most routes open a raw pg.Client per request. When Postgres drops a connection that is
+// still open (maintenance, idle cut, network blip) the client emits 'error'; with no listener
+// Node throws it as an uncaught exception and the whole service exits with status 1.
+// Give every client a default listener so a dropped connection only fails that request.
+try {
+  const pg = require('pg')
+  const origConnect = pg.Client.prototype.connect
+  pg.Client.prototype.connect = function patchedConnect(...args) {
+    if (this.listenerCount('error') === 0) {
+      this.on('error', (err) => {
+        console.error('[pg] client connection error (ignored, request-scoped):', err?.code || '', err?.message || err)
+      })
+    }
+    return origConnect.apply(this, args)
+  }
+} catch (_) {}
+// A forgotten `await`/`.catch()` somewhere must not take the whole API down.
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] unhandledRejection:', reason?.stack || reason?.message || reason)
+  try { if (process.env.SENTRY_DSN) Sentry.captureException(reason) } catch (_) {}
+})
+
 // TypeScript API routes (src/api) yüklenebilsin
 try {
   require('ts-node/register')

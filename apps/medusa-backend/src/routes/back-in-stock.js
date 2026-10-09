@@ -132,6 +132,17 @@ const adminHubBackInStockSubscribersGET = async (req, res) => {
  * product that currently has stock is by definition "restocked since they asked", send once,
  * stamp notified_at so it never fires twice for the same subscription.
  */
+function isUndeliverableTestAddress(email) {
+  const e = String(email || '').trim().toLowerCase()
+  if (!e || !e.includes('@')) return true
+  const domain = e.split('@').pop() || ''
+  return (
+    domain === 'example.com' || domain === 'example.org' || domain === 'example.net' ||
+    domain === 'test' || domain === 'localhost' ||
+    domain.endsWith('.example') || domain.endsWith('.invalid') || domain.endsWith('.localhost')
+  )
+}
+
 async function runBackInStockWatcher() {
   const client = getDbClient()
   if (!client) return
@@ -148,6 +159,12 @@ async function runBackInStockWatcher() {
     `)
     for (const row of due.rows || []) {
       try {
+        // Test/placeholder addresses (example.com etc.) are rejected by the mail provider on
+        // every run — stamp them once so the watcher stops retrying them forever.
+        if (isUndeliverableTestAddress(row.email)) {
+          await client.query('UPDATE store_back_in_stock_subscriptions SET notified_at = now() WHERE id = $1', [row.id])
+          continue
+        }
         const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
         const deTitle = meta.translations?.de?.title || row.title || 'Produkt'
         const handle = meta.translations?.de?.handle || row.handle
