@@ -954,6 +954,7 @@ async function sendImmediateStepsForFlow({
   }
   let idx = 0
   let emailsSent = 0
+  let alreadyHandled = 0
   let cumulativeWaitHours = 0
   while (idx < steps.length) {
     const s = steps[idx]
@@ -997,7 +998,10 @@ async function sendImmediateStepsForFlow({
       metadata: { templateLocale, step_type: s.step_type, channel: 'email', dedupe_key: dedupeKey || undefined },
     })
     if (reserved?.skip) {
-      logger.info(
+      alreadyHandled += 1
+      // Periodic scans (abandoned_cart etc.) revisit the same recipients every run, so this is
+      // routine — keep it at debug instead of flooding the production log.
+      logger.debug(
         `[flow-automation] idempotent-skip trigger=${triggerKey} flow=${flowId} step=${stepOrder} status=${reserved.status} attempts=${reserved.attempts} recipient=${String(toEmail || '').toLowerCase()}`,
       )
       idx += 1
@@ -1172,7 +1176,9 @@ async function sendImmediateStepsForFlow({
     idx += 1
   }
   const hasSendEmailStep = steps.some((x) => x.step_type === 'send_email')
-  if (hasSendEmailStep && emailsSent === 0) {
+  // Only warn when something actually failed to go out, not when every email step was
+  // already sent on an earlier run.
+  if (hasSendEmailStep && emailsSent === 0 && alreadyHandled === 0) {
     logger.warn(
       `[flow-automation] order ${orderId} flow ${flowId}: send_email step(s) but nothing delivered (empty templates, missing From, or wait > 0 before any email).`,
     )
