@@ -10,6 +10,14 @@ Test komutları (apps/medusa-backend):
 
 ---
 
+## 2026-10-09 — JTL Faz E: SCX connector (JTL-Wawi ↔ Andertal)
+
+- Backend `src/connectors/`: SCX istemcisi, eşleyici, servis (olaylar / sipariş aktarımı / stok imleci / signup-update / kanal kurulumu), runtime (60 sn poller, advisory lock, yalnız `JTL_SCX_CHANNEL_REFRESH_TOKEN` varsa), şema tabloları. Route `src/routes/erp-connectors.js`; `server.js`'te şema + router + poller. `createAdminHubProductDb` ve `resolveMediaSegForSellerId` dışa açıldı.
+- Ürünler mevcut ürün kapılarından geçer; yayınlanamayan teklif sebebiyle Wawi'ye `listing-failed` döner. Varyasyonlar aile üyesi ürün olur (Faz 3 family_link). Görseller kendi depomuza kopyalanır.
+- Para: satıcı iptali/iadesi mevcut settlement yollarıyla (actor = satıcı, idempotency anahtarlı). JTL %1 satıcı ledger'ına yazılmaz; signup → `attributeJtlSeller`, unlink → `endJtlAttribution`.
+- Sellercentral: `/integrations/jtl` (+ `/signup`, `/update`), Ayarlar → Entegrasyonlar'da JTL-Wawi girişi; middleware giriş yönlendirmesi sorgu parametresini koruyor.
+- Test: `client` (4), `mapper` (4), `service` (9, gerçek PG); ilgili paket 74/74 geçti. Sandbox ile canlı doğrulama kullanıcıda (`docs/jtl.md` §9c).
+
 ## 2026-10-08 — Faz 3 adım 4 (kod): aile modu varsayılan; yapılamayanlar
 
 - SC "Varyant olarak birleştir" artık varsayılan olarak aile oluşturur (`legacyFold: false`): backend yeni-çatı yoluna aile modu eklendi (çatı ürünü yok; seçilen ürünler satılabilir kalır, PDP'de varyant). Aile handle'ı benzersiz ek alır (benzersiz indeks). Kendi varyantı olan ürün aileye eklenemez (400, açıklamalı). Eski katlama `legacyFold: true` ile hâlâ mümkün.

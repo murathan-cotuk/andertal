@@ -2080,6 +2080,12 @@ async function start() {
         } catch (jtlErr) {
           console.error('[jtl-partner] schema migration failed:', jtlErr && jtlErr.message)
         }
+        // ERP connectors (JTL SCX, docs/CONNECTOR.md): connections, offer links, event log, order exports.
+        try {
+          await require('./src/connectors/schema').ensureConnectorSchema(client)
+        } catch (erpErr) {
+          console.error('[erp] connector schema migration failed:', erpErr && erpErr.message)
+        }
         // Checkout stock deduction / restore markers (src/inventory.js).
         try {
           await require('./src/inventory').ensureInventorySchema(client)
@@ -2564,6 +2570,11 @@ async function start() {
       createJtlPartnerRouter.runJtlAutoReport().catch((e) => console.warn('[jtl-partner] auto report:', e && e.message))
       setInterval(() => createJtlPartnerRouter.runJtlAutoReport().catch((e) => console.warn('[jtl-partner] auto report:', e && e.message)), 6 * 60 * 60 * 1000)
     }, 90 * 1000)
+    // JTL-Wawi via SCX (JTL Faz E): seller sign-up/update + superuser setup; background poller
+    // (events → orders → stock) only when JTL_SCX_CHANNEL_REFRESH_TOKEN is set and JTL_SCX_POLL != off.
+    const createErpConnectorsRouter = require('./src/routes/erp-connectors')
+    httpApp.use('/', createErpConnectorsRouter({ loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform }))
+    require('./src/connectors/scx/runtime').startScxPoller({ loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform })
 
     // --- Seller Health (Analysen → Seller Health): scoring engine + config + history: src/routes/seller-health.js ---
     const createSellerHealthRouter = require('./src/routes/seller-health')

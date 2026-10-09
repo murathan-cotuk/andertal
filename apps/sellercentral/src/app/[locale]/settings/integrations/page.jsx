@@ -777,6 +777,16 @@ function LogoMarketing() {
   );
 }
 
+function LogoErp() {
+  return (
+    <AccordionLogoWrap bg="#e8f0fe">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9m11 0l-3-3m3 3l-3 3" stroke="#1a56db" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
 function LogoDocuments() {
   return (
     <AccordionLogoWrap bg="#fcebd5">
@@ -1003,6 +1013,21 @@ function IntegrationsSettingsPageInner() {
             onFindInStore={() => setHubTab("store")}
             onConfigureApp={() => setHubTab("installed")}
           />
+        </IntegrationsAccordion>
+
+        <IntegrationsAccordion
+          sectionId="erp"
+          open={openSection === "erp"}
+          onToggle={() => toggleSection("erp")}
+          logo={<LogoErp />}
+          title="JTL-Wawi"
+          subtitle={lt(locale, "ERP connection via JTL marketplace interface (SCX) — products, stock, orders", "JTL pazaryeri arayüzü (SCX) ile ERP bağlantısı — ürün, stok, sipariş", "Connexion ERP via l'interface marketplace JTL (SCX) — produits, stock, commandes", "Conexión ERP mediante la interfaz de marketplace de JTL (SCX) — productos, stock, pedidos", "Collegamento ERP tramite l'interfaccia marketplace JTL (SCX) — prodotti, stock, ordini", "ERP-Anbindung über die JTL-Marktplatzschnittstelle (SCX) — Artikel, Bestand, Bestellungen")}
+        >
+          <InlineStack>
+            <Button onClick={() => router.push("/integrations/jtl")}>
+              {lt(locale, "Open JTL connection", "JTL bağlantısını aç", "Ouvrir la connexion JTL", "Abrir conexión JTL", "Apri collegamento JTL", "JTL-Anbindung öffnen")}
+            </Button>
+          </InlineStack>
         </IntegrationsAccordion>
 
         {isSuperuser && (

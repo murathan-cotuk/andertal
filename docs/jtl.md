@@ -140,11 +140,11 @@ Mümkünse Flow editöründe şablon görünsün; yoksa kod şablonu + ayar yete
 **Bu fazın detayı:** `docs/CONNECTOR.md` — yeniden yazma.  
 JTL.md açısından minimum “ortaklık için hazır” checklist:
 
-- [ ] Env: `JTL_SCX_*`
-- [ ] Signup/update URL’leri Partner Portal’da
-- [ ] Seller bağlanınca attribution (Faz A)
-- [ ] Ürün/stok/sipariş sync (CONNECTOR task list)
-- [ ] ASLA JTL DB direct
+- [x] Env: `JTL_SCX_*` (kod hazır; değerleri kullanıcı girer — bkz. §9c)
+- [ ] Signup/update URL’leri Partner Portal’da (kullanıcı)
+- [x] Seller bağlanınca attribution (Faz A) — `signupSeller` → `attributeJtlSeller(source 'jtl_scx_signup')`; `Channel.Unlinked` → `endJtlAttribution`
+- [x] Ürün/stok/sipariş sync (kod + testler; sandbox doğrulaması kullanıcıda)
+- [x] ASLA JTL DB direct — yalnız SCX Channel API
 
 Connector olmadan da manuel attributed satıcılar için reporting çalışabilmeli (superuser işaret).
 
@@ -184,10 +184,10 @@ Connector olmadan da manuel attributed satıcılar için reporting çalışabilm
 - [x] D4 Flow/cron kaydı Content→Flows veya worker
 
 ### Connector (paralel, CONNECTOR.md)
-- [ ] E0 Token/env + signup URL
-- [ ] E1 SCX auth + poller
-- [ ] E2 Signup → attribution hook
-- [ ] E3 Product/order sync (CONNECTOR fazları)
+- [ ] E0 Token/env + signup URL (kullanıcı: Partner Portal + Render env)
+- [x] E1 SCX auth + poller
+- [x] E2 Signup → attribution hook
+- [x] E3 Product/order sync (CONNECTOR fazları) — sandbox testi bekliyor
 
 ### Doğrulama
 - [x] Eligible satıcı 100 € → accrual 1 €
@@ -244,6 +244,27 @@ Connector olmadan da manuel attributed satıcılar için reporting çalışabilm
 | `JTL_REPORT_CC` | — | superuser kopya adresi |
 | `RESEND_API_KEY` / `SMTP_*` | mevcut | e-posta sağlayıcı (yoksa gönderim yalnız loglanır) |
 | `JTL_SCX_*` | — | Faz E (CONNECTOR.md) |
+
+## 9c. Uygulama durumu (2026-10-09, Faz E — SCX connector)
+
+- Kod (`apps/medusa-backend/src/connectors/`): `scx/client.js` (auth token önbelleği, 401'de tek yeniden auth, 429/503 Retry-After), `scx/mapper.js` (offer → ürün, varyasyon → aile üyesi ürün; sipariş → SCX order), `scx/service.js` (olaylar, sipariş aktarımı, stok imleci, signup/update, kanal kurulumu), `scx/runtime.js` (prod bağlamı + 60 sn'lik poller, PG advisory lock), `schema.js` (`erp_connections`, `erp_offer_links`, `erp_event_log`, `erp_order_exports`, `erp_sync_state`). API: `src/routes/erp-connectors.js`.
+- Akış: Wawi → `Seller:Offer.New/Update` → ürün (tüm kapılar: hazır olma, GPSR, EAN, marka) → `listed` (shop URL) veya `listing-failed` (sebep). Görseller 7 gün sonra süresi dolduğu için kendi depomuza kopyalanır. Fiyat/stok/End olayları; ayrıca `stock-updates/all` imleci. Ödenmiş siparişler (bağlantı tarihinden sonra) satıcı payı başına `A<sipariş no>` olarak SCX'e (ACCEPTED, PAID, adresli, kargo satırı); Andertal'de iptal → `CANCELED_BY_BUYER`. Wawi'den kargo → `recordShipment` + sipariş takip + `order_shipped` flow; satıcı iptali → mevcut iade yolları (`refundSellerLines` / settlement) + `CANCELED_BY_SELLER`; Wawi iadesi → settlement refund + `refund/processing-result`. Para her zaman backend/settlement'tan; JTL %1 satıcı ledger'ına yazılmaz.
+- Olaylar idempotent (`erp_event_log`); işlenemeyen olay ack edilmez → SCX yeniden gönderir (en çok 10).
+- Sellercentral: `/[locale]/integrations/jtl` (durum + reddedilen teklifler), `/signup?session=…`, `/update?session=…` (yalnız hesap sahibi; açık onay butonu). Ayarlar → Entegrasyonlar'da JTL-Wawi girişi. Giriş yönlendirmesi artık sorgu parametresini korur (`?session=` kaybolmaz).
+- Superuser API: `GET /admin-hub/v1/erp/jtl/status`, `POST /admin-hub/v1/erp/jtl/setup` (`{categories:true}` ile kategori ağacı da gönderilir), `POST /admin-hub/v1/erp/jtl/run` (tek döngü).
+- Testler: `src/connectors/scx/{client,mapper,service}.test.js` (service: gerçek PG + sahte SCX/Stripe, 9 senaryo).
+
+**Kullanıcıda kalanlar (sırayla)**
+1. JTL Partner Portal'da kanal: Signup URL `https://sellercentral.andertal.com/de/integrations/jtl/signup`, Update URL `https://sellercentral.andertal.com/de/integrations/jtl/update`.
+2. Render env: `JTL_SCX_CHANNEL_REFRESH_TOKEN` (sandbox), `JTL_SCX_API_BASE` (boş = sandbox; canlıda `https://scx.api.jtl-software.com`), gerekirse `JTL_SCX_POLL=off`.
+3. Superuser: `POST /admin-hub/v1/erp/jtl/setup` (fiyat tipi `ANDERTAL_B2C` + GPSR öznitelikleri; kategoriler için `{ "categories": true }`).
+4. Sandbox'ta Wawi ile uçtan uca: bağlan → teklif → sipariş → kargo → iade.
+
+| Değişken | Varsayılan | Not |
+|---|---|---|
+| `JTL_SCX_CHANNEL_REFRESH_TOKEN` | — | yoksa connector tamamen kapalı (poller başlamaz, bağlan butonu pasif) |
+| `JTL_SCX_API_BASE` | sandbox | canlı: `https://scx.api.jtl-software.com` |
+| `JTL_SCX_POLL` | açık | `off` = arka plan döngüsü kapalı |
 
 ## 10. Claude’a son emir
 

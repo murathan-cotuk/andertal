@@ -822,3 +822,4 @@ module.exports.useS3 = useS3
 module.exports.GENERIC_IMAGE_MAX_EDGE = GENERIC_IMAGE_MAX_EDGE
 module.exports.GENERIC_IMAGE_SKIP_MIMETYPES = GENERIC_IMAGE_SKIP_MIMETYPES
 module.exports.processProductImageToSquareWebp = processProductImageToSquareWebp
+module.exports.resolveMediaSegForSellerId = resolveMediaSegForSellerId

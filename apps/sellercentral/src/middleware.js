@@ -48,7 +48,8 @@ function getLoginUrl(request, pathname) {
     ? rawLocale
     : routing.defaultLocale || "en";
   const loginUrl = new URL(`/${locale}/login`, request.url);
-  loginUrl.searchParams.set("next", pathname);
+  // Keep the query (e.g. JTL-Wawi sign-up ?session=…) so the deep link survives the login.
+  loginUrl.searchParams.set("next", pathname + (request.nextUrl?.search || ""));
   return loginUrl;
 }
 

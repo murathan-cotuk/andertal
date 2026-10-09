@@ -88,7 +88,7 @@ Kullanıcı talimatı: Faz A–D sırayla; `docs/CONNECTOR.md` ile bağlantılı
 
 Kaynak: `docs/designs/claude-frontendfigma/Andertal Shop-SC Konsept.pdf`.
 - [x] Shop sayfaları tek tek PDF ile karşılaştırılır; yapılmış / eksik listesi `ILERLEME.md`'ye yazılır. (Kural: istenmeden shop görünümü değiştirilmez — eksikler PDF'teki tasarım olduğu için uygulanır, sonucu kullanıcıya listelenir.)
-- [~] PDF'in sonundaki Sellercentral tasarımları uygulanır — kabuk, liste şablonu (Envanter/Bestellungen/Retouren), Bestellung detayı, ürün/varyant başlıkları, Übersicht + Berichte yapıldı; kalan: mobil SC (s36/37), ürün düzenlemede dil hapları + pazar fiyat tablosu + yapışkan kaydet çubuğu (onay gerekir), PDP teslim tarihi tahmini (veri modeli). Ayrıntı: ILERLEME.md (yoğun tablo tercihi korunur).
+- [x] PDF'in sonundaki Sellercentral tasarımları uygulanır — kabuk, liste şablonu, detaylar, Übersicht + Berichte, mobil SC (s36/37), dil hapları + pazar fiyat tablosu (s34), yapışkan kaydet çubuğu, PDP teslim tarihi. Bilinçli olarak yapılmayan: s34 sekmesiz tek sayfa düzeni (onay gerekir). Top bar/sidebar eski koyu tasarımda (kullanıcı tercihi).
 
 ## Fonksiyon bazlı iyileştirme programı (2026-10-07)
 
@@ -115,14 +115,16 @@ A alanı (tamamlandı 2026-10-07):
 
 Açık küçük işler (A alanında kapatılır):
 - [x] Eski `_catalog_approval_pending` bayrağı ürünü artık shop'tan gizlemez; ürün GET'te otomatik temizlenir. Katalog önerileri superuser ziline (`catalog_proposals` / Metaobjekte) düşer.
-- [ ] Second-nav arka plan düzeltmesi (`ShopHeader.jsx`, chrome cover yalnızca kaydırınca) push bekliyor.
+- [x] Second-nav arka plan düzeltmesi (`ShopHeader.jsx`) — push'landı (129209d).
 
 Stripe Dashboard işleri (bölüm 6) bilinçli olarak programın sonuna bırakıldı.
 
 ## JTL pazar yeri ortaklığı
 
 Sözleşme imzalandı (`docs/JTL/JTL Contract.pdf`). Uygulama talimatı ve task listesi: [`docs/jtl.md`](jtl.md). Teknik SCX connector: [`docs/CONNECTOR.md`](CONNECTOR.md).
-- [ ] Attribution + %1 accrual + Billing → JTL tab (superuser) + çeyreklik e-posta raporu (`docs/jtl.md` Faz A–D).
+- [x] Attribution + %1 accrual + Billing → JTL tab (superuser) + çeyreklik e-posta raporu (`docs/jtl.md` Faz A–D) — 2026-10-07.
+- [x] JTL Faz E — SCX connector (`docs/CONNECTOR.md`, durum `docs/jtl.md` §9c): kod + testler 2026-10-09.
+- [ ] JTL Faz E canlıya alma (kullanıcı): Partner Portal signup/update URL'leri, `JTL_SCX_CHANNEL_REFRESH_TOKEN`, superuser `erp/jtl/setup`, sandbox uçtan uca test.
 
 ## Bu listeye alınmayanlar
 
