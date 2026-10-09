@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Text, TextField, Select, Banner, BlockStack, InlineStack } from "@shopify/polaris";
+import { Text, TextField, Select, Banner, BlockStack, InlineStack, Button } from "@shopify/polaris";
 import { ProductSectionHeading, ProductSectionRule } from "@/components/products/ProductSection";
 import InfoIconTooltip from "@/components/InfoIconTooltip";
 
@@ -20,6 +20,83 @@ const ALREADY_RENDERED_KEYS = new Set([
 function pickI18n(dict, locale) {
   if (!dict || typeof dict !== "object") return "";
   return dict[locale] || dict.en || dict.de || "";
+}
+
+const FILE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/svg+xml,application/pdf,.pdf,.png,.jpg,.jpeg,.webp,.gif,.svg";
+const isPdfUrl = (u) => /\.pdf(\?|#|$)/i.test(String(u || ""));
+const isImageUrl = (u) => /\.(png|jpe?g|webp|gif|svg|avif)(\?|#|$)/i.test(String(u || ""));
+
+/**
+ * Document/image field (energy label, CE declaration, safety data sheet …): paste a URL
+ * (.png/.jpg/.pdf …) or upload an image/PDF file — the upload is stored in the seller's media
+ * library and its URL saved in the field.
+ */
+function ComplianceFileField({ client, locale, labelNode, isRequired, value, error, onChange }) {
+  const inputRef = React.useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const t = (o) => pickI18n(o, locale);
+  const base = (client && client.baseURL) || "";
+  const href = value && value.startsWith("/") ? `${base}${value}` : value;
+
+  const onPick = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const okType = /^image\//.test(file.type) || file.type === "application/pdf" || /\.(pdf|png|jpe?g|webp|gif|svg)$/i.test(file.name);
+    if (!okType) {
+      setUploadError(t({ de: "Nur Bilder (PNG, JPG, WebP, GIF, SVG) oder PDF.", en: "Images (PNG, JPG, WebP, GIF, SVG) or PDF only.", tr: "Yalnızca görsel (PNG, JPG, WebP, GIF, SVG) veya PDF.", fr: "Images (PNG, JPG, WebP, GIF, SVG) ou PDF uniquement.", es: "Solo imágenes (PNG, JPG, WebP, GIF, SVG) o PDF.", it: "Solo immagini (PNG, JPG, WebP, GIF, SVG) o PDF." }));
+      return;
+    }
+    setBusy(true);
+    setUploadError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await client.uploadMedia(fd, { purpose: "document" });
+      const url = r?.url || r?.media?.url;
+      if (!url) throw new Error("Upload failed");
+      onChange(url);
+    } catch (err) {
+      setUploadError(err?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <BlockStack gap="150">
+      <TextField
+        label={labelNode}
+        requiredIndicator={isRequired}
+        value={value}
+        onChange={onChange}
+        error={error || uploadError || undefined}
+        placeholder="https://… (.png, .jpg, .pdf)"
+        autoComplete="off"
+        connectedRight={
+          <Button loading={busy} onClick={() => inputRef.current && inputRef.current.click()}>
+            {t({ de: "Datei hochladen", en: "Upload file", tr: "Dosya yükle", fr: "Téléverser", es: "Subir archivo", it: "Carica file" })}
+          </Button>
+        }
+        helpText={t({ de: "URL einfügen oder Bild/PDF hochladen.", en: "Paste a URL or upload an image/PDF.", tr: "URL yapıştırın veya görsel/PDF yükleyin.", fr: "Collez une URL ou téléversez une image/un PDF.", es: "Pega una URL o sube una imagen/PDF.", it: "Incolla un URL o carica un'immagine/PDF." })}
+      />
+      <input ref={inputRef} type="file" accept={FILE_ACCEPT} style={{ display: "none" }} onChange={onPick} />
+      {value ? (
+        <InlineStack gap="300" blockAlign="center">
+          {isImageUrl(value) ? (
+            <img src={href} alt="" style={{ maxHeight: 96, maxWidth: 160, border: "1px solid var(--p-color-border-secondary)", borderRadius: 4, objectFit: "contain" }} />
+          ) : null}
+          <a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13 }}>
+            {isPdfUrl(value) ? "PDF ↗" : t({ de: "Öffnen ↗", en: "Open ↗", tr: "Aç ↗", fr: "Ouvrir ↗", es: "Abrir ↗", it: "Apri ↗" })}
+          </a>
+          <Button variant="plain" tone="critical" onClick={() => onChange("")}>
+            {t({ de: "Entfernen", en: "Remove", tr: "Kaldır", fr: "Retirer", es: "Quitar", it: "Rimuovi" })}
+          </Button>
+        </InlineStack>
+      ) : null}
+    </BlockStack>
+  );
 }
 
 /**
@@ -239,6 +316,21 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
                     value={value}
                     onChange={(v) => updateMeta(key, v || null)}
                     error={missingError}
+                  />
+                );
+              }
+
+              if (def.type === "file") {
+                return (
+                  <ComplianceFileField
+                    key={key}
+                    client={client}
+                    locale={locale}
+                    labelNode={labelNode}
+                    isRequired={isRequired}
+                    value={value}
+                    error={missingError}
+                    onChange={(v) => updateMeta(key, v || null)}
                   />
                 );
               }

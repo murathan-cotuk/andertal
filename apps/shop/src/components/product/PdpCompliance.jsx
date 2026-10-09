@@ -139,7 +139,18 @@ export function EnergyClassBadge({ meta, variantMeta, locale, resolveUrl = (u) =
             </div>
             <div style={{ padding: 18, overflowY: "auto" }}>
               {tab === "class" && (
-                info.label
+                info.label && /\.pdf(\?|#|$)/i.test(info.label)
+                  ? (
+                    <div>
+                      <object data={resolveUrl(info.label)} type="application/pdf" aria-label={`${L(tx.classAria, locale)} ${info.grade}`} style={{ display: "block", width: "100%", height: "65vh", border: "none" }}>
+                        <p style={{ fontSize: 14 }}>{L(tx.classAria, locale)}: <strong>{info.grade}</strong></p>
+                      </object>
+                      <p style={{ fontSize: 13, marginTop: 8 }}>
+                        <a href={resolveUrl(info.label)} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb" }}>PDF ↗</a>
+                      </p>
+                    </div>
+                  )
+                  : info.label
                   ? <img src={resolveUrl(info.label)} alt={`${L(tx.classAria, locale)} ${info.grade}`} style={{ display: "block", maxWidth: "100%", maxHeight: "70vh", margin: "0 auto" }} />
                   : <p style={{ fontSize: 14 }}>{L(tx.classAria, locale)}: <strong>{info.grade}</strong> ({ends.top}–{ends.bottom})</p>
               )}

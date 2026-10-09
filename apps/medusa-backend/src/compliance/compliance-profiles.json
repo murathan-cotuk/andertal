@@ -493,21 +493,21 @@
     "energy_label_image": {
       "type": "file",
       "label_i18n": {
-        "de": "Energielabel (Bild/URL)",
-        "en": "Energy label (image/URL)",
-        "tr": "Enerji etiketi (görsel/URL)",
-        "fr": "Étiquette énergie (image/URL)",
-        "es": "Etiqueta energética (imagen/URL)",
-        "it": "Etichetta energetica (immagine/URL)"
+        "de": "Energielabel (Bild/PDF/URL)",
+        "en": "Energy label (image/PDF/URL)",
+        "tr": "Enerji etiketi (görsel/PDF/URL)",
+        "fr": "Étiquette énergie (image/PDF/URL)",
+        "es": "Etiqueta energética (imagen/PDF/URL)",
+        "it": "Etichetta energetica (immagine/PDF/URL)"
       },
       "validation_regex": null,
       "help_text_i18n": {
-        "de": "Das offizielle Energielabel als Bild (PNG/JPG) oder Link – am einfachsten aus EPREL herunterladen. Wird im Shop beim Klick auf den Effizienzklassen-Pfeil angezeigt.",
-        "en": "The official energy label as an image (PNG/JPG) or link – easiest to download from EPREL. Shown in the shop when the efficiency-class arrow is clicked.",
-        "tr": "Resmi enerji etiketi görsel (PNG/JPG) veya bağlantı olarak – en kolayı EPREL'den indirmek. Mağazada verimlilik sınıfı okuna tıklanınca gösterilir.",
-        "fr": "L'étiquette énergie officielle en image (PNG/JPG) ou lien – le plus simple : la télécharger depuis EPREL. Affichée dans la boutique au clic sur la flèche de classe.",
-        "es": "La etiqueta energética oficial como imagen (PNG/JPG) o enlace; lo más fácil es descargarla de EPREL. Se muestra en la tienda al hacer clic en la flecha de clase.",
-        "it": "L'etichetta energetica ufficiale come immagine (PNG/JPG) o link – più semplice scaricarla da EPREL. Mostrata nel negozio cliccando sulla freccia della classe."
+        "de": "Das offizielle Energielabel als Bild (PNG/JPG/PDF) oder Link – am einfachsten aus EPREL herunterladen. Wird im Shop beim Klick auf den Effizienzklassen-Pfeil angezeigt.",
+        "en": "The official energy label as an image (PNG/JPG/PDF) or link – easiest to download from EPREL. Shown in the shop when the efficiency-class arrow is clicked.",
+        "tr": "Resmi enerji etiketi görsel (PNG/JPG/PDF) veya bağlantı olarak – en kolayı EPREL'den indirmek. Mağazada verimlilik sınıfı okuna tıklanınca gösterilir.",
+        "fr": "L'étiquette énergie officielle en image (PNG/JPG/PDF) ou lien – le plus simple : la télécharger depuis EPREL. Affichée dans la boutique au clic sur la flèche de classe.",
+        "es": "La etiqueta energética oficial como imagen (PNG/JPG/PDF) o enlace; lo más fácil es descargarla de EPREL. Se muestra en la tienda al hacer clic en la flecha de clase.",
+        "it": "L'etichetta energetica ufficiale come immagine (PNG/JPG/PDF) o link – più semplice scaricarla da EPREL. Mostrata nel negozio cliccando sulla freccia della classe."
       },
       "group": "eprel"
     },
