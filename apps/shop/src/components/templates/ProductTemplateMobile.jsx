@@ -42,12 +42,6 @@ const Lightbox = dynamic(
   () => import("@/components/Lightbox").then((m) => ({ default: m.Lightbox })),
   { ssr: false }
 );
-// TrustpilotTrustBox injects a third-party script — defer until after hydration.
-const TrustpilotTrustBox = dynamic(() => import("@/components/TrustpilotTrustBox"), { ssr: false });
-const TrustpilotWordmark  = dynamic(
-  () => import("@/components/TrustpilotTrustBox").then((m) => ({ default: m.TrustpilotWordmark })),
-  { ssr: false }
-);
 import ProductPurchaseActions from "@/components/ui/ProductPurchaseActions";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import ProductImageBadges from "@/components/ProductImageBadges";
@@ -2341,20 +2335,9 @@ export default function ProductTemplateMobile() {
       )}
 
       <ReviewsSection id="reviews">
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-          <SectionTitle style={{ marginBottom: 0 }}>
-            Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
-          </SectionTitle>
-          <a
-            href="https://www.trustpilot.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "none" }}
-            aria-label="Trustpilot"
-          >
-            <TrustpilotWordmark />
-          </a>
-        </div>
+        <SectionTitle>
+          Kundenbewertungen {reviewCount > 0 && `(${reviewCount})`}
+        </SectionTitle>
         <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
           {tp("reviewsDisclaimer")}
         </p>
@@ -2395,10 +2378,6 @@ export default function ProductTemplateMobile() {
         ) : reviewCount === 0 ? (
           <p className="text-gray-500 text-sm mt-2">{tp("noReviews")}</p>
         ) : null}
-        <TrustpilotTrustBox
-          locale={{ de: "de-DE", en: "en-US", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" }[locale] || "en-US"}
-          style={{ marginTop: 28 }}
-        />
       </ReviewsSection>
 
       <PdpShippingReturns shipping={shippingDisplay} returnDays={returnDays} returnCost={returnCost} sellerName={effectiveStoreName} />
